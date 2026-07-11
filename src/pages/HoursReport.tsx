@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getNormalWorkingHours } from "@/lib/workingHours";
+import { projectLabel } from "@/lib/projectLabel";
 
 interface TimeEntry {
   id: string;
@@ -47,8 +48,9 @@ interface Profile {
 interface Project {
   id: string;
   name: string;
-  adresse?: string;
-  plz?: string;
+  adresse?: string | null;
+  plz?: string | null;
+  customers?: { strasse: string | null; ort: string | null } | null;
 }
 
 const monthNames = [
@@ -119,7 +121,7 @@ export default function HoursReport() {
   };
 
   const fetchProjects = async () => {
-    const { data } = await supabase.from("projects").select("id, name, adresse, plz");
+    const { data } = await supabase.from("projects").select("id, name, adresse, plz, customers(strasse, ort)");
     if (data) {
       const projectMap: Record<string, Project> = {};
       data.forEach((p) => {
@@ -695,7 +697,7 @@ export default function HoursReport() {
                               const ortText = entry.location_type === "baustelle" ? "Baustelle" : entry.location_type === "werkstatt" ? "Werkstatt" : "";
                               const projektName = entry.taetigkeit === "Urlaub" || entry.taetigkeit === "Krankenstand"
                                 ? entry.taetigkeit
-                                : (project?.name || "");
+                                : (project ? projectLabel(project) : "");
                               const isFirstEntry = entryIndex === 0;
                               const isLastEntry = entryIndex === dayEntries.length - 1;
 

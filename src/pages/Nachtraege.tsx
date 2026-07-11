@@ -5,7 +5,6 @@ import {
   Search,
   FileSignature,
   Package,
-  Trash2,
   CheckCircle2,
   PenLine,
   Loader2,
@@ -36,7 +35,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SignaturePad } from "@/components/SignaturePad";
-import { MaterialPicker, type CatalogMaterial } from "@/components/MaterialPicker";
+import {
+  NachtragDialog,
+  MaterialRowsEditor,
+  MaterialSummaryList,
+  materialRowsToInserts,
+  type MaterialRow,
+  type ProjectOption,
+} from "@/components/NachtragDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -70,20 +76,6 @@ type Nachtrag = {
   nachtrag_materials: NachtragMaterial[];
 };
 
-type ProjectOption = {
-  id: string;
-  name: string;
-  adresse: string | null;
-};
-
-type MaterialRow = {
-  key: number;
-  material: string;
-  menge: string;
-  einheit: string;
-  material_id: string | null;
-};
-
 const projectLabel = (n: Nachtrag) => {
   const p = n.projects;
   if (!p) return "Unbekanntes Projekt";
@@ -111,91 +103,6 @@ const StatusBadge = ({ nachtrag }: { nachtrag: Nachtrag }) => {
   );
 };
 
-const MaterialRowsEditor = ({
-  rows,
-  setRows,
-  nextKey,
-}: {
-  rows: MaterialRow[];
-  setRows: (rows: MaterialRow[]) => void;
-  nextKey: () => number;
-}) => {
-  const updateRow = (key: number, patch: Partial<MaterialRow>) => {
-    setRows(rows.map((r) => (r.key === key ? { ...r, ...patch } : r)));
-  };
-
-  const addFromCatalog = (m: CatalogMaterial) => {
-    setRows([
-      ...rows,
-      { key: nextKey(), material: m.name, menge: "", einheit: m.einheit ?? "", material_id: m.id },
-    ]);
-  };
-
-  const addFreeRow = () => {
-    setRows([...rows, { key: nextKey(), material: "", menge: "", einheit: "", material_id: null }]);
-  };
-
-  return (
-    <div className="space-y-2">
-      <Label>Material</Label>
-      {rows.map((row) => (
-        <div key={row.key} className="flex items-center gap-2">
-          <Input
-            placeholder="Material"
-            value={row.material}
-            onChange={(e) => updateRow(row.key, { material: e.target.value, material_id: null })}
-            className="flex-1 min-w-0"
-          />
-          <Input
-            placeholder="Menge"
-            value={row.menge}
-            onChange={(e) => updateRow(row.key, { menge: e.target.value })}
-            className="w-16 sm:w-20 shrink-0"
-          />
-          <Input
-            placeholder="Einh."
-            value={row.einheit}
-            onChange={(e) => updateRow(row.key, { einheit: e.target.value })}
-            className="w-14 sm:w-20 shrink-0"
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="shrink-0 text-destructive hover:text-destructive"
-            onClick={() => setRows(rows.filter((r) => r.key !== row.key))}
-            title="Zeile entfernen"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      ))}
-      <div className="flex flex-wrap gap-2 pt-1">
-        <MaterialPicker onSelect={addFromCatalog} triggerLabel="Material aus Katalog" />
-        <Button type="button" variant="outline" size="sm" onClick={addFreeRow} className="gap-1">
-          <Plus className="h-4 w-4" />
-          Zeile hinzufügen
-        </Button>
-      </div>
-    </div>
-  );
-};
-
-const MaterialSummaryList = ({ materials }: { materials: NachtragMaterial[] }) => (
-  <ul className="text-sm space-y-1">
-    {materials.map((m) => (
-      <li key={m.id} className="flex gap-2">
-        <span>•</span>
-        <span>
-          {[m.menge, m.einheit].filter(Boolean).join(" ")}
-          {(m.menge || m.einheit) && " "}
-          {m.material}
-        </span>
-      </li>
-    ))}
-  </ul>
-);
-
 const Nachtraege = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -207,12 +114,9 @@ const Nachtraege = () => {
   const [search, setSearch] = useState("");
   const [projectFilter, setProjectFilter] = useState<string>("alle");
 
-  // Create dialog
+  // Create dialog (shared NachtragDialog)
   const [createOpen, setCreateOpen] = useState(false);
   const [createProjectId, setCreateProjectId] = useState<string>("");
-  const [createTitel, setCreateTitel] = useState("");
-  const [createBeschreibung, setCreateBeschreibung] = useState("");
-  const [createMaterials, setCreateMaterials] = useState<MaterialRow[]>([]);
   const [saving, setSaving] = useState(false);
 
   // Detail dialog
@@ -321,65 +225,7 @@ const Nachtraege = () => {
 
   const openCreate = () => {
     setCreateProjectId(projectFilter !== "alle" ? projectFilter : "");
-    setCreateTitel("");
-    setCreateBeschreibung("");
-    setCreateMaterials([]);
     setCreateOpen(true);
-  };
-
-  const materialRowsToInserts = (nachtragId: string, rows: MaterialRow[]) =>
-    rows
-      .filter((r) => r.material.trim())
-      .map((r) => ({
-        nachtrag_id: nachtragId,
-        material: r.material.trim(),
-        menge: r.menge.trim() || null,
-        einheit: r.einheit.trim() || null,
-        material_id: r.material_id,
-      }));
-
-  const handleCreate = async () => {
-    if (!createProjectId) {
-      toast({ variant: "destructive", title: "Fehler", description: "Bitte ein Projekt auswählen" });
-      return;
-    }
-    if (!createTitel.trim()) {
-      toast({ variant: "destructive", title: "Fehler", description: "Bitte einen Titel eingeben" });
-      return;
-    }
-    setSaving(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data: inserted, error } = await supabase
-        .from("nachtraege")
-        .insert({
-          project_id: createProjectId,
-          titel: createTitel.trim(),
-          beschreibung: createBeschreibung.trim() || null,
-          created_by: user?.id ?? null,
-        })
-        .select("id")
-        .single();
-      if (error) throw error;
-
-      const materialInserts = materialRowsToInserts(inserted.id, createMaterials);
-      if (materialInserts.length > 0) {
-        const { error: matError } = await supabase.from("nachtrag_materials").insert(materialInserts);
-        if (matError) throw matError;
-      }
-
-      toast({ title: "Nachtrag angelegt", description: createTitel.trim() });
-      setCreateOpen(false);
-      await fetchNachtraege();
-    } catch (error: unknown) {
-      toast({
-        variant: "destructive",
-        title: "Fehler",
-        description: error instanceof Error ? error.message : "Nachtrag konnte nicht gespeichert werden",
-      });
-    } finally {
-      setSaving(false);
-    }
   };
 
   const openDetail = (n: Nachtrag) => {
@@ -399,15 +245,32 @@ const Nachtraege = () => {
     setSignature(null);
   };
 
-  const saveEdits = async (nachtragId: string) => {
-    const { error } = await supabase
+  // Meldung + Refetch, wenn der Nachtrag zwischenzeitlich unterschrieben wurde (Race)
+  const handleConcurrentlySigned = async () => {
+    toast({
+      variant: "destructive",
+      title: "Fehler",
+      description:
+        "Nachtrag wurde zwischenzeitlich unterschrieben und kann nicht mehr geändert werden",
+    });
+    setDetail(null);
+    await fetchNachtraege();
+  };
+
+  // Speichert Änderungen nur, solange der Nachtrag noch offen ist.
+  // Gibt false zurück, wenn er zwischenzeitlich unterschrieben wurde.
+  const saveEdits = async (nachtragId: string): Promise<boolean> => {
+    const { data, error } = await supabase
       .from("nachtraege")
       .update({
         titel: editTitel.trim(),
         beschreibung: editBeschreibung.trim() || null,
       })
-      .eq("id", nachtragId);
+      .eq("id", nachtragId)
+      .eq("status", "offen")
+      .select("id");
     if (error) throw error;
+    if (!data || data.length === 0) return false;
 
     const { error: delError } = await supabase
       .from("nachtrag_materials")
@@ -420,6 +283,7 @@ const Nachtraege = () => {
       const { error: matError } = await supabase.from("nachtrag_materials").insert(materialInserts);
       if (matError) throw matError;
     }
+    return true;
   };
 
   const handleSaveEdits = async () => {
@@ -430,7 +294,11 @@ const Nachtraege = () => {
     }
     setSaving(true);
     try {
-      await saveEdits(detail.id);
+      const saved = await saveEdits(detail.id);
+      if (!saved) {
+        await handleConcurrentlySigned();
+        return;
+      }
       toast({ title: "Nachtrag gespeichert", description: editTitel.trim() });
       setDetail(null);
       await fetchNachtraege();
@@ -458,16 +326,26 @@ const Nachtraege = () => {
     setSigning(true);
     try {
       // Persist any pending edits first, then the signature
-      await saveEdits(detail.id);
-      const { error } = await supabase
+      const saved = await saveEdits(detail.id);
+      if (!saved) {
+        await handleConcurrentlySigned();
+        return;
+      }
+      const { data: signedRows, error } = await supabase
         .from("nachtraege")
         .update({
           unterschrift_kunde: signature,
           status: "unterschrieben",
           unterschrieben_am: new Date().toISOString(),
         })
-        .eq("id", detail.id);
+        .eq("id", detail.id)
+        .eq("status", "offen")
+        .select("id");
       if (error) throw error;
+      if (!signedRows || signedRows.length === 0) {
+        await handleConcurrentlySigned();
+        return;
+      }
 
       toast({
         title: "Nachtrag unterschrieben",
@@ -597,57 +475,13 @@ const Nachtraege = () => {
         )}
       </main>
 
-      {/* Create dialog */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Neuer Nachtrag</DialogTitle>
-            <DialogDescription>
-              Zusatzauftrag für ein Projekt erfassen
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label>Projekt *</Label>
-              <Select value={createProjectId} onValueChange={setCreateProjectId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Projekt auswählen" />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.adresse ? `${p.name} – ${p.adresse}` : p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="nachtrag-titel">Titel *</Label>
-              <Input
-                id="nachtrag-titel"
-                value={createTitel}
-                onChange={(e) => setCreateTitel(e.target.value)}
-                placeholder="z. B. Zusätzliche Steckdosen Wohnzimmer"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="nachtrag-beschreibung">Beschreibung</Label>
-              <Textarea
-                id="nachtrag-beschreibung"
-                value={createBeschreibung}
-                onChange={(e) => setCreateBeschreibung(e.target.value)}
-                placeholder="Beschreibung der zusätzlichen Arbeiten..."
-                rows={4}
-              />
-            </div>
-            <MaterialRowsEditor rows={createMaterials} setRows={setCreateMaterials} nextKey={nextKey} />
-            <Button onClick={handleCreate} disabled={saving} className="w-full">
-              {saving ? "Speichern..." : "Nachtrag anlegen"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Create dialog (shared) */}
+      <NachtragDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        projectId={createProjectId || undefined}
+        onCreated={fetchNachtraege}
+      />
 
       {/* Detail / edit / sign dialog */}
       <Dialog open={!!detail} onOpenChange={(open) => !open && setDetail(null)}>

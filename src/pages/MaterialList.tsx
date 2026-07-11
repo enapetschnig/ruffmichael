@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/PageHeader";
+import { projectLabel } from "@/lib/projectLabel";
 
 type MaterialEntry = {
   id: string;
@@ -74,12 +75,12 @@ const MaterialList = () => {
 
     const { data } = await supabase
       .from("projects")
-      .select("name")
+      .select("name, adresse, customers(strasse, ort)")
       .eq("id", projectId)
       .single();
 
     if (data) {
-      setProjectName(data.name);
+      setProjectName(projectLabel(data));
     }
   };
 
@@ -225,7 +226,7 @@ const MaterialList = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <PageHeader title={`${projectName} - Materialliste`} backPath={`/projects/${projectId}`} />
+      <PageHeader title={`${projectName} – Materialliste`} backPath={`/projects/${projectId}`} />
 
       <main className="container mx-auto px-4 py-6 max-w-3xl">
         <Card>

@@ -14,7 +14,7 @@ const AI_BASE = "https://api.openai.com/v1";
 
 type Mode = "time" | "disturbance" | "auto";
 
-interface ContextProject { id: string; name: string; plz: string | null; }
+interface ContextProject { id: string; name: string; plz: string | null; adresse?: string | null; }
 interface ContextEmployee { id: string; name: string; }
 interface ContextCustomer { name: string; email: string | null; adresse: string | null; telefon: string | null; }
 
@@ -80,7 +80,7 @@ async function transcribe(audio: Blob, mime: string): Promise<string> {
 
 function buildSystemPrompt(p: RequestPayload): string {
   const projectsList = (p.context?.projects ?? [])
-    .map((pr) => `- id=${pr.id} | ${pr.name}${pr.plz ? ` (PLZ ${pr.plz})` : ""}`)
+    .map((pr) => `- id=${pr.id} | ${pr.name}${pr.adresse ? ` | ${pr.adresse}` : ""}${pr.plz ? ` (PLZ ${pr.plz})` : ""}`)
     .join("\n") || "(keine)";
   const employeesList = (p.context?.employees ?? [])
     .map((e) => `- id=${e.id} | ${e.name}`).join("\n") || "(keine)";
@@ -119,7 +119,8 @@ REGELN DATUM:
 - "letzten Freitag" = letzter Freitag vor heute
 - Format: YYYY-MM-DD
 
-VERFUEGBARE PROJEKTE (nutze exakte id bei Match):
+VERFUEGBARE PROJEKTE (nutze exakte id bei Match; Match auch ueber die Adresse moeglich,
+z.B. "die Baustelle in der Bahnhofstrasse" oder der Kundenname im Projektnamen):
 ${projectsList}
 
 VERFUEGBARE MITARBEITER (nutze exakte id bei Match, mit Toleranz fuer Vor-/Spitznamen):

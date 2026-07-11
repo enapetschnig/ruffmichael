@@ -391,7 +391,7 @@ export default function Index() {
               <div className="h-12 w-12 rounded-lg bg-accent/10 flex items-center justify-center">
                 <Package className="h-6 w-6 text-accent" />
               </div>
-              <CardTitle className="text-lg sm:text-xl">Material</CardTitle>
+              <CardTitle className="text-lg sm:text-xl">Materialkatalog</CardTitle>
               <CardDescription className="text-sm">
                 Materialdatenbank durchsuchen
               </CardDescription>

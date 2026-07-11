@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { projectLabel } from "@/lib/projectLabel";
 
 type TimeEntry = {
   id: string;
@@ -21,7 +22,12 @@ type TimeEntry = {
   pause_minutes: number | null;
   location_type: string;
   notizen: string | null;
-  projects: { name: string; plz: string } | null;
+  projects: {
+    name: string;
+    plz: string | null;
+    adresse: string | null;
+    customers: { strasse: string | null; ort: string | null } | null;
+  } | null;
   project_id: string | null;
 };
 
@@ -54,7 +60,7 @@ const MyHours = () => {
 
     const { data } = await supabase
       .from("time_entries")
-      .select("*, projects(name, plz)")
+      .select("*, projects(name, plz, adresse, customers(strasse, ort))")
       .eq("user_id", user.id)
       .gte("datum", startDate)
       .lte("datum", endDate)
@@ -146,7 +152,7 @@ const MyHours = () => {
         start_time: editingEntry.start_time,
         end_time: editingEntry.end_time,
         pause_minutes: editingEntry.pause_minutes || 0,
-        notizen: editingEntry.notizen,
+        notizen: editingEntry.notizen?.trim() || null,
         stunden: Math.max(0, calculatedHours),
       })
       .eq("id", editingEntry.id);
@@ -295,8 +301,13 @@ const MyHours = () => {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell>{entry.projects?.name || '-'}</TableCell>
-                        <TableCell>{entry.taetigkeit}</TableCell>
+                        <TableCell>{entry.projects ? projectLabel(entry.projects) : '-'}</TableCell>
+                        <TableCell>
+                          <div>{entry.taetigkeit}</div>
+                          {entry.notizen && (
+                            <div className="text-xs text-muted-foreground">{entry.notizen}</div>
+                          )}
+                        </TableCell>
                         <TableCell className="text-center">
                           {entry.start_time?.substring(0, 5) || '-'}
                         </TableCell>
@@ -462,6 +473,18 @@ const MyHours = () => {
                     Freitags ist die Normalarbeitszeit 7:30-12:30 Uhr. Nachmittag nur bei Überstunden.
                   </p>
                 )}
+              </div>
+
+              {/* Notizen */}
+              <div>
+                <Label htmlFor="edit-notizen">Notizen</Label>
+                <Textarea
+                  id="edit-notizen"
+                  value={editingEntry.notizen || ''}
+                  onChange={(e) => setEditingEntry({...editingEntry, notizen: e.target.value})}
+                  placeholder="Zusätzliche Bemerkungen..."
+                  rows={2}
+                />
               </div>
 
               <div className="flex gap-2 pt-4">

@@ -10,6 +10,7 @@ import { Download, Calendar, Briefcase, MapPin, Wrench } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
 import { format, parseISO } from "date-fns";
 import { de } from "date-fns/locale";
+import { projectAddress, projectLabel } from "@/lib/projectLabel";
 
 interface DetailedProjectEntry {
   id: string;
@@ -29,7 +30,9 @@ interface DetailedProjectEntry {
 interface Project {
   id: string;
   name: string;
-  plz?: string;
+  plz?: string | null;
+  adresse?: string | null;
+  customers?: { strasse: string | null; ort: string | null } | null;
 }
 
 export default function ProjectHoursReport() {
@@ -92,7 +95,7 @@ export default function ProjectHoursReport() {
   const fetchProjects = async () => {
     const { data, error } = await supabase
       .from("projects")
-      .select("id, name, plz")
+      .select("id, name, plz, adresse, customers(strasse, ort)")
       .order("name");
 
     if (data && !error) {
@@ -207,7 +210,7 @@ export default function ProjectHoursReport() {
 
     const worksheetData: any[][] = [
       ["Projektzeiterfassung", selectedProject.name],
-      ["PLZ:", selectedProject.plz || "k.A."],
+      ["Adresse:", projectAddress(selectedProject) || "k.A."],
       ["Zeitraum:", `${startDate} bis ${endDate}`],
       [],
       ["Datum", "Start", "Ende", "Pause", "Stunden", "Mitarbeiter", "Tätigkeit", "Ort"],
@@ -319,7 +322,7 @@ export default function ProjectHoursReport() {
                 <SelectContent>
                   {projects.map((project) => (
                     <SelectItem key={project.id} value={project.id}>
-                      {project.name} {project.plz && `(${project.plz})`}
+                      {projectLabel(project)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -397,7 +400,7 @@ export default function ProjectHoursReport() {
               <CardContent>
                 <p className="text-xl font-bold">{selectedProject.name}</p>
                 <p className="text-sm text-muted-foreground">
-                  PLZ: {selectedProject.plz || "k.A."}
+                  {projectAddress(selectedProject) || "Keine Adresse hinterlegt"}
                 </p>
               </CardContent>
             </Card>

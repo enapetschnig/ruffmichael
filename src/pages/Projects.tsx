@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { QuickUploadDialog } from "@/components/QuickUploadDialog";
 import { MobilePhotoCapture } from "@/components/MobilePhotoCapture";
@@ -494,56 +494,37 @@ const Projects = () => {
     setSavingStatuses(false);
   };
 
-  // Ampel-Punkt inkl. Dropdown zum Statuswechsel neben dem Projektnamen
+  // Echte Ampel vor dem Projektnamen: alle Farben nebeneinander,
+  // ein Klick auf eine Farbe setzt den Status direkt.
+  // Klick auf die aktive Farbe entfernt den Status wieder.
   const renderAmpel = (project: Project) => (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          onClick={(e) => e.stopPropagation()}
-          title={project.project_statuses?.name ?? "Kein Status"}
-          aria-label={`Projektstatus: ${project.project_statuses?.name ?? "Kein Status"}`}
-          className="shrink-0 rounded-full p-0.5 hover:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          {project.project_statuses ? (
-            <span
-              className="block h-3.5 w-3.5 rounded-full"
-              style={{ backgroundColor: project.project_statuses.color }}
-            />
-          ) : (
-            <span className="block h-3.5 w-3.5 rounded-full border-2 border-muted-foreground/50" />
-          )}
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="start"
-        className="w-64 bg-background z-50"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {statuses.map((s) => (
-          <DropdownMenuItem
+    <span
+      className="flex items-center gap-1.5 shrink-0 rounded-full border bg-background/90 px-2 py-1.5"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {statuses.map((s) => {
+        const active = project.status_id === s.id;
+        return (
+          <button
             key={s.id}
+            type="button"
+            title={active ? `${s.name} – Klick zum Entfernen` : s.name}
+            aria-label={`Status setzen: ${s.name}`}
+            aria-pressed={active}
             onClick={(e) => {
               e.stopPropagation();
-              handleSetProjectAmpel(project.id, s.id);
+              handleSetProjectAmpel(project.id, active ? null : s.id);
             }}
-          >
-            <span className="mr-2 h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
-            {s.name}
-          </DropdownMenuItem>
-        ))}
-        {statuses.length > 0 && <DropdownMenuSeparator />}
-        <DropdownMenuItem
-          onClick={(e) => {
-            e.stopPropagation();
-            handleSetProjectAmpel(project.id, null);
-          }}
-        >
-          <span className="mr-2 h-3 w-3 rounded-full border-2 border-muted-foreground/50 shrink-0" />
-          Kein Status
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+            className={
+              active
+                ? "h-5 w-5 rounded-full ring-2 ring-offset-1 ring-foreground/50 transition-all focus:outline-none focus-visible:ring-ring"
+                : "h-3.5 w-3.5 rounded-full opacity-50 hover:opacity-100 hover:scale-125 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            }
+            style={{ backgroundColor: s.color }}
+          />
+        );
+      })}
+    </span>
   );
 
   // Karten-Einfärbung je nach Ampel-Status
@@ -562,8 +543,29 @@ const Projects = () => {
     setDeleting(true);
 
     const { id, name } = projectToDelete;
-    
+
     try {
+      // Unterschriebene Nachträge blockieren das Löschen (rechtlich relevante Dokumente)
+      const { count: signedCount, error: signedError } = await supabase
+        .from('nachtraege')
+        .select('id', { count: 'exact', head: true })
+        .eq('project_id', id)
+        .eq('status', 'unterschrieben');
+
+      if (signedError) throw signedError;
+
+      if ((signedCount ?? 0) > 0) {
+        toast({
+          title: "Löschen nicht möglich",
+          description:
+            signedCount === 1
+              ? "Projekt hat 1 unterschriebenen Nachtrag und kann nicht gelöscht werden"
+              : `Projekt hat ${signedCount} unterschriebene Nachträge und kann nicht gelöscht werden`,
+          variant: "destructive",
+        });
+        return;
+      }
+
       // Delete all files from storage buckets
       const buckets = ['project-plans', 'project-reports', 'project-materials', 'project-photos'];
       
@@ -828,7 +830,7 @@ const Projects = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="projekt-status">Status</Label>
+                    <Label htmlFor="projekt-status">Ampel-Status</Label>
                     <Select value={newProjectStatusId} onValueChange={setNewProjectStatusId}>
                       <SelectTrigger id="projekt-status">
                         <SelectValue placeholder="Status wählen" />
@@ -1163,10 +1165,17 @@ const Projects = () => {
                           <div className="flex-1 min-w-0">
                             <CardTitle className="text-base sm:text-xl flex items-center gap-2 min-w-0">
                               {renderAmpel(project)}
-                              <span className="truncate">{project.name}</span>
+                              <span className="truncate">
+                                {project.name}
+                                {projectDisplayAddress(project) && (
+                                  <span className="font-normal text-muted-foreground text-sm sm:text-base"> – {projectDisplayAddress(project)}</span>
+                                )}
+                              </span>
                             </CardTitle>
-                            {project.adresse && (
-                              <CardDescription className="text-xs sm:text-sm">{project.adresse}</CardDescription>
+                            {project.customers && (
+                              <CardDescription className="text-xs sm:text-sm">
+                                Kunde: {customerDisplayName(project.customers)}
+                              </CardDescription>
                             )}
                           </div>
                         </div>
@@ -1308,7 +1317,7 @@ const Projects = () => {
             <AlertDialogDescription>
               Bist du sicher, dass du das Projekt <strong>{projectToDelete?.name}</strong> unwiderruflich löschen möchtest?
               <br /><br />
-              <span className="text-destructive font-semibold">Alle zugehörigen Dateien, Dokumente und Zuweisungen werden ebenfalls gelöscht.</span>
+              <span className="text-destructive font-semibold">Alle zugehörigen Dateien, Dokumente, Ordner, Nachträge und Zuweisungen des Projekts werden ebenfalls gelöscht.</span>
               <br /><br />
               Diese Aktion kann nicht rückgängig gemacht werden!
             </AlertDialogDescription>

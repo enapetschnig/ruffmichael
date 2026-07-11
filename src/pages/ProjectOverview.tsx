@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import { projectLabel } from "@/lib/projectLabel";
 
 type ProjectNachtrag = {
   id: string;
@@ -98,12 +99,12 @@ const ProjectOverview = () => {
     
     const { data } = await supabase
       .from("projects")
-      .select("name")
+      .select("name, adresse, customers(strasse, ort)")
       .eq("id", projectId)
       .single();
 
     if (data) {
-      setProjectName(data.name);
+      setProjectName(projectLabel(data));
     }
   };
 

@@ -1147,17 +1147,23 @@ export default function Admin() {
             {/* Tab 3: Stunden */}
             <TabsContent value="stunden">
               <ScrollArea className="h-[500px]">
-                <div className="p-4">
+                <div className="p-4 space-y-2">
                   <Button
                     onClick={() => {
-                      if (selectedEmployee) {
-                        navigate(`/hours-report?employeeId=${selectedEmployee.id}`);
+                      if (selectedEmployee?.user_id) {
+                        navigate(`/hours-report?employee=${selectedEmployee.user_id}`);
                       }
                     }}
                     className="w-full"
+                    disabled={!selectedEmployee?.user_id}
                   >
                     Zur Stundenauswertung
                   </Button>
+                  {!selectedEmployee?.user_id && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      Dieser Mitarbeiter hat noch keinen Benutzer-Account
+                    </p>
+                  )}
                 </div>
               </ScrollArea>
             </TabsContent>

@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/PageHeader";
 import { FileViewer } from "@/components/FileViewer";
+import { projectLabel, type ProjectLike } from "@/lib/projectLabel";
 
 type DocumentType = "plans" | "reports" | "photos" | "chef";
 
@@ -38,7 +39,7 @@ const ProjectDetail = () => {
   const [files, setFiles] = useState<StorageFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [projectName, setProjectName] = useState("");
+  const [project, setProject] = useState<ProjectLike | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [viewerState, setViewerState] = useState<{
     open: boolean;
@@ -52,7 +53,7 @@ const ProjectDetail = () => {
   useEffect(() => {
     if (projectId && type) {
       checkAdminStatus();
-      fetchProjectName();
+      fetchProject();
       fetchFiles();
     }
   }, [projectId, type]);
@@ -108,17 +109,17 @@ const ProjectDetail = () => {
     setIsAdmin(data?.role === "administrator");
   };
 
-  const fetchProjectName = async () => {
+  const fetchProject = async () => {
     if (!projectId) return;
-    
+
     const { data } = await supabase
       .from("projects")
-      .select("name")
+      .select("name, adresse, customers(strasse, ort)")
       .eq("id", projectId)
       .single();
 
     if (data) {
-      setProjectName(data.name);
+      setProject(data as unknown as ProjectLike);
     }
   };
 
@@ -225,7 +226,10 @@ const ProjectDetail = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <PageHeader title={`${projectName} - ${titleMap[type]}`} backPath="/projects" />
+      <PageHeader
+        title={project ? `${projectLabel(project)} – ${titleMap[type]}` : titleMap[type]}
+        backPath={`/projects/${projectId}`}
+      />
 
       <main className="container mx-auto px-4 py-6 max-w-5xl">
         <Card>

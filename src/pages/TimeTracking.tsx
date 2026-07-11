@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { Clock, Plus, AlertTriangle, CheckCircle2, Calendar, Sun, Trash2, Users, FolderOpen, ChevronDown, FilePlus2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Switch } from "@/components/ui/switch";
 import { MultiEmployeeSelect } from "@/components/MultiEmployeeSelect";
+import { NachtragDialog } from "@/components/NachtragDialog";
 import { PageHeader } from "@/components/PageHeader";
 import { VoiceInputButton, type VoiceContext } from "@/components/VoiceInputButton";
 import { resolveTimeBlocks } from "@/lib/timeBlockResolver";
@@ -93,7 +93,6 @@ const absenceSpansLunch = (start: string, end: string): boolean => {
 };
 
 const TimeTracking = () => {
-  const navigate = useNavigate();
   const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -108,6 +107,10 @@ const TimeTracking = () => {
 
   const [existingDayEntries, setExistingDayEntries] = useState<ExistingEntry[]>([]);
   const [loadingDayEntries, setLoadingDayEntries] = useState(false);
+
+  // Nachtrag-Dialog (direkt aus der Zeiterfassung, ohne Seitenwechsel)
+  const [showNachtragDialog, setShowNachtragDialog] = useState(false);
+  const [nachtragProjectId, setNachtragProjectId] = useState<string>("");
   
   const [showAbsenceDialog, setShowAbsenceDialog] = useState(false);
   
@@ -132,7 +135,7 @@ const TimeTracking = () => {
   useEffect(() => {
     try { localStorage.setItem("tt.projectListOpen", projectListOpen ? "1" : "0"); } catch { /* ignore */ }
   }, [projectListOpen]);
-  const openProjects = projects.filter((p) => p.status !== "abgeschlossen").sort((a, b) => a.name.localeCompare(b.name));
+  const openProjects = [...projects].sort((a, b) => a.name.localeCompare(b.name));
   const [voiceEmployees, setVoiceEmployees] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
@@ -146,7 +149,12 @@ const TimeTracking = () => {
   }, []);
 
   const voiceContext: VoiceContext = {
-    projects: projects.map((p) => ({ id: p.id, name: p.name, plz: p.plz })),
+    projects: projects.map((p) => ({
+      id: p.id,
+      name: p.name,
+      plz: p.plz,
+      adresse: p.customers ? [p.customers.strasse, p.customers.ort].filter(Boolean).join(", ") || null : null,
+    })),
     employees: voiceEmployees,
     coreHours: { start: "07:00", end: "16:00", pauseStart: "12:00", pauseEnd: "12:30" },
   };
@@ -1094,7 +1102,10 @@ const TimeTracking = () => {
                             variant="outline"
                             size="sm"
                             className="w-full gap-2"
-                            onClick={() => navigate(`/nachtraege?new=1&project=${block.projectId}`)}
+                            onClick={() => {
+                              setNachtragProjectId(block.projectId);
+                              setShowNachtragDialog(true);
+                            }}
                           >
                             <FilePlus2 className="h-4 w-4" />
                             Nachtrag zu diesem Projekt erstellen
@@ -1473,6 +1484,13 @@ const TimeTracking = () => {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Nachtrag Dialog */}
+        <NachtragDialog
+          open={showNachtragDialog}
+          onOpenChange={setShowNachtragDialog}
+          projectId={nachtragProjectId || undefined}
+        />
 
       </div>
     </div>

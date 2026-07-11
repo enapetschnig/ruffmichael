@@ -52,6 +52,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { projectLabel } from "@/lib/projectLabel";
 
 const BUCKET = "project-files";
 const PLACEHOLDER_NAMES = [".keep", ".emptyFolderPlaceholder"];
@@ -118,7 +119,7 @@ const ProjectFiles = () => {
     const fetchProjectName = async () => {
       const { data, error } = await supabase
         .from("projects")
-        .select("name")
+        .select("name, adresse, customers(strasse, ort)")
         .eq("id", projectId)
         .single();
 
@@ -129,7 +130,7 @@ const ProjectFiles = () => {
           description: "Projekt konnte nicht geladen werden.",
         });
       } else if (data) {
-        setProjectName(data.name);
+        setProjectName(projectLabel(data));
       }
     };
     fetchProjectName();

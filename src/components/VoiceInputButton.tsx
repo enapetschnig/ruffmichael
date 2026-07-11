@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 export type VoiceMode = "time" | "disturbance" | "auto";
 
 export interface VoiceContext {
-  projects?: { id: string; name: string; plz: string | null }[];
+  projects?: { id: string; name: string; plz: string | null; adresse?: string | null }[];
   employees?: { id: string; name: string }[];
   customers?: { name: string; email: string | null; adresse: string | null; telefon: string | null }[];
   materials?: string[];
@@ -69,7 +69,7 @@ export const VoiceInputButton = ({
   context,
   existingData,
   onResult,
-  label = "Per Sprache ausfuellen",
+  label = "Per Sprache ausfüllen",
   compact = false,
   maxSeconds = 180,
 }: Props) => {
@@ -155,7 +155,7 @@ export const VoiceInputButton = ({
       rafRef.current = requestAnimationFrame(tick);
     } catch (err) {
       cleanup();
-      const message = err instanceof Error ? err.message : "Mikrofon nicht verfuegbar";
+      const message = err instanceof Error ? err.message : "Mikrofon nicht verfügbar";
       setState({ kind: "error", message });
       toast({
         variant: "destructive",
@@ -190,7 +190,7 @@ export const VoiceInputButton = ({
       setState({ kind: "processing", stage: "Ich transkribiere..." });
       const audioBase64 = await blobToBase64(blob);
 
-      setState({ kind: "processing", stage: "Ich verstehe und fuelle aus..." });
+      setState({ kind: "processing", stage: "Ich verstehe und fülle aus..." });
       const now = new Date();
       const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
       const weekdays = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
@@ -309,7 +309,7 @@ export const VoiceInputButton = ({
       </div>
       {!isRecording && !isBusy && state.kind !== "error" && (
         <p className="text-xs text-muted-foreground mt-2">
-          Sag z.B. „Heute von sieben bis vier auf der Baustelle Mueller, Fensterinstallation." – die AI fuellt alles aus.
+          Sag z.B. „Heute von sieben bis vier auf der Baustelle Müller, Heizungstausch." – die KI füllt alles aus.
         </p>
       )}
     </Card>

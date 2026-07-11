@@ -19,6 +19,13 @@ type MaterialEntry = {
   menge: string;
 };
 
+type CustomerSuggestion = {
+  name: string;
+  email: string | null;
+  adresse: string | null;
+  telefon: string | null;
+};
+
 type DisturbanceFormProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -61,6 +68,8 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
   const [voiceContext, setVoiceContext] = useState<VoiceContext>({});
   const [transcription, setTranscription] = useState<string>("");
   const [aiFilledFields, setAiFilledFields] = useState<Set<string>>(new Set());
+  const [customerSuggestions, setCustomerSuggestions] = useState<CustomerSuggestion[]>([]);
+  const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
 
   useEffect(() => {
     if (editData) {
@@ -98,24 +107,38 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
     }
   }, [editData, open]);
 
-  // Load voice context (employees + recent customers + material catalog)
+  // Load voice context (employees + Kundenverwaltung + recent customers + material catalog)
   useEffect(() => {
     if (!open) return;
     (async () => {
-      const [empRes, custRes, matRes] = await Promise.all([
+      const [empRes, kundenRes, custRes, matRes, catalogRes] = await Promise.all([
         supabase.from("profiles").select("id, vorname, nachname").eq("is_active", true),
+        supabase.from("customers")
+          .select("vorname, nachname, email, strasse, ort, telefon, mobil")
+          .order("nachname"),
         supabase.from("disturbances")
           .select("kunde_name, kunde_email, kunde_adresse, kunde_telefon")
           .order("datum", { ascending: false })
           .limit(80),
         supabase.from("disturbance_materials").select("material").limit(300),
+        supabase.from("materials").select("name").eq("is_active", true),
       ]);
       const employees = (empRes.data ?? []).map((e: any) => ({
         id: e.id,
         name: [e.vorname, e.nachname].filter(Boolean).join(" ").trim() || "Unbenannt",
       }));
+      // Kunden aus der Kundenverwaltung zuerst, dann Kunden aus früheren Regieberichten
+      // (Dedupe: Name, Groß-/Kleinschreibung ignoriert)
       const seen = new Set<string>();
-      const customers = (custRes.data ?? [])
+      const fromKundenverwaltung: CustomerSuggestion[] = (kundenRes.data ?? [])
+        .map((c: any) => ({
+          name: [c.vorname, c.nachname].filter(Boolean).join(" ").trim(),
+          email: c.email ?? null,
+          adresse: [c.strasse, c.ort].filter(Boolean).join(", ") || null,
+          telefon: c.mobil || c.telefon || null,
+        }))
+        .filter((c) => c.name && !seen.has(c.name.toLowerCase()) && seen.add(c.name.toLowerCase()));
+      const fromDisturbances: CustomerSuggestion[] = (custRes.data ?? [])
         .filter((c: any) => c.kunde_name && !seen.has(c.kunde_name.toLowerCase()) && seen.add(c.kunde_name.toLowerCase()))
         .map((c: any) => ({
           name: c.kunde_name,
@@ -123,11 +146,34 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
           adresse: c.kunde_adresse,
           telefon: c.kunde_telefon,
         }));
+      const customers = [...fromKundenverwaltung, ...fromDisturbances];
       const materialsSet = new Set<string>();
+      (catalogRes.data ?? []).forEach((m: any) => m.name && materialsSet.add(m.name));
       (matRes.data ?? []).forEach((m: any) => m.material && materialsSet.add(m.material));
       setVoiceContext({ employees, customers, materials: Array.from(materialsSet) });
+      setCustomerSuggestions(customers);
     })();
   }, [open]);
+
+  // Kundenvorschläge (Kundenverwaltung + frühere Regieberichte) passend zur Eingabe
+  const filteredCustomerSuggestions = (() => {
+    const q = formData.kundeName.trim().toLowerCase();
+    if (!q) return [];
+    return customerSuggestions
+      .filter((c) => c.name.toLowerCase().includes(q) && c.name.toLowerCase() !== q)
+      .slice(0, 6);
+  })();
+
+  const pickCustomerSuggestion = (c: CustomerSuggestion) => {
+    setFormData((prev) => ({
+      ...prev,
+      kundeName: c.name,
+      kundeEmail: c.email || prev.kundeEmail,
+      kundeAdresse: c.adresse || prev.kundeAdresse,
+      kundeTelefon: c.telefon || prev.kundeTelefon,
+    }));
+    setShowCustomerSuggestions(false);
+  };
 
   const handleVoiceResult = (result: { transcription: string; extracted: any }) => {
     setTranscription(result.transcription);
@@ -608,15 +654,41 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
               Kundendaten
             </h3>
             <div className="space-y-3">
-              <div>
+              <div className="relative">
                 <Label htmlFor="kundeName">Kundenname *</Label>
                 <Input
                   id="kundeName"
                   value={formData.kundeName}
-                  onChange={(e) => setFormData({ ...formData, kundeName: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, kundeName: e.target.value });
+                    setShowCustomerSuggestions(true);
+                  }}
+                  onFocus={() => setShowCustomerSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowCustomerSuggestions(false), 150)}
                   placeholder="Max Mustermann"
+                  autoComplete="off"
                   required
                 />
+                {showCustomerSuggestions && filteredCustomerSuggestions.length > 0 && (
+                  <div className="absolute z-50 mt-1 w-full max-h-48 overflow-y-auto rounded-md border bg-popover shadow-md">
+                    {filteredCustomerSuggestions.map((c) => (
+                      <button
+                        key={c.name}
+                        type="button"
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-accent"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          pickCustomerSuggestion(c);
+                        }}
+                      >
+                        <span className="font-medium">{c.name}</span>
+                        {c.adresse && (
+                          <span className="block text-xs text-muted-foreground truncate">{c.adresse}</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <div>
                 <Label htmlFor="kundeEmail" className="flex items-center gap-1">

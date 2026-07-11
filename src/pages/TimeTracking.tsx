@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
-import { Clock, Plus, AlertTriangle, CheckCircle2, Calendar, Sun, Trash2, Users, FolderOpen, ChevronDown } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Clock, Plus, AlertTriangle, CheckCircle2, Calendar, Sun, Trash2, Users, FolderOpen, ChevronDown, FilePlus2 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Switch } from "@/components/ui/switch";
 import { MultiEmployeeSelect } from "@/components/MultiEmployeeSelect";
@@ -57,6 +59,7 @@ interface TimeBlock {
   locationType: "baustelle" | "werkstatt";
   projectId: string;
   taetigkeit: string;
+  notizen: string;
   startTime: string;
   endTime: string;
   pauseStart: string;
@@ -70,6 +73,7 @@ const createDefaultBlock = (startTime = "", endTime = "", pauseStart = "", pause
   locationType: "baustelle",
   projectId: "",
   taetigkeit: "",
+  notizen: "",
   startTime,
   endTime,
   pauseStart,
@@ -89,6 +93,7 @@ const absenceSpansLunch = (start: string, end: string): boolean => {
 };
 
 const TimeTracking = () => {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -196,6 +201,7 @@ const TimeTracking = () => {
           locationType: (b.locationType === "werkstatt" ? "werkstatt" : "baustelle") as "baustelle" | "werkstatt",
           projectId: b.projectId && projectIds.has(b.projectId) ? b.projectId : "",
           taetigkeit: b.taetigkeit || (b.projectNameGuess ? `${b.projectNameGuess}` : ""),
+          notizen: "",
           startTime: r.startTime,
           endTime: r.endTime,
           pauseStart: r.pauseStart,
@@ -757,7 +763,7 @@ const TimeTracking = () => {
         pause_start: block.pauseStart || null,
         pause_end: block.pauseEnd || null,
         location_type: block.locationType,
-        notizen: null,
+        notizen: block.notizen.trim() || null,
         week_type: null,
       };
 
@@ -774,7 +780,7 @@ const TimeTracking = () => {
         pause_start: block.pauseStart || null,
         pause_end: block.pauseEnd || null,
         location_type: block.locationType,
-        notizen: null,
+        notizen: block.notizen.trim() || null,
         week_type: null,
       }));
 
@@ -1063,12 +1069,37 @@ const TimeTracking = () => {
                         {/* Activity - optional */}
                         <div className="space-y-2">
                           <Label>Tätigkeit <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                          <Input 
-                            value={block.taetigkeit} 
-                            onChange={(e) => updateBlock(block.id, { taetigkeit: e.target.value })} 
+                          <Input
+                            value={block.taetigkeit}
+                            onChange={(e) => updateBlock(block.id, { taetigkeit: e.target.value })}
                             placeholder="Optional - z.B. Montage, Aufmaß..."
                           />
                         </div>
+
+                        {/* Notizen - optional */}
+                        <div className="space-y-2">
+                          <Label>Notizen <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                          <Textarea
+                            value={block.notizen}
+                            onChange={(e) => updateBlock(block.id, { notizen: e.target.value })}
+                            placeholder="Notizen zu diesem Arbeitsblock..."
+                            className="min-h-16"
+                          />
+                        </div>
+
+                        {/* Nachtrag zum Projekt */}
+                        {block.projectId && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full gap-2"
+                            onClick={() => navigate(`/nachtraege?new=1&project=${block.projectId}`)}
+                          >
+                            <FilePlus2 className="h-4 w-4" />
+                            Nachtrag zu diesem Projekt erstellen
+                          </Button>
+                        )}
 
                         {/* Start/End/Pause time inputs */}
                         <div className="grid grid-cols-2 gap-3">

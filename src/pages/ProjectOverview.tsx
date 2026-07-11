@@ -1,9 +1,20 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, FileText, FileCheck, FolderOpen, Package, Camera, ImagePlus, Lock } from "lucide-react";
+import { ArrowLeft, FileText, FileCheck, FolderOpen, Package, Camera, ImagePlus, Lock, FileSignature, Plus, CheckCircle2 } from "lucide-react";
+import { format } from "date-fns";
+import { de } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+
+type ProjectNachtrag = {
+  id: string;
+  titel: string;
+  status: string;
+  created_at: string;
+  unterschrieben_am: string | null;
+};
 
 type DocumentCategory = {
   type: "plans" | "reports" | "photos" | "chef";
@@ -20,6 +31,7 @@ const ProjectOverview = () => {
   const [projectName, setProjectName] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
   const [materialCount, setMaterialCount] = useState(0);
+  const [nachtraege, setNachtraege] = useState<ProjectNachtrag[]>([]);
   const [categories, setCategories] = useState<DocumentCategory[]>([
     {
       type: "photos",
@@ -56,6 +68,7 @@ const ProjectOverview = () => {
     if (projectId) {
       checkAdminStatus();
       fetchProjectName();
+      fetchNachtraege();
     }
   }, [projectId]);
 
@@ -92,6 +105,18 @@ const ProjectOverview = () => {
     if (data) {
       setProjectName(data.name);
     }
+  };
+
+  const fetchNachtraege = async () => {
+    if (!projectId) return;
+
+    const { data } = await supabase
+      .from("nachtraege")
+      .select("id, titel, status, created_at, unterschrieben_am")
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false });
+
+    setNachtraege(data ?? []);
   };
 
   const fetchMaterialCount = async () => {
@@ -171,6 +196,57 @@ const ProjectOverview = () => {
           <h1 className="text-2xl sm:text-3xl font-bold mb-2">{projectName}</h1>
           <p className="text-muted-foreground">Dokumentation und Dateien</p>
         </div>
+
+        {/* Nachträge - nur anzeigen, wenn das Projekt Nachträge hat */}
+        {nachtraege.length > 0 && (
+          <div className="mb-4 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <FileSignature className="h-5 w-5 text-primary" />
+                Nachträge
+              </h2>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1"
+                onClick={() => navigate(`/nachtraege?new=1&project=${projectId}`)}
+              >
+                <Plus className="h-4 w-4" />
+                Neuer Nachtrag
+              </Button>
+            </div>
+            <div className="space-y-2">
+              {nachtraege.map((n) => (
+                <Card
+                  key={n.id}
+                  className="cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => navigate(`/nachtraege?project=${projectId}`)}
+                >
+                  <CardContent className="p-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{n.titel}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(n.created_at), "dd.MM.yyyy", { locale: de })}
+                      </p>
+                    </div>
+                    <div className="shrink-0">
+                      {n.status === "unterschrieben" ? (
+                        <Badge className="bg-green-600 text-white hover:bg-green-600 gap-1">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Unterschrieben
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="border-yellow-500 text-yellow-600">
+                          Offen
+                        </Badge>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Projektordner - freie Ordnerstruktur mit Dateien */}
         <Card

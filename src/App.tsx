@@ -27,6 +27,8 @@ import Disturbances from "./pages/Disturbances";
 import DisturbanceDetail from "./pages/DisturbanceDetail";
 import Customers from "./pages/Customers";
 import ProjectFiles from "./pages/ProjectFiles";
+import MaterialCatalog from "./pages/MaterialCatalog";
+import Nachtraege from "./pages/Nachtraege";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -70,6 +72,8 @@ function AppContent() {
         <Route path="/disturbances" element={<Disturbances />} />
         <Route path="/disturbances/:id" element={<DisturbanceDetail />} />
         <Route path="/customers" element={<Customers />} />
+        <Route path="/materialien" element={<MaterialCatalog />} />
+        <Route path="/nachtraege" element={<Nachtraege />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
 

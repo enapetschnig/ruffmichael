@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { MultiEmployeeSelect } from "@/components/MultiEmployeeSelect";
 import { VoiceInputButton, type VoiceContext } from "@/components/VoiceInputButton";
+import { MaterialPicker } from "@/components/MaterialPicker";
 
 type MaterialEntry = {
   id: string;
@@ -697,15 +698,30 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
 
           {/* Materials Section */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
               <h3 className="font-medium flex items-center gap-2">
                 <Package className="h-4 w-4" />
                 Verwendetes Material (optional)
               </h3>
-              <Button type="button" variant="outline" size="sm" onClick={addMaterial}>
-                <Plus className="h-4 w-4 mr-1" />
-                Material
-              </Button>
+              <div className="flex gap-2">
+                <MaterialPicker
+                  triggerLabel="Aus Katalog"
+                  onSelect={(m) =>
+                    setMaterials((prev) => [
+                      ...prev,
+                      {
+                        id: crypto.randomUUID(),
+                        material: m.einheit ? `${m.name} (${m.einheit})` : m.name,
+                        menge: "",
+                      },
+                    ])
+                  }
+                />
+                <Button type="button" variant="outline" size="sm" onClick={addMaterial}>
+                  <Plus className="h-4 w-4 mr-1" />
+                  Material
+                </Button>
+              </div>
             </div>
             
             {materials.length > 0 && (

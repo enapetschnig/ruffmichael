@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, FolderKanban, Users, BarChart3, LogOut, FileText, Camera, ArrowRight, Info, User as UserIcon, Zap, Receipt, Contact } from "lucide-react";
+import { Clock, FolderKanban, Users, BarChart3, LogOut, FileText, Camera, ArrowRight, Info, User as UserIcon, Zap, Receipt, Contact, Package, FilePlus2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useOnboarding } from "@/contexts/OnboardingContext";
 import {
@@ -360,6 +360,44 @@ export default function Index() {
             </CardHeader>
             <CardContent>
               <Button className="w-full" size="sm" variant="outline">Regiearbeiten öffnen</Button>
+            </CardContent>
+          </Card>
+
+          {/* Nachträge - Für alle */}
+          <Card
+            className="cursor-pointer hover:shadow-lg transition-all hover:border-primary/50"
+            onClick={() => navigate("/nachtraege")}
+          >
+            <CardHeader className="space-y-2 pb-3">
+              <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                <FilePlus2 className="h-6 w-6 text-primary" />
+              </div>
+              <CardTitle className="text-lg sm:text-xl">Nachträge</CardTitle>
+              <CardDescription className="text-sm">
+                Projektbezogene Nachträge mit Kundenunterschrift
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button className="w-full" size="sm" variant="outline">Nachträge öffnen</Button>
+            </CardContent>
+          </Card>
+
+          {/* Materialdatenbank - Für alle (Preise nur Admin) */}
+          <Card
+            className="cursor-pointer hover:shadow-lg transition-all hover:border-primary/50"
+            onClick={() => navigate("/materialien")}
+          >
+            <CardHeader className="space-y-2 pb-3">
+              <div className="h-12 w-12 rounded-lg bg-accent/10 flex items-center justify-center">
+                <Package className="h-6 w-6 text-accent" />
+              </div>
+              <CardTitle className="text-lg sm:text-xl">Material</CardTitle>
+              <CardDescription className="text-sm">
+                Materialdatenbank durchsuchen
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button className="w-full" size="sm" variant="outline">Material öffnen</Button>
             </CardContent>
           </Card>
 

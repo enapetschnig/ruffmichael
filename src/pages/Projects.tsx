@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { ArrowLeft, FolderOpen, Plus, FileText, Image, Package, Lock, Search, Upload, Camera, Trash2, ChevronDown, Home } from "lucide-react";
+import { ArrowLeft, FolderOpen, Plus, FileText, Image, Package, Lock, Search, Upload, Camera, Trash2, ChevronDown, Home, Settings, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { QuickUploadDialog } from "@/components/QuickUploadDialog";
 import { MobilePhotoCapture } from "@/components/MobilePhotoCapture";
@@ -20,6 +20,14 @@ import { CustomerFormFields, customerFormToRow, customerAddress, customerDisplay
 
 type ProjectCustomer = Pick<Customer, "id" | "vorname" | "nachname" | "strasse" | "ort">;
 
+// Konfigurierbarer Projektstatus (Ampel)
+type ProjectStatus = {
+  id: string;
+  name: string;
+  color: string;
+  sort_order: number;
+};
+
 type Project = {
   id: string;
   name: string;
@@ -27,6 +35,8 @@ type Project = {
   adresse: string | null;
   plz: string | null;
   status: string;
+  status_id?: string | null;
+  project_statuses?: Pick<ProjectStatus, "id" | "name" | "color"> | null;
   customer_id?: string | null;
   customers?: ProjectCustomer | null;
   created_at: string;
@@ -102,8 +112,19 @@ const Projects = () => {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [showStatusDialog, setShowStatusDialog] = useState(false);
 
+  // Ampel-Status (project_statuses)
+  const [statuses, setStatuses] = useState<ProjectStatus[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [newProjectStatusId, setNewProjectStatusId] = useState<string>("none");
+  const [showStatusSettings, setShowStatusSettings] = useState(false);
+  const [editStatuses, setEditStatuses] = useState<ProjectStatus[]>([]);
+  const [newStatusForm, setNewStatusForm] = useState({ name: "", color: "#22c55e" });
+  const [statusToDelete, setStatusToDelete] = useState<ProjectStatus | null>(null);
+  const [savingStatuses, setSavingStatuses] = useState(false);
+
   useEffect(() => {
     checkAdminStatus();
+    fetchStatuses();
     fetchProjects();
     fetchCustomers();
 
@@ -144,10 +165,20 @@ const Projects = () => {
     setCustomers(data ?? []);
   };
 
+  const fetchStatuses = async (): Promise<ProjectStatus[]> => {
+    const { data } = await supabase
+      .from("project_statuses")
+      .select("id, name, color, sort_order")
+      .order("sort_order", { ascending: true });
+    const list = data ?? [];
+    setStatuses(list);
+    return list;
+  };
+
   const fetchProjects = async () => {
     const { data, error } = await supabase
       .from("projects")
-      .select("*, customers(id, vorname, nachname, strasse, ort)")
+      .select("*, customers(id, vorname, nachname, strasse, ort), project_statuses(id, name, color)")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -254,6 +285,7 @@ const Projects = () => {
           adresse: derivedAdresse || null,
           plz: newProject.plz.trim(),
           customer_id: customerId,
+          status_id: newProjectStatusId !== "none" ? newProjectStatusId : null,
         })
         .select("id")
         .single();
@@ -282,6 +314,7 @@ const Projects = () => {
         description: "Projekt wurde erstellt (inkl. Standardordner)",
       });
       setNewProject({ name: "", beschreibung: "", adresse: "", plz: "" });
+      setNewProjectStatusId("none");
       setSelectedCustomerId("none");
       setShowNewCustomerForm(false);
       setNewCustomer(emptyCustomerForm);
@@ -331,6 +364,198 @@ const Projects = () => {
     }
     setProjectToClose(null);
   };
+
+  // Ampel: Status eines Projekts setzen (auch für Nicht-Admins)
+  const handleSetProjectAmpel = async (projectId: string, statusId: string | null) => {
+    const { error } = await supabase
+      .from("projects")
+      .update({ status_id: statusId })
+      .eq("id", projectId);
+
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Status konnte nicht gesetzt werden",
+      });
+      return;
+    }
+    fetchProjects();
+  };
+
+  // --- Status-Einstellungen (nur Admin) ---
+  const openStatusSettings = () => {
+    setEditStatuses(statuses.map((s) => ({ ...s })));
+    setNewStatusForm({ name: "", color: "#22c55e" });
+    setShowStatusSettings(true);
+  };
+
+  const isStatusDirty = (edited: ProjectStatus) => {
+    const original = statuses.find((s) => s.id === edited.id);
+    if (!original) return false;
+    return original.name !== edited.name || original.color !== edited.color;
+  };
+
+  const handleSaveStatus = async (edited: ProjectStatus) => {
+    if (!edited.name.trim()) {
+      toast({ variant: "destructive", title: "Fehler", description: "Name darf nicht leer sein" });
+      return false;
+    }
+    const { error } = await supabase
+      .from("project_statuses")
+      .update({ name: edited.name.trim(), color: edited.color })
+      .eq("id", edited.id);
+    if (error) {
+      toast({ variant: "destructive", title: "Fehler", description: "Status konnte nicht gespeichert werden" });
+      return false;
+    }
+    return true;
+  };
+
+  const handleSaveSingleStatus = async (edited: ProjectStatus) => {
+    if (savingStatuses) return;
+    setSavingStatuses(true);
+    const ok = await handleSaveStatus(edited);
+    if (ok) {
+      toast({ title: "Gespeichert", description: `Status "${edited.name.trim()}" wurde aktualisiert` });
+      await fetchStatuses();
+      fetchProjects();
+    }
+    setSavingStatuses(false);
+  };
+
+  const handleSaveAllStatuses = async () => {
+    if (savingStatuses) return;
+    const dirty = editStatuses.filter(isStatusDirty);
+    if (dirty.length === 0) {
+      toast({ title: "Keine Änderungen", description: "Es gibt nichts zu speichern" });
+      return;
+    }
+    setSavingStatuses(true);
+    let allOk = true;
+    for (const s of dirty) {
+      const ok = await handleSaveStatus(s);
+      if (!ok) allOk = false;
+    }
+    if (allOk) {
+      toast({ title: "Gespeichert", description: "Alle Änderungen wurden übernommen" });
+    }
+    await fetchStatuses();
+    fetchProjects();
+    setSavingStatuses(false);
+  };
+
+  const handleAddStatus = async () => {
+    if (savingStatuses) return;
+    if (!newStatusForm.name.trim()) {
+      toast({ variant: "destructive", title: "Fehler", description: "Bitte einen Namen für den neuen Status eingeben" });
+      return;
+    }
+    setSavingStatuses(true);
+    const maxOrder = statuses.reduce((max, s) => Math.max(max, s.sort_order), 0);
+    const { data: created, error } = await supabase
+      .from("project_statuses")
+      .insert({
+        name: newStatusForm.name.trim(),
+        color: newStatusForm.color,
+        sort_order: maxOrder + 1,
+      })
+      .select("id, name, color, sort_order")
+      .single();
+    if (error || !created) {
+      toast({ variant: "destructive", title: "Fehler", description: "Status konnte nicht angelegt werden" });
+    } else {
+      toast({ title: "Erfolg", description: `Status "${created.name}" wurde angelegt` });
+      setEditStatuses((prev) => [...prev, { ...created }]);
+      setNewStatusForm({ name: "", color: "#22c55e" });
+      await fetchStatuses();
+    }
+    setSavingStatuses(false);
+  };
+
+  const handleDeleteStatus = async () => {
+    if (!statusToDelete || savingStatuses) return;
+    setSavingStatuses(true);
+    const { id, name } = statusToDelete;
+    const { error } = await supabase
+      .from("project_statuses")
+      .delete()
+      .eq("id", id);
+    if (error) {
+      toast({ variant: "destructive", title: "Fehler", description: "Status konnte nicht gelöscht werden" });
+    } else {
+      toast({ title: "Gelöscht", description: `Status "${name}" wurde gelöscht` });
+      setEditStatuses((prev) => prev.filter((s) => s.id !== id));
+      if (statusFilter === id) setStatusFilter(null);
+      await fetchStatuses();
+      fetchProjects();
+    }
+    setStatusToDelete(null);
+    setSavingStatuses(false);
+  };
+
+  // Ampel-Punkt inkl. Dropdown zum Statuswechsel neben dem Projektnamen
+  const renderAmpel = (project: Project) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          onClick={(e) => e.stopPropagation()}
+          title={project.project_statuses?.name ?? "Kein Status"}
+          aria-label={`Projektstatus: ${project.project_statuses?.name ?? "Kein Status"}`}
+          className="shrink-0 rounded-full p-0.5 hover:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {project.project_statuses ? (
+            <span
+              className="block h-3.5 w-3.5 rounded-full"
+              style={{ backgroundColor: project.project_statuses.color }}
+            />
+          ) : (
+            <span className="block h-3.5 w-3.5 rounded-full border-2 border-muted-foreground/50" />
+          )}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        className="w-64 bg-background z-50"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {statuses.map((s) => (
+          <DropdownMenuItem
+            key={s.id}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleSetProjectAmpel(project.id, s.id);
+            }}
+          >
+            <span className="mr-2 h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+            {s.name}
+          </DropdownMenuItem>
+        ))}
+        {statuses.length > 0 && <DropdownMenuSeparator />}
+        <DropdownMenuItem
+          onClick={(e) => {
+            e.stopPropagation();
+            handleSetProjectAmpel(project.id, null);
+          }}
+        >
+          <span className="mr-2 h-3 w-3 rounded-full border-2 border-muted-foreground/50 shrink-0" />
+          Kein Status
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  // Karten-Einfärbung je nach Ampel-Status
+  const ampelCardStyle = (project: Project) =>
+    project.project_statuses
+      ? { backgroundColor: `${project.project_statuses.color}14`, borderColor: project.project_statuses.color }
+      : undefined;
+
+  const ampelHeaderStyle = (project: Project) =>
+    project.project_statuses
+      ? { backgroundColor: `${project.project_statuses.color}22` }
+      : undefined;
 
   const handleDeleteProject = async () => {
     if (!projectToDelete || deleting) return;
@@ -489,7 +714,20 @@ const Projects = () => {
                 onClick={() => navigate("/")}
               />
             </div>
-            <Dialog open={showNewDialog} onOpenChange={setShowNewDialog}>
+            <div className="flex items-center gap-2">
+              {isAdmin && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1"
+                  onClick={openStatusSettings}
+                  title="Status-Einstellungen"
+                  aria-label="Status-Einstellungen"
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
+              )}
+              <Dialog open={showNewDialog} onOpenChange={setShowNewDialog}>
               <DialogTrigger asChild>
                 <Button size="sm" className="gap-1 sm:gap-2">
                   <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -589,12 +827,37 @@ const Projects = () => {
                       className="min-h-20"
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="projekt-status">Status</Label>
+                    <Select value={newProjectStatusId} onValueChange={setNewProjectStatusId}>
+                      <SelectTrigger id="projekt-status">
+                        <SelectValue placeholder="Status wählen" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">
+                          <span className="flex items-center gap-2">
+                            <span className="h-3 w-3 rounded-full border-2 border-muted-foreground/50 shrink-0" />
+                            Kein Status
+                          </span>
+                        </SelectItem>
+                        {statuses.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            <span className="flex items-center gap-2">
+                              <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                              {s.name}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <Button onClick={handleCreateProject} disabled={creating} className="w-full">
                     {creating ? "Erstelle..." : "Projekt erstellen"}
                   </Button>
                 </div>
               </DialogContent>
-            </Dialog>
+              </Dialog>
+            </div>
           </div>
         </div>
       </header>
@@ -616,6 +879,44 @@ const Projects = () => {
             </Badge>
           </div>
 
+          {/* Ampel-Filter */}
+          {statuses.length > 0 && (
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className={`h-8 rounded-full ${statusFilter === null ? 'bg-primary text-primary-foreground border-primary hover:bg-primary/90 hover:text-primary-foreground' : ''}`}
+                onClick={() => setStatusFilter(null)}
+              >
+                Alle
+              </Button>
+              {statuses.map((s) => {
+                const count = projects.filter((p) => p.status === 'aktiv' && p.status_id === s.id).length;
+                const selected = statusFilter === s.id;
+                return (
+                  <Button
+                    key={s.id}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className={`h-8 rounded-full gap-2 ${selected ? 'hover:opacity-90' : ''}`}
+                    style={selected ? { backgroundColor: s.color, borderColor: s.color, color: '#ffffff' } : undefined}
+                    onClick={() => setStatusFilter(selected ? null : s.id)}
+                    title={s.name}
+                  >
+                    <span
+                      className="h-3 w-3 rounded-full shrink-0"
+                      style={{ backgroundColor: selected ? '#ffffff' : s.color }}
+                    />
+                    {s.name}
+                    <span className={selected ? 'text-white/80' : 'text-muted-foreground'}>({count})</span>
+                  </Button>
+                );
+              })}
+            </div>
+          )}
+
           <div className="mb-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -633,6 +934,7 @@ const Projects = () => {
             {projects
               .filter((project) => {
                 if (project.status !== 'aktiv') return false;
+                if (statusFilter && project.status_id !== statusFilter) return false;
                 const query = searchQuery.toLowerCase();
                 return (
                   project.name.toLowerCase().includes(query) ||
@@ -643,13 +945,14 @@ const Projects = () => {
                 );
               })
               .map((project) => (
-            <Card 
-              key={project.id} 
+            <Card
+              key={project.id}
               className="border-2 hover:shadow-lg transition-all cursor-pointer"
+              style={ampelCardStyle(project)}
               onClick={() => navigate(`/projects/${project.id}`)}
-              
+
             >
-              <CardHeader className="bg-primary/5 pb-3 sm:pb-4">
+              <CardHeader className="bg-primary/5 pb-3 sm:pb-4" style={ampelHeaderStyle(project)}>
                 <div className="flex flex-col sm:flex-row sm:justify-between gap-3">
                   <div className="flex gap-2 sm:gap-3">
                     <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
@@ -660,11 +963,14 @@ const Projects = () => {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <CardTitle className="text-base sm:text-xl truncate">
-                        {project.name}
-                        {projectDisplayAddress(project) && (
-                          <span className="font-normal text-muted-foreground text-sm sm:text-base"> – {projectDisplayAddress(project)}</span>
-                        )}
+                      <CardTitle className="text-base sm:text-xl flex items-center gap-2 min-w-0">
+                        {renderAmpel(project)}
+                        <span className="truncate">
+                          {project.name}
+                          {projectDisplayAddress(project) && (
+                            <span className="font-normal text-muted-foreground text-sm sm:text-base"> – {projectDisplayAddress(project)}</span>
+                          )}
+                        </span>
                       </CardTitle>
                       {project.customers && (
                         <CardDescription className="text-xs sm:text-sm">
@@ -842,19 +1148,23 @@ const Projects = () => {
                 {projects
                   .filter((project) => project.status === 'geschlossen')
                   .map((project) => (
-                  <Card 
-                    key={project.id} 
+                  <Card
+                    key={project.id}
                     className="border-2 hover:shadow-lg transition-all cursor-pointer"
+                    style={ampelCardStyle(project)}
                     onClick={() => navigate(`/projects/${project.id}`)}
                   >
-                    <CardHeader className="bg-primary/5 pb-3 sm:pb-4">
+                    <CardHeader className="bg-primary/5 pb-3 sm:pb-4" style={ampelHeaderStyle(project)}>
                       <div className="flex flex-col sm:flex-row sm:justify-between gap-3">
                         <div className="flex gap-2 sm:gap-3">
                           <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
                             <Lock className="w-5 h-5 sm:w-6 sm:h-6" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <CardTitle className="text-base sm:text-xl truncate">{project.name}</CardTitle>
+                            <CardTitle className="text-base sm:text-xl flex items-center gap-2 min-w-0">
+                              {renderAmpel(project)}
+                              <span className="truncate">{project.name}</span>
+                            </CardTitle>
                             {project.adresse && (
                               <CardDescription className="text-xs sm:text-sm">{project.adresse}</CardDescription>
                             )}
@@ -1011,6 +1321,142 @@ const Projects = () => {
               disabled={deleting}
             >
               {deleting ? 'Wird gelöscht...' : 'Ja, endgültig löschen'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog: Status-Einstellungen (nur Admin) */}
+      <Dialog open={showStatusSettings} onOpenChange={setShowStatusSettings}>
+        <DialogContent className="max-w-sm sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Status-Einstellungen</DialogTitle>
+            <DialogDescription>
+              Projekt-Status (Ampel) verwalten: Name und Farbe anpassen, Status löschen oder neue anlegen
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              {editStatuses.length === 0 && (
+                <p className="text-sm text-muted-foreground">Noch keine Status vorhanden.</p>
+              )}
+              {editStatuses.map((s) => (
+                <div key={s.id} className="flex items-center gap-2 rounded-lg border p-2">
+                  <input
+                    type="color"
+                    value={s.color}
+                    onChange={(e) =>
+                      setEditStatuses((prev) =>
+                        prev.map((x) => (x.id === s.id ? { ...x, color: e.target.value } : x))
+                      )
+                    }
+                    className="h-8 w-10 shrink-0 cursor-pointer rounded border bg-background p-0.5"
+                    title="Farbe wählen"
+                    aria-label={`Farbe für ${s.name}`}
+                  />
+                  <Input
+                    value={s.name}
+                    onChange={(e) =>
+                      setEditStatuses((prev) =>
+                        prev.map((x) => (x.id === s.id ? { ...x, name: e.target.value } : x))
+                      )
+                    }
+                    placeholder="Statusname"
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0"
+                    onClick={() => handleSaveSingleStatus(s)}
+                    disabled={savingStatuses || !isStatusDirty(s)}
+                    title="Speichern"
+                    aria-label={`Status ${s.name} speichern`}
+                  >
+                    <Save className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0 text-destructive hover:text-destructive"
+                    onClick={() => setStatusToDelete(s)}
+                    disabled={savingStatuses}
+                    title="Löschen"
+                    aria-label={`Status ${s.name} löschen`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+
+            {editStatuses.length > 0 && (
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full gap-2"
+                onClick={handleSaveAllStatuses}
+                disabled={savingStatuses || !editStatuses.some(isStatusDirty)}
+              >
+                <Save className="h-4 w-4" />
+                {savingStatuses ? 'Speichert...' : 'Alle Änderungen speichern'}
+              </Button>
+            )}
+
+            {/* Neuen Status hinzufügen */}
+            <div className="rounded-lg border p-3 space-y-3">
+              <Label>Neuen Status hinzufügen</Label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={newStatusForm.color}
+                  onChange={(e) => setNewStatusForm({ ...newStatusForm, color: e.target.value })}
+                  className="h-8 w-10 shrink-0 cursor-pointer rounded border bg-background p-0.5"
+                  title="Farbe wählen"
+                  aria-label="Farbe für neuen Status"
+                />
+                <Input
+                  value={newStatusForm.name}
+                  onChange={(e) => setNewStatusForm({ ...newStatusForm, name: e.target.value })}
+                  placeholder="z.B. In Bearbeitung"
+                  className="flex-1"
+                />
+              </div>
+              <Button
+                type="button"
+                className="w-full gap-2"
+                onClick={handleAddStatus}
+                disabled={savingStatuses}
+              >
+                <Plus className="h-4 w-4" />
+                Status hinzufügen
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* AlertDialog: Status löschen */}
+      <AlertDialog open={!!statusToDelete} onOpenChange={(open) => !open && setStatusToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Status löschen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bist du sicher, dass du den Status <strong>{statusToDelete?.name}</strong> löschen möchtest?
+              <br /><br />
+              Projekte mit diesem Status bleiben erhalten – ihr Status wird lediglich auf "Kein Status" zurückgesetzt.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={savingStatuses}>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteStatus}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={savingStatuses}
+            >
+              {savingStatuses ? 'Wird gelöscht...' : 'Ja, Status löschen'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

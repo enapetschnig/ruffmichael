@@ -664,6 +664,157 @@ export type Database = {
           },
         ]
       }
+      material_prices: {
+        Row: {
+          einkaufspreis: number | null
+          material_id: string
+          updated_at: string
+          verkaufspreis: number | null
+        }
+        Insert: {
+          einkaufspreis?: number | null
+          material_id: string
+          updated_at?: string
+          verkaufspreis?: number | null
+        }
+        Update: {
+          einkaufspreis?: number | null
+          material_id?: string
+          updated_at?: string
+          verkaufspreis?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "material_prices_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: true
+            referencedRelation: "materials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      materials: {
+        Row: {
+          created_at: string
+          einheit: string | null
+          id: string
+          is_active: boolean
+          kategorie: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          einheit?: string | null
+          id?: string
+          is_active?: boolean
+          kategorie?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          einheit?: string | null
+          id?: string
+          is_active?: boolean
+          kategorie?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      nachtrag_materials: {
+        Row: {
+          created_at: string
+          einheit: string | null
+          id: string
+          material: string
+          material_id: string | null
+          menge: string | null
+          nachtrag_id: string
+        }
+        Insert: {
+          created_at?: string
+          einheit?: string | null
+          id?: string
+          material: string
+          material_id?: string | null
+          menge?: string | null
+          nachtrag_id: string
+        }
+        Update: {
+          created_at?: string
+          einheit?: string | null
+          id?: string
+          material?: string
+          material_id?: string | null
+          menge?: string | null
+          nachtrag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nachtrag_materials_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nachtrag_materials_nachtrag_id_fkey"
+            columns: ["nachtrag_id"]
+            isOneToOne: false
+            referencedRelation: "nachtraege"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nachtraege: {
+        Row: {
+          beschreibung: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          project_id: string
+          status: string
+          titel: string
+          unterschrieben_am: string | null
+          unterschrift_kunde: string | null
+          updated_at: string
+        }
+        Insert: {
+          beschreibung?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          project_id: string
+          status?: string
+          titel: string
+          unterschrieben_am?: string | null
+          unterschrift_kunde?: string | null
+          updated_at?: string
+        }
+        Update: {
+          beschreibung?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          project_id?: string
+          status?: string
+          titel?: string
+          unterschrieben_am?: string | null
+          unterschrift_kunde?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nachtraege_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           anleitung_completed: boolean | null
@@ -694,6 +845,33 @@ export type Database = {
         }
         Relationships: []
       }
+      project_statuses: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       projects: {
         Row: {
           adresse: string | null
@@ -704,6 +882,7 @@ export type Database = {
           name: string
           plz: string
           status: string | null
+          status_id: string | null
           updated_at: string
         }
         Insert: {
@@ -715,6 +894,7 @@ export type Database = {
           name: string
           plz: string
           status?: string | null
+          status_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -726,6 +906,7 @@ export type Database = {
           name?: string
           plz?: string
           status?: string | null
+          status_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -734,6 +915,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_status_id_fkey"
+            columns: ["status_id"]
+            isOneToOne: false
+            referencedRelation: "project_statuses"
             referencedColumns: ["id"]
           },
         ]

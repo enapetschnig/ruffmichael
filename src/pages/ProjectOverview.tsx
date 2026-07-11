@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, FileText, FileCheck, Package, Camera, ImagePlus, Lock } from "lucide-react";
+import { ArrowLeft, FileText, FileCheck, FolderOpen, Package, Camera, ImagePlus, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -171,6 +171,27 @@ const ProjectOverview = () => {
           <h1 className="text-2xl sm:text-3xl font-bold mb-2">{projectName}</h1>
           <p className="text-muted-foreground">Dokumentation und Dateien</p>
         </div>
+
+        {/* Projektordner - freie Ordnerstruktur mit Dateien */}
+        <Card
+          className="cursor-pointer hover:shadow-lg transition-shadow mb-4 border-primary/40"
+          onClick={() => navigate(`/projects/${projectId}/files`)}
+        >
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="text-primary"><FolderOpen className="h-8 w-8" /></div>
+            </div>
+            <CardTitle className="text-xl">Projektordner</CardTitle>
+            <CardDescription>
+              Eigene Ordner &amp; Dateien — erstellen, verschieben, löschen
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button variant="outline" className="w-full">
+              Öffnen
+            </Button>
+          </CardContent>
+        </Card>
 
         <div className="grid gap-4 md:grid-cols-2">
           {visibleCategories.map((category) => (

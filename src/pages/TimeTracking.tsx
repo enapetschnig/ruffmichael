@@ -32,6 +32,13 @@ type Project = {
   name: string;
   status: string;
   plz: string;
+  customers?: { strasse: string | null; ort: string | null } | null;
+};
+
+// Anzeige: Projektname – Adresse des Kunden (Fallback: PLZ)
+const projectLabel = (p: Project): string => {
+  const addr = p.customers ? [p.customers.strasse, p.customers.ort].filter(Boolean).join(", ") : "";
+  return addr ? `${p.name} – ${addr}` : `${p.name} (${p.plz})`;
 };
 
 type ExistingEntry = {
@@ -345,7 +352,7 @@ const TimeTracking = () => {
   const fetchProjects = async () => {
     const { data } = await supabase
       .from("projects")
-      .select("id, name, status, plz")
+      .select("id, name, status, plz, customers(strasse, ort)")
       .eq("status", "aktiv")
       .order("name");
 
@@ -870,7 +877,9 @@ const TimeTracking = () => {
                         openProjects.map((p) => (
                           <div key={p.id} className="flex items-center justify-between px-3 py-1.5 text-sm">
                             <span className="truncate">{p.name}</span>
-                            {p.plz && <span className="text-xs text-muted-foreground ml-2 shrink-0">{p.plz}</span>}
+                            <span className="text-xs text-muted-foreground ml-2 shrink-0">
+                              {p.customers && [p.customers.strasse, p.customers.ort].filter(Boolean).join(", ") || p.plz}
+                            </span>
                           </div>
                         ))
                       )}
@@ -1041,7 +1050,7 @@ const TimeTracking = () => {
                               <SelectTrigger><SelectValue placeholder="Projekt auswählen" /></SelectTrigger>
                               <SelectContent>
                                 {projects.map((p) => (
-                                  <SelectItem key={p.id} value={p.id}>{p.name} ({p.plz})</SelectItem>
+                                  <SelectItem key={p.id} value={p.id}>{projectLabel(p)}</SelectItem>
                                 ))}
                                 <SelectItem value="new" className="text-primary font-semibold">
                                   <div className="flex items-center gap-2"><Plus className="w-4 h-4" />Neues Projekt erstellen</div>

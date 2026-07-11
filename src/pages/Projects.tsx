@@ -15,6 +15,10 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { QuickUploadDialog } from "@/components/QuickUploadDialog";
 import { MobilePhotoCapture } from "@/components/MobilePhotoCapture";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CustomerFormFields, customerFormToRow, customerAddress, customerDisplayName, type Customer } from "./Customers";
+
+type ProjectCustomer = Pick<Customer, "id" | "vorname" | "nachname" | "strasse" | "ort">;
 
 type Project = {
   id: string;
@@ -23,6 +27,8 @@ type Project = {
   adresse: string | null;
   plz: string | null;
   status: string;
+  customer_id?: string | null;
+  customers?: ProjectCustomer | null;
   created_at: string;
   updated_at: string;
   fileCount?: {
@@ -32,6 +38,36 @@ type Project = {
     photos: number;
     chef: number;
   };
+};
+
+// Anzeige: Projektname, dahinter die Adresse des Kunden (Fallback: Projektadresse)
+export const projectDisplayAddress = (p: Pick<Project, "adresse" | "customers">): string => {
+  if (p.customers) {
+    const addr = customerAddress(p.customers);
+    if (addr) return addr;
+  }
+  return p.adresse ?? "";
+};
+
+// Standardordner für neue Projekte (lt. Vorlage der Firma, ohne Vorlagen-Ordner)
+const STANDARD_PROJECT_FOLDERS = [
+  "Abnahme Protokoll",
+  "Beschreibung",
+  "Foto",
+  "Hydraulik",
+  "Programmierung",
+];
+
+const emptyCustomerForm = {
+  vorname: "",
+  nachname: "",
+  strasse: "",
+  ort: "",
+  telefon: "",
+  mobil: "",
+  email: "",
+  liefer_strasse: "",
+  liefer_ort: "",
 };
 
 const Projects = () => {
@@ -48,6 +84,11 @@ const Projects = () => {
     adresse: "",
     plz: "",
   });
+  const [customers, setCustomers] = useState<ProjectCustomer[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("none");
+  const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
+  const [newCustomer, setNewCustomer] = useState(emptyCustomerForm);
+  const [creating, setCreating] = useState(false);
   const [quickUploadProject, setQuickUploadProject] = useState<{
     projectId: string;
     documentType: 'photos' | 'plans' | 'reports' | 'materials';
@@ -64,6 +105,7 @@ const Projects = () => {
   useEffect(() => {
     checkAdminStatus();
     fetchProjects();
+    fetchCustomers();
 
     // Realtime subscription
     const channel = supabase
@@ -93,10 +135,19 @@ const Projects = () => {
     setIsAdmin(data?.role === "administrator");
   };
 
+  const fetchCustomers = async () => {
+    const { data } = await supabase
+      .from("customers")
+      .select("id, vorname, nachname, strasse, ort")
+      .order("nachname")
+      .order("vorname");
+    setCustomers(data ?? []);
+  };
+
   const fetchProjects = async () => {
     const { data, error } = await supabase
       .from("projects")
-      .select("*")
+      .select("*, customers(id, vorname, nachname, strasse, ort)")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -127,6 +178,7 @@ const Projects = () => {
   };
 
   const handleCreateProject = async () => {
+    if (creating) return;
     if (!newProject.name.trim()) {
       toast({
         variant: "destructive",
@@ -154,29 +206,90 @@ const Projects = () => {
       return;
     }
 
-    const { error } = await supabase
-      .from("projects")
-      .insert({
-        name: newProject.name.trim(),
-        beschreibung: newProject.beschreibung.trim() || null,
-        adresse: newProject.adresse.trim() || null,
-        plz: newProject.plz.trim(),
-      });
-
-    if (error) {
+    if (showNewCustomerForm && !newCustomer.nachname.trim()) {
       toast({
         variant: "destructive",
         title: "Fehler",
-        description: "Projekt konnte nicht erstellt werden",
+        description: "Bitte Nachname des Kunden eingeben",
       });
-    } else {
+      return;
+    }
+
+    setCreating(true);
+    try {
+      // Kunde: entweder neu anlegen oder bestehenden verwenden
+      let customerId: string | null = null;
+      let customerForAddress: { strasse: string | null; ort: string | null } | null = null;
+
+      if (showNewCustomerForm) {
+        const { data: { user } } = await supabase.auth.getUser();
+        const row = customerFormToRow(newCustomer);
+        const { data: created, error: custError } = await supabase
+          .from("customers")
+          .insert({ ...row, created_by: user?.id ?? null })
+          .select("id, strasse, ort")
+          .single();
+        if (custError || !created) {
+          toast({ variant: "destructive", title: "Fehler", description: "Kunde konnte nicht angelegt werden" });
+          setCreating(false);
+          return;
+        }
+        customerId = created.id;
+        customerForAddress = created;
+      } else if (selectedCustomerId !== "none") {
+        customerId = selectedCustomerId;
+        const c = customers.find((c) => c.id === selectedCustomerId);
+        customerForAddress = c ? { strasse: c.strasse, ort: c.ort } : null;
+      }
+
+      // Projektadresse: falls leer, aus Kundenadresse übernehmen
+      const derivedAdresse = newProject.adresse.trim()
+        || (customerForAddress ? [customerForAddress.strasse, customerForAddress.ort].filter(Boolean).join(", ") : "");
+
+      const { data: createdProject, error } = await supabase
+        .from("projects")
+        .insert({
+          name: newProject.name.trim(),
+          beschreibung: newProject.beschreibung.trim() || null,
+          adresse: derivedAdresse || null,
+          plz: newProject.plz.trim(),
+          customer_id: customerId,
+        })
+        .select("id")
+        .single();
+
+      if (error || !createdProject) {
+        toast({
+          variant: "destructive",
+          title: "Fehler",
+          description: "Projekt konnte nicht erstellt werden",
+        });
+        setCreating(false);
+        return;
+      }
+
+      // Standardordner anlegen (leere Ordner via .keep-Platzhalter)
+      await Promise.all(
+        STANDARD_PROJECT_FOLDERS.map((folder) =>
+          supabase.storage
+            .from("project-files")
+            .upload(`${createdProject.id}/${folder}/.keep`, new Blob([""], { type: "text/plain" }))
+        )
+      );
+
       toast({
         title: "Erfolg",
-        description: "Projekt wurde erstellt",
+        description: "Projekt wurde erstellt (inkl. Standardordner)",
       });
       setNewProject({ name: "", beschreibung: "", adresse: "", plz: "" });
+      setSelectedCustomerId("none");
+      setShowNewCustomerForm(false);
+      setNewCustomer(emptyCustomerForm);
       setShowNewDialog(false);
       fetchProjects();
+      fetchCustomers();
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -384,7 +497,7 @@ const Projects = () => {
                   <span className="sm:hidden">Neu</span>
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-sm sm:max-w-md">
+              <DialogContent className="max-w-sm sm:max-w-lg max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Neues Projekt erstellen</DialogTitle>
                   <DialogDescription>Bauvorhaben hinzufügen</DialogDescription>
@@ -399,6 +512,51 @@ const Projects = () => {
                       placeholder="z.B. Einfamilienhaus Müller"
                     />
                   </div>
+
+                  {/* Kunde: aus Bestand wählen oder neu anlegen (gleiche Struktur wie Kundenverwaltung) */}
+                  <div className="rounded-lg border p-3 space-y-3">
+                    <Label>Kunde</Label>
+                    {!showNewCustomerForm ? (
+                      <>
+                        <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Kunde auswählen" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">— Kein Kunde —</SelectItem>
+                            {customers.map((c) => (
+                              <SelectItem key={c.id} value={c.id}>
+                                {customerDisplayName(c)}{customerAddress(c) ? ` (${customerAddress(c)})` : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="w-full gap-2"
+                          onClick={() => setShowNewCustomerForm(true)}
+                        >
+                          <Plus className="h-4 w-4" /> Neuen Kunden anlegen
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <CustomerFormFields form={newCustomer} setForm={setNewCustomer} />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => setShowNewCustomerForm(false)}
+                        >
+                          Stattdessen bestehenden Kunden wählen
+                        </Button>
+                      </>
+                    )}
+                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="plz">PLZ *</Label>
                     <Input
@@ -418,7 +576,7 @@ const Projects = () => {
                       id="adresse"
                       value={newProject.adresse}
                       onChange={(e) => setNewProject({ ...newProject, adresse: e.target.value })}
-                      placeholder="Straße und Hausnummer"
+                      placeholder="Leer lassen = Adresse des Kunden"
                     />
                   </div>
                   <div className="space-y-2">
@@ -431,8 +589,8 @@ const Projects = () => {
                       className="min-h-20"
                     />
                   </div>
-                  <Button onClick={handleCreateProject} className="w-full">
-                    Projekt erstellen
+                  <Button onClick={handleCreateProject} disabled={creating} className="w-full">
+                    {creating ? "Erstelle..." : "Projekt erstellen"}
                   </Button>
                 </div>
               </DialogContent>
@@ -479,7 +637,9 @@ const Projects = () => {
                 return (
                   project.name.toLowerCase().includes(query) ||
                   project.adresse?.toLowerCase().includes(query) ||
-                  project.beschreibung?.toLowerCase().includes(query)
+                  project.beschreibung?.toLowerCase().includes(query) ||
+                  (project.customers ? customerDisplayName(project.customers).toLowerCase().includes(query) : false) ||
+                  projectDisplayAddress(project).toLowerCase().includes(query)
                 );
               })
               .map((project) => (
@@ -500,9 +660,16 @@ const Projects = () => {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <CardTitle className="text-base sm:text-xl truncate">{project.name}</CardTitle>
-                      {project.adresse && (
-                        <CardDescription className="text-xs sm:text-sm">{project.adresse}</CardDescription>
+                      <CardTitle className="text-base sm:text-xl truncate">
+                        {project.name}
+                        {projectDisplayAddress(project) && (
+                          <span className="font-normal text-muted-foreground text-sm sm:text-base"> – {projectDisplayAddress(project)}</span>
+                        )}
+                      </CardTitle>
+                      {project.customers && (
+                        <CardDescription className="text-xs sm:text-sm">
+                          Kunde: {customerDisplayName(project.customers)}
+                        </CardDescription>
                       )}
                     </div>
                   </div>

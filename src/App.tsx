@@ -25,6 +25,8 @@ import Notepad from "./pages/Notepad";
 import MaterialList from "./pages/MaterialList";
 import Disturbances from "./pages/Disturbances";
 import DisturbanceDetail from "./pages/DisturbanceDetail";
+import Customers from "./pages/Customers";
+import ProjectFiles from "./pages/ProjectFiles";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -54,6 +56,7 @@ function AppContent() {
         <Route path="/time-tracking" element={<TimeTracking />} />
         <Route path="/projects" element={<Projects />} />
         <Route path="/projects/:projectId" element={<ProjectOverview />} />
+        <Route path="/projects/:projectId/files" element={<ProjectFiles />} />
         <Route path="/projects/:projectId/:type" element={<ProjectDetail />} />
         <Route path="/projects/:projectId/materials" element={<MaterialList />} />
         <Route path="/my-hours" element={<MyHours />} />
@@ -66,6 +69,7 @@ function AppContent() {
         <Route path="/notepad" element={<Notepad />} />
         <Route path="/disturbances" element={<Disturbances />} />
         <Route path="/disturbances/:id" element={<DisturbanceDetail />} />
+        <Route path="/customers" element={<Customers />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
 

@@ -32,6 +32,54 @@ export type Database = {
         }
         Relationships: []
       }
+      customers: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          email: string | null
+          id: string
+          liefer_ort: string | null
+          liefer_strasse: string | null
+          mobil: string | null
+          nachname: string
+          ort: string | null
+          strasse: string | null
+          telefon: string | null
+          updated_at: string
+          vorname: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          liefer_ort?: string | null
+          liefer_strasse?: string | null
+          mobil?: string | null
+          nachname: string
+          ort?: string | null
+          strasse?: string | null
+          telefon?: string | null
+          updated_at?: string
+          vorname?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          liefer_ort?: string | null
+          liefer_strasse?: string | null
+          mobil?: string | null
+          nachname?: string
+          ort?: string | null
+          strasse?: string | null
+          telefon?: string | null
+          updated_at?: string
+          vorname?: string
+        }
+        Relationships: []
+      }
       disturbance_materials: {
         Row: {
           created_at: string
@@ -651,6 +699,7 @@ export type Database = {
           adresse: string | null
           beschreibung: string | null
           created_at: string
+          customer_id: string | null
           id: string
           name: string
           plz: string
@@ -661,6 +710,7 @@ export type Database = {
           adresse?: string | null
           beschreibung?: string | null
           created_at?: string
+          customer_id?: string | null
           id?: string
           name: string
           plz: string
@@ -671,13 +721,22 @@ export type Database = {
           adresse?: string | null
           beschreibung?: string | null
           created_at?: string
+          customer_id?: string | null
           id?: string
           name?: string
           plz?: string
           status?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "projects_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       reports: {
         Row: {

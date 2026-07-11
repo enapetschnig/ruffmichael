@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, FolderKanban, Users, BarChart3, LogOut, FileText, Camera, ArrowRight, Info, User as UserIcon, Zap, Receipt } from "lucide-react";
+import { Clock, FolderKanban, Users, BarChart3, LogOut, FileText, Camera, ArrowRight, Info, User as UserIcon, Zap, Receipt, Contact } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useOnboarding } from "@/contexts/OnboardingContext";
 import {
@@ -360,6 +360,25 @@ export default function Index() {
             </CardHeader>
             <CardContent>
               <Button className="w-full" size="sm" variant="outline">Regiearbeiten öffnen</Button>
+            </CardContent>
+          </Card>
+
+          {/* Kundenverwaltung - Für alle */}
+          <Card
+            className="cursor-pointer hover:shadow-lg transition-all hover:border-primary/50"
+            onClick={() => navigate("/customers")}
+          >
+            <CardHeader className="space-y-2 pb-3">
+              <div className="h-12 w-12 rounded-lg bg-accent/10 flex items-center justify-center">
+                <Contact className="h-6 w-6 text-accent" />
+              </div>
+              <CardTitle className="text-lg sm:text-xl">Kundenverwaltung</CardTitle>
+              <CardDescription className="text-sm">
+                Kunden anlegen & verwalten
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button className="w-full" size="sm" variant="outline">Kunden öffnen</Button>
             </CardContent>
           </Card>
 

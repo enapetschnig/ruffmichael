@@ -71,6 +71,16 @@ const createDefaultBlock = (startTime = "", endTime = "", pauseStart = "", pause
   manualHours: "",
 });
 
+// Ueberdeckt der Zeitraum die Mittagspause (12:00-12:30)? Dann gehoert eine Pause abgezogen.
+const absenceSpansLunch = (start: string, end: string): boolean => {
+  if (!/^\d{2}:\d{2}$/.test(start) || !/^\d{2}:\d{2}$/.test(end)) return false;
+  const toMin = (s: string) => {
+    const [h, m] = s.split(":").map(Number);
+    return h * 60 + m;
+  };
+  return toMin(start) < 12 * 60 && toMin(end) > 12 * 60;
+};
+
 const TimeTracking = () => {
   const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -138,15 +148,23 @@ const TimeTracking = () => {
     }
     if (t.absence?.isAbsence) {
       const a = t.absence;
-      setAbsenceData((prev) => ({
-        ...prev,
-        date: t.date && /^\d{4}-\d{2}-\d{2}$/.test(t.date) ? t.date : prev.date,
-        type: (a.type || prev.type) as any,
-        isFullDay: typeof a.isFullDay === "boolean" ? a.isFullDay : prev.isFullDay,
-        absenceStartTime: /^\d{2}:\d{2}$/.test(a.startTime || "") ? a.startTime : prev.absenceStartTime,
-        absenceEndTime: /^\d{2}:\d{2}$/.test(a.endTime || "") ? a.endTime : prev.absenceEndTime,
-        absencePauseMinutes: typeof a.pauseMinutes === "number" ? String(a.pauseMinutes) : prev.absencePauseMinutes,
-      }));
+      setAbsenceData((prev) => {
+        const nextStart = /^\d{2}:\d{2}$/.test(a.startTime || "") ? a.startTime : prev.absenceStartTime;
+        const nextEnd = /^\d{2}:\d{2}$/.test(a.endTime || "") ? a.endTime : prev.absenceEndTime;
+        // Pause: diktierter Wert hat Vorrang, sonst automatisch anhand des Zeitraums
+        const nextPause = typeof a.pauseMinutes === "number" && a.pauseMinutes > 0
+          ? String(a.pauseMinutes)
+          : (absenceSpansLunch(nextStart, nextEnd) ? "30" : "0");
+        return {
+          ...prev,
+          date: t.date && /^\d{4}-\d{2}-\d{2}$/.test(t.date) ? t.date : prev.date,
+          type: (a.type || prev.type) as any,
+          isFullDay: typeof a.isFullDay === "boolean" ? a.isFullDay : prev.isFullDay,
+          absenceStartTime: nextStart,
+          absenceEndTime: nextEnd,
+          absencePauseMinutes: nextPause,
+        };
+      });
       setShowAbsenceDialog(true);
       return;
     }
@@ -335,11 +353,38 @@ const TimeTracking = () => {
     setLoading(false);
   };
 
+  // Mittagspause automatisch eintragen, wenn der Block das Pausenfenster (12:00-12:30)
+  // ueberdeckt und noch keine Pause gesetzt ist. Pause zaehlt nie als Arbeitszeit.
+  const withAutoPause = (block: TimeBlock): TimeBlock => {
+    if (block.pauseStart || block.pauseEnd) return block;
+    if (!block.startTime || !block.endTime) return block;
+    const toMin = (s: string) => {
+      const [h, m] = s.split(':').map(Number);
+      return h * 60 + m;
+    };
+    const start = toMin(block.startTime);
+    const end = toMin(block.endTime);
+    const pauseStart = 12 * 60;
+    const pauseEnd = 12 * 60 + 30;
+    if (start < pauseStart && end > pauseStart) {
+      const effEnd = Math.min(pauseEnd, end);
+      const fmt = (min: number) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+      return { ...block, pauseStart: fmt(pauseStart), pauseEnd: fmt(effEnd) };
+    }
+    return block;
+  };
+
   // Update a specific block
   const updateBlock = (blockId: string, updates: Partial<TimeBlock>) => {
-    setTimeBlocks(prev => prev.map(block => 
-      block.id === blockId ? { ...block, ...updates } : block
-    ));
+    setTimeBlocks(prev => prev.map(block => {
+      if (block.id !== blockId) return block;
+      const next = { ...block, ...updates };
+      // Bei Zeitaenderungen ggf. Mittagspause automatisch nachziehen
+      if (updates.startTime !== undefined || updates.endTime !== undefined) {
+        return withAutoPause(next);
+      }
+      return next;
+    }));
   };
 
   // Add a new time block
@@ -583,9 +628,20 @@ const TimeTracking = () => {
       return;
     }
 
+    // Sicherheitsnetz: Mittagspause immer automatisch eintragen, wenn sie fehlt
+    const blocksToSave = timeBlocks.map(withAutoPause);
+    const autoPausedBlocks = blocksToSave
+      .map((b, i) => (b.pauseStart && !timeBlocks[i].pauseStart ? i + 1 : null))
+      .filter((n): n is number => n !== null);
+    if (autoPausedBlocks.length > 0) {
+      sonnerToast.info(
+        `Mittagspause 12:00-12:30 automatisch eingetragen (Block ${autoPausedBlocks.join(", ")}) – zählt nicht als Arbeitszeit.`
+      );
+    }
+
     // Validate all blocks
-    for (let i = 0; i < timeBlocks.length; i++) {
-      const block = timeBlocks[i];
+    for (let i = 0; i < blocksToSave.length; i++) {
+      const block = blocksToSave[i];
       const blockNum = i + 1;
 
       if (!block.startTime || !block.endTime) {
@@ -611,10 +667,10 @@ const TimeTracking = () => {
       return hours * 60 + minutes;
     };
 
-    for (let i = 0; i < timeBlocks.length; i++) {
-      for (let j = i + 1; j < timeBlocks.length; j++) {
-        const blockA = timeBlocks[i];
-        const blockB = timeBlocks[j];
+    for (let i = 0; i < blocksToSave.length; i++) {
+      for (let j = i + 1; j < blocksToSave.length; j++) {
+        const blockA = blocksToSave[i];
+        const blockB = blocksToSave[j];
         
         const aStart = timeToMinutes(blockA.startTime);
         const aEnd = timeToMinutes(blockA.endTime);
@@ -655,8 +711,8 @@ const TimeTracking = () => {
         const existingStart = timeToMinutes(entry.start_time);
         const existingEnd = timeToMinutes(entry.end_time);
         
-        for (let i = 0; i < timeBlocks.length; i++) {
-          const block = timeBlocks[i];
+        for (let i = 0; i < blocksToSave.length; i++) {
+          const block = blocksToSave[i];
           const blockStart = timeToMinutes(block.startTime);
           const blockEnd = timeToMinutes(block.endTime);
           
@@ -677,7 +733,7 @@ const TimeTracking = () => {
     let totalEntriesCreated = 0;
     let hasError = false;
 
-    for (const block of timeBlocks) {
+    for (const block of blocksToSave) {
       const blockHours = calculateBlockHours(block);
       const pauseMinutes = calculateBlockPauseMinutes(block);
 
@@ -1294,7 +1350,14 @@ const TimeTracking = () => {
                       <Input
                         type="time"
                         value={absenceData.absenceStartTime}
-                        onChange={(e) => setAbsenceData({ ...absenceData, absenceStartTime: e.target.value })}
+                        onChange={(e) => {
+                          const start = e.target.value;
+                          setAbsenceData({
+                            ...absenceData,
+                            absenceStartTime: start,
+                            absencePauseMinutes: absenceSpansLunch(start, absenceData.absenceEndTime) ? "30" : "0",
+                          });
+                        }}
                       />
                     </div>
                     <div className="space-y-1.5">
@@ -1302,7 +1365,14 @@ const TimeTracking = () => {
                       <Input
                         type="time"
                         value={absenceData.absenceEndTime}
-                        onChange={(e) => setAbsenceData({ ...absenceData, absenceEndTime: e.target.value })}
+                        onChange={(e) => {
+                          const end = e.target.value;
+                          setAbsenceData({
+                            ...absenceData,
+                            absenceEndTime: end,
+                            absencePauseMinutes: absenceSpansLunch(absenceData.absenceStartTime, end) ? "30" : "0",
+                          });
+                        }}
                       />
                     </div>
                   </div>

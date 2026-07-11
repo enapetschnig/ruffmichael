@@ -1,9 +1,13 @@
 // Loest eine Liste von Zeitbloecken auf konkrete Start/End-Zeiten auf.
 // - Bloecke koennen entweder explizite startTime/endTime haben ODER durationHours.
 // - Sequenzielle Bloecke ohne startTime beginnen am Cursor (Anker = 07:00 oder das Ende des letzten Blocks).
-// - Wenn ein Block das Pausenfenster (Default 12:00-12:30) ueberdeckt,
-//   wird er in zwei saubere Bloecke gesplittet (Vormittag bis 12:00, Nachmittag ab 12:30),
-//   damit die Pause als echte Luecke sichtbar ist und die Arbeitszeit erhalten bleibt.
+// - Pausenbehandlung, wenn ein Block das Pausenfenster (Default 12:00-12:30) ueberdeckt
+//   und keine eigene Pause angegeben ist:
+//   * ZEITRAUM-Modus (endTime explizit genannt, z.B. "von sieben bis vier"): Die Pause wird
+//     IM Block eingetragen (pauseStart/pauseEnd) - das Ende bleibt wie diktiert, die Pause
+//     zaehlt nicht als Arbeitszeit.
+//   * DAUER-Modus (nur durationHours): Der Block wird in Vormittag/Nachmittag gesplittet,
+//     damit die volle Arbeitsdauer erhalten bleibt und die Pause als Luecke sichtbar ist.
 
 export interface RawBlock {
   startTime?: string;
@@ -59,17 +63,40 @@ export function resolveTimeBlocks<T extends RawBlock>(
   blocks.forEach((raw, idx) => {
     let start = toMin(raw.startTime);
     let end = toMin(raw.endTime);
+    const explicitEnd = end != null;
     const duration = typeof raw.durationHours === "number" && raw.durationHours > 0
       ? Math.round(raw.durationHours * 60)
       : null;
 
     if (start == null) start = cursor;
+    // Sequenzieller Block wuerde mitten im Pausenfenster starten -> nach der Pause beginnen
+    if (toMin(raw.startTime) == null && pauseLen > 0 && start >= pauseStartMin && start < pauseEndMin) {
+      start = pauseEndMin;
+    }
     if (end == null && duration != null) end = start + duration;
     if (end == null) end = start + 60;
 
     const explicitPause = toMin(raw.pauseStart) != null || toMin(raw.pauseEnd) != null;
 
-    // Splitting-Regel: Block ueberdeckt die Mittagspause und hat keine eigene Pause?
+    // ZEITRAUM-Modus: Ende wurde explizit genannt ("von sieben bis vier").
+    // Die Mittagspause wird IM Block vermerkt - Ende bleibt wie diktiert,
+    // die Pause wird bei der Stundenberechnung abgezogen.
+    if (explicitEnd && !explicitPause && pauseLen > 0 && start < pauseStartMin && end > pauseStartMin) {
+      const resolved: T & ResolvedBlock = {
+        ...raw,
+        startTime: toHHMM(start),
+        endTime: toHHMM(end),
+        pauseStart: toHHMM(pauseStartMin),
+        pauseEnd: toHHMM(Math.min(pauseEndMin, end)),
+        autoPause: true,
+      };
+      out.push(resolved);
+      cursor = end;
+      suggestions.push(`Block ${idx + 1}: Mittagspause ${toHHMM(pauseStartMin)}-${toHHMM(Math.min(pauseEndMin, end))} automatisch eingetragen (zaehlt nicht als Arbeitszeit).`);
+      return;
+    }
+
+    // DAUER-Modus-Splitting: Block ueberdeckt die Mittagspause und hat keine eigene Pause?
     // -> in zwei Bloecke aufteilen; Nachmittagsteil startet nach der Pause.
     if (!explicitPause && pauseLen > 0 && start < pauseStartMin && end > pauseStartMin) {
       const totalWork = end - start;

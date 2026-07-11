@@ -499,8 +499,9 @@ const Projects = () => {
   // Klick auf die aktive Farbe entfernt den Status wieder.
   const renderAmpel = (project: Project) => (
     <span
-      className="flex items-center gap-1.5 shrink-0 rounded-full border bg-background/90 px-2 py-1.5"
-      onClick={(e) => e.stopPropagation()}
+      className="flex items-center gap-1 shrink-0 rounded-full border bg-background/90 px-1.5 py-1"
+      onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
+      onPointerDown={(e) => e.stopPropagation()}
     >
       {statuses.map((s) => {
         const active = project.status_id === s.id;
@@ -511,17 +512,23 @@ const Projects = () => {
             title={active ? `${s.name} – Klick zum Entfernen` : s.name}
             aria-label={`Status setzen: ${s.name}`}
             aria-pressed={active}
+            onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
+              e.preventDefault();
               handleSetProjectAmpel(project.id, active ? null : s.id);
             }}
-            className={
-              active
-                ? "h-5 w-5 rounded-full ring-2 ring-offset-1 ring-foreground/50 transition-all focus:outline-none focus-visible:ring-ring"
-                : "h-3.5 w-3.5 rounded-full opacity-50 hover:opacity-100 hover:scale-125 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            }
-            style={{ backgroundColor: s.color }}
-          />
+            className="flex items-center justify-center h-9 w-9 rounded-full transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-muted"
+          >
+            <span
+              className={
+                active
+                  ? "block h-7 w-7 rounded-full ring-2 ring-offset-1 ring-foreground/50 transition-all"
+                  : "block h-5 w-5 rounded-full opacity-60 hover:opacity-100 transition-all"
+              }
+              style={{ backgroundColor: s.color }}
+            />
+          </button>
         );
       })}
     </span>

@@ -12,11 +12,11 @@ const corsHeaders = {
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 const AI_BASE = "https://api.openai.com/v1";
 
-type Mode = "time" | "disturbance" | "auto";
+type Mode = "time" | "disturbance" | "auto" | "uebernahme" | "erstaufnahme" | "assistent";
 
 interface ContextProject { id: string; name: string; plz: string | null; adresse?: string | null; }
 interface ContextEmployee { id: string; name: string; }
-interface ContextCustomer { name: string; email: string | null; adresse: string | null; telefon: string | null; }
+interface ContextCustomer { id?: string; name: string; email: string | null; adresse: string | null; telefon: string | null; }
 
 interface RequestPayload {
   mode: Mode;
@@ -29,6 +29,7 @@ interface RequestPayload {
     employees?: ContextEmployee[];
     customers?: ContextCustomer[];
     materials?: string[];
+    checklist?: string[];
     coreHours?: { start: string; end: string; pauseStart: string; pauseEnd: string };
   };
   existingData?: any; // for append-mode
@@ -85,16 +86,24 @@ function buildSystemPrompt(p: RequestPayload): string {
   const employeesList = (p.context?.employees ?? [])
     .map((e) => `- id=${e.id} | ${e.name}`).join("\n") || "(keine)";
   const customersList = (p.context?.customers ?? [])
-    .slice(0, 30)
-    .map((c) => `- ${c.name}${c.telefon ? ` | Tel ${c.telefon}` : ""}${c.email ? ` | ${c.email}` : ""}${c.adresse ? ` | ${c.adresse}` : ""}`)
+    .slice(0, 50)
+    .map((c) => `- ${c.id ? `id=${c.id} | ` : ""}${c.name}${c.telefon ? ` | Tel ${c.telefon}` : ""}${c.email ? ` | ${c.email}` : ""}${c.adresse ? ` | ${c.adresse}` : ""}`)
     .join("\n") || "(keine)";
   const materialsList = (p.context?.materials ?? []).slice(0, 80).join(", ") || "(keine)";
+
+  const checklistList = (p.context?.checklist ?? []).map((c) => `- ${c}`).join("\n") || "(keine)";
 
   const modeInstructions = p.mode === "disturbance"
     ? `Extrahiere einen REGIEBERICHT (Service-Einsatz beim Kunden).`
     : p.mode === "time"
       ? `Extrahiere ZEITERFASSUNG (Arbeitszeitbloecke oder Abwesenheit).`
-      : `Erkenne automatisch, ob es sich um ZEITERFASSUNG oder REGIEBERICHT handelt. Setze das Feld "mode" entsprechend.`;
+      : p.mode === "uebernahme"
+        ? `Extrahiere eine UEBERNAHMEBESTAETIGUNG (Abnahme nach Montage). Felder: Auftragsnummer (z.B. "2026 / 45"), zusaetzlich aufgewendete Leistungen, Leistungsverzeichnis bei Regiemontagen, ob eine Bedienungsanleitung uebergeben wurde, Ort und Datum. Kunde/Adresse nur setzen, wenn ausdruecklich genannt.`
+        : p.mode === "erstaufnahme"
+          ? `Extrahiere eine ERSTAUFNAHME (Vor-Ort-Aufnahme beim Kunden vor Angebotserstellung). Ordne Gesagtes den CHECKLISTEN-PUNKTEN zu (exakter Punkt-Text aus der Liste unten als "item"). Kunde: wenn er in BISHERIGE KUNDEN vorkommt, setze existingCustomerId auf dessen id; sonst fuelle die Kundenfelder. Schlage einen kurzen Projektnamen vor (z.B. "Nachname Waermepumpentausch"). Alles Uebrige in "notizen".`
+          : p.mode === "assistent"
+            ? `Du bist der Sprachassistent im Dashboard. Erkenne die ABSICHT: "projektnotiz" (der Sprecher will eine Notiz zu einem bestehenden Projekt festhalten - matche das Projekt aus der Liste und setze assistent.projectId + assistent.notiz) ODER "erstaufnahme" (der Sprecher beschreibt einen neuen Kunden/eine Vor-Ort-Aufnahme - fuelle zusaetzlich das erstaufnahme-Objekt wie im Erstaufnahme-Modus). Setze assistent.intent entsprechend.`
+            : `Erkenne automatisch, ob es sich um ZEITERFASSUNG oder REGIEBERICHT handelt. Setze das Feld "mode" entsprechend.`;
 
   return `Du bist ein hochprazisions-Assistent fuer einen oesterreichischen Installateur-Betrieb (Ruff Michael GmbH - Waerme, Kaelte, Regelung).
 Du bekommst eine deutsche Sprachnachricht (auch Kaerntner/oesterreichischer Dialekt moeglich) und extrahierst strukturierte Formulardaten.
@@ -132,6 +141,9 @@ ${customersList}
 BEKANNTE MATERIALIEN (nutze diese Schreibweise wenn passend):
 ${materialsList}
 
+CHECKLISTEN-PUNKTE (fuer Erstaufnahme; nutze exakt diesen Text als "item"):
+${checklistList}
+
 ABWESENHEITSTYPEN: urlaub, krankenstand, weiterbildung, feiertag, za (Zeitausgleich)
 LOCATION-TYPEN: baustelle, werkstatt
 
@@ -139,11 +151,65 @@ Bei Unsicherheit: Feld leer/null lassen und in "warnings" eintragen. NIE erfinde
 Bei Widerspruechen (Endzeit vor Startzeit etc.) in "warnings" vermerken.`;
 }
 
+const uebernahmeSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    auftragNr: { type: "string", description: "z.B. 2026 / 45, sonst leer" },
+    zusatzLeistungen: { type: "string" },
+    leistungsverzeichnis: { type: "string" },
+    bedienungsanleitung: { type: "boolean" },
+    ort: { type: "string" },
+    datum: { type: "string", description: "YYYY-MM-DD oder leer" },
+    kundeName: { type: "string" },
+    strasse: { type: "string" },
+    plzOrt: { type: "string" },
+  },
+  required: ["auftragNr", "zusatzLeistungen", "leistungsverzeichnis", "bedienungsanleitung", "ort", "datum", "kundeName", "strasse", "plzOrt"],
+};
+
+const erstaufnahmeSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    existingCustomerId: { type: "string", description: "id aus BISHERIGE KUNDEN bei Match, sonst leer" },
+    kunde: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        vorname: { type: "string" },
+        nachname: { type: "string" },
+        strasse: { type: "string" },
+        ort: { type: "string" },
+        telefon: { type: "string" },
+        email: { type: "string" },
+      },
+      required: ["vorname", "nachname", "strasse", "ort", "telefon", "email"],
+    },
+    projektName: { type: "string", description: "kurzer Vorschlag, z.B. Nachname Waermepumpe" },
+    notizen: { type: "string" },
+    checklist: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          item: { type: "string", description: "exakter Text aus CHECKLISTEN-PUNKTE" },
+          bemerkung: { type: "string" },
+          erledigt: { type: "boolean" },
+        },
+        required: ["item", "bemerkung", "erledigt"],
+      },
+    },
+  },
+  required: ["existingCustomerId", "kunde", "projektName", "notizen", "checklist"],
+};
+
 const extractionSchema = {
   type: "object",
   additionalProperties: false,
   properties: {
-    mode: { type: "string", enum: ["time", "disturbance"] },
+    mode: { type: "string", enum: ["time", "disturbance", "uebernahme", "erstaufnahme", "assistent"] },
     // ZEITERFASSUNG
     time: {
       type: "object",
@@ -217,9 +283,24 @@ const extractionSchema = {
       },
       required: ["date", "startTime", "endTime", "pauseMinutes", "kundeName", "kundeEmail", "kundeAdresse", "kundeTelefon", "beschreibung", "notizen", "employeeIds", "materials"],
     },
+    // UEBERNAHMEBESTAETIGUNG
+    uebernahme: uebernahmeSchema,
+    // ERSTAUFNAHME
+    erstaufnahme: erstaufnahmeSchema,
+    // SPRACHASSISTENT (Dashboard)
+    assistent: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        intent: { type: "string", enum: ["projektnotiz", "erstaufnahme", ""] },
+        projectId: { type: "string", description: "id aus Projekte-Liste bei projektnotiz, sonst leer" },
+        notiz: { type: "string" },
+      },
+      required: ["intent", "projectId", "notiz"],
+    },
     warnings: { type: "array", items: { type: "string" } },
   },
-  required: ["mode", "time", "disturbance", "warnings"],
+  required: ["mode", "time", "disturbance", "uebernahme", "erstaufnahme", "assistent", "warnings"],
 };
 
 async function extract(transcription: string, payload: RequestPayload) {

@@ -27,6 +27,7 @@ import Customers from "./pages/Customers";
 import ProjectFiles from "./pages/ProjectFiles";
 import MaterialCatalog from "./pages/MaterialCatalog";
 import Nachtraege from "./pages/Nachtraege";
+import Uebernahmen from "./pages/Uebernahmen";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -70,6 +71,7 @@ function AppContent() {
         <Route path="/customers" element={<Customers />} />
         <Route path="/materialien" element={<MaterialCatalog />} />
         <Route path="/nachtraege" element={<Nachtraege />} />
+        <Route path="/uebernahmen" element={<Uebernahmen />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
 

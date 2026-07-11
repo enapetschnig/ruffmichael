@@ -4,7 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, FolderKanban, Users, BarChart3, LogOut, FileText, Camera, ArrowRight, Info, User as UserIcon, Zap, Receipt, Contact, Package, FilePlus2 } from "lucide-react";
+import { Clock, FolderKanban, Users, BarChart3, LogOut, FileText, ArrowRight, Info, User as UserIcon, Zap, Contact, Package, FilePlus2, ClipboardList, FileCheck } from "lucide-react";
+import { ErstaufnahmeDialog, type ErstaufnahmePrefill } from "@/components/ErstaufnahmeDialog";
+import { DashboardVoiceAssistant } from "@/components/DashboardVoiceAssistant";
 import { useToast } from "@/hooks/use-toast";
 import { useOnboarding } from "@/contexts/OnboardingContext";
 import {
@@ -41,6 +43,8 @@ export default function Index() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [session, setSession] = useState<Session | null>(null);
+  const [showErstaufnahme, setShowErstaufnahme] = useState(false);
+  const [erstaufnahmePrefill, setErstaufnahmePrefill] = useState<ErstaufnahmePrefill | undefined>(undefined);
   const [user, setUser] = useState<User | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userName, setUserName] = useState<string>("");
@@ -279,11 +283,36 @@ export default function Index() {
             {isAdmin ? "Admin Dashboard" : "Mein Dashboard"}
           </h1>
           <p className="text-sm sm:text-base text-muted-foreground">
-            {isAdmin 
-              ? "Verwaltung aller Projekte und Mitarbeiter" 
+            {isAdmin
+              ? "Verwaltung aller Projekte und Mitarbeiter"
               : "Zeiterfassung und Projektdokumentation"}
           </p>
         </div>
+
+        {/* Schnellaktionen ganz oben: Erstaufnahme + Sprachassistent */}
+        <div className="mb-6 sm:mb-8 space-y-3">
+          <Button
+            size="lg"
+            className="w-full sm:w-auto gap-2 text-base h-12 px-6"
+            onClick={() => { setErstaufnahmePrefill(undefined); setShowErstaufnahme(true); }}
+          >
+            <ClipboardList className="h-5 w-5" />
+            Erstaufnahme erstellen
+          </Button>
+          <DashboardVoiceAssistant
+            onErstaufnahme={(prefill) => {
+              setErstaufnahmePrefill(prefill);
+              setShowErstaufnahme(true);
+            }}
+          />
+        </div>
+
+        <ErstaufnahmeDialog
+          open={showErstaufnahme}
+          onOpenChange={setShowErstaufnahme}
+          prefill={erstaufnahmePrefill}
+          onFinished={(projectId) => navigate(`/projects/${projectId}`)}
+        />
 
         {/* Main Actions Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
@@ -379,6 +408,25 @@ export default function Index() {
             </CardHeader>
             <CardContent>
               <Button className="w-full" size="sm" variant="outline">Nachträge öffnen</Button>
+            </CardContent>
+          </Card>
+
+          {/* Übernahmebestätigungen - Für alle */}
+          <Card
+            className="cursor-pointer hover:shadow-lg transition-all hover:border-primary/50"
+            onClick={() => navigate("/uebernahmen")}
+          >
+            <CardHeader className="space-y-2 pb-3">
+              <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                <FileCheck className="h-6 w-6 text-primary" />
+              </div>
+              <CardTitle className="text-lg sm:text-xl">Übernahmebestätigungen</CardTitle>
+              <CardDescription className="text-sm">
+                Abnahme unterschreiben lassen — PDF im Projektordner
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button className="w-full" size="sm" variant="outline">Übernahmen öffnen</Button>
             </CardContent>
           </Card>
 

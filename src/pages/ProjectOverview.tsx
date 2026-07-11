@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { projectLabel } from "@/lib/projectLabel";
+import { UebernahmeDialog } from "@/components/UebernahmeDialog";
 
 type ProjectNachtrag = {
   id: string;
@@ -33,6 +34,7 @@ const ProjectOverview = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [materialCount, setMaterialCount] = useState(0);
   const [nachtraege, setNachtraege] = useState<ProjectNachtrag[]>([]);
+  const [uebernahmeOpen, setUebernahmeOpen] = useState(false);
   const [categories, setCategories] = useState<DocumentCategory[]>([
     {
       type: "photos",
@@ -198,6 +200,14 @@ const ProjectOverview = () => {
           <p className="text-muted-foreground">Dokumentation und Dateien</p>
         </div>
 
+        {/* Übernahmebestätigung - prominente Schnellaktion */}
+        <div className="mb-4 flex flex-wrap gap-2">
+          <Button className="gap-2" onClick={() => setUebernahmeOpen(true)}>
+            <FileCheck className="h-4 w-4" />
+            Übernahmebestätigung erstellen
+          </Button>
+        </div>
+
         {/* Nachträge - nur anzeigen, wenn das Projekt Nachträge hat */}
         {nachtraege.length > 0 && (
           <div className="mb-4 space-y-2">
@@ -323,6 +333,12 @@ const ProjectOverview = () => {
           <ImagePlus className="h-6 w-6" />
         </Button>
       </main>
+
+      <UebernahmeDialog
+        open={uebernahmeOpen}
+        onOpenChange={setUebernahmeOpen}
+        projectId={projectId}
+      />
     </div>
   );
 };

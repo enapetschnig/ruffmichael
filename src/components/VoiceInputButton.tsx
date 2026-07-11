@@ -6,13 +6,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
-export type VoiceMode = "time" | "disturbance" | "auto";
+export type VoiceMode = "time" | "disturbance" | "auto" | "uebernahme" | "erstaufnahme" | "assistent";
 
 export interface VoiceContext {
   projects?: { id: string; name: string; plz: string | null; adresse?: string | null }[];
   employees?: { id: string; name: string }[];
-  customers?: { name: string; email: string | null; adresse: string | null; telefon: string | null }[];
+  customers?: { id?: string; name: string; email: string | null; adresse: string | null; telefon: string | null }[];
   materials?: string[];
+  checklist?: string[];
   coreHours?: { start: string; end: string; pauseStart: string; pauseEnd: string };
 }
 
@@ -27,6 +28,8 @@ interface Props {
   existingData?: any;
   onResult: (result: VoiceResult) => void;
   label?: string;
+  /** Hilfetext unter dem Button (Beispiel-Satz) */
+  hint?: string;
   compact?: boolean;
   maxSeconds?: number;
 }
@@ -70,6 +73,7 @@ export const VoiceInputButton = ({
   existingData,
   onResult,
   label = "Per Sprache ausfüllen",
+  hint = "Sag z.B. „Heute von sieben bis vier auf der Baustelle Müller, Heizungstausch.“ – die KI füllt alles aus.",
   compact = false,
   maxSeconds = 180,
 }: Props) => {
@@ -309,7 +313,7 @@ export const VoiceInputButton = ({
       </div>
       {!isRecording && !isBusy && state.kind !== "error" && (
         <p className="text-xs text-muted-foreground mt-2">
-          Sag z.B. „Heute von sieben bis vier auf der Baustelle Müller, Heizungstausch." – die KI füllt alles aus.
+          {hint}
         </p>
       )}
     </Card>

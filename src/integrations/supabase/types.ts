@@ -32,6 +32,149 @@ export type Database = {
         }
         Relationships: []
       }
+      erstaufnahme_checklist_items: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          sort_order: number
+          text: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          sort_order?: number
+          text: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          sort_order?: number
+          text?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      erstaufnahmen: {
+        Row: {
+          checklist: Json
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          id: string
+          notizen: string | null
+          project_id: string | null
+          projekt_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          checklist?: Json
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          id?: string
+          notizen?: string | null
+          project_id?: string | null
+          projekt_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          checklist?: Json
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          id?: string
+          notizen?: string | null
+          project_id?: string | null
+          projekt_name?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "erstaufnahmen_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "erstaufnahmen_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      uebernahmen: {
+        Row: {
+          auftrag_nr: string | null
+          bedienungsanleitung: boolean
+          created_at: string
+          created_by: string | null
+          datum: string
+          id: string
+          kunde_name: string
+          leistungsverzeichnis: string | null
+          ort: string | null
+          pdf_path: string | null
+          plz_ort: string | null
+          project_id: string
+          strasse: string | null
+          unterschrift: string | null
+          updated_at: string
+          zusatz_leistungen: string | null
+        }
+        Insert: {
+          auftrag_nr?: string | null
+          bedienungsanleitung?: boolean
+          created_at?: string
+          created_by?: string | null
+          datum?: string
+          id?: string
+          kunde_name: string
+          leistungsverzeichnis?: string | null
+          ort?: string | null
+          pdf_path?: string | null
+          plz_ort?: string | null
+          project_id: string
+          strasse?: string | null
+          unterschrift?: string | null
+          updated_at?: string
+          zusatz_leistungen?: string | null
+        }
+        Update: {
+          auftrag_nr?: string | null
+          bedienungsanleitung?: boolean
+          created_at?: string
+          created_by?: string | null
+          datum?: string
+          id?: string
+          kunde_name?: string
+          leistungsverzeichnis?: string | null
+          ort?: string | null
+          pdf_path?: string | null
+          plz_ort?: string | null
+          project_id?: string
+          strasse?: string | null
+          unterschrift?: string | null
+          updated_at?: string
+          zusatz_leistungen?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "uebernahmen_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           created_at: string

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Clock, Plus, AlertTriangle, CheckCircle2, Calendar, Sun, Trash2, Users, FolderOpen, ChevronDown, FilePlus2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -28,6 +28,15 @@ import {
   getWeeklyTargetHours,
   getTotalWorkingHours
 } from "@/lib/workingHours";
+
+// Standardordner für neue Projekte (identisch zu Projects.tsx / ErstaufnahmeDialog)
+const STANDARD_PROJECT_FOLDERS = [
+  "Abnahme Protokoll",
+  "Beschreibung",
+  "Foto",
+  "Hydraulik",
+  "Programmierung",
+];
 
 type Project = {
   id: string;
@@ -127,6 +136,11 @@ const TimeTracking = () => {
   
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([createDefaultBlock()]);
+  // Steuert, ob der [selectedDate]-Effekt die Zeitblöcke zurücksetzen darf.
+  // true = beim initialen Mount und bei manueller Datumsänderung (Datumsfeld).
+  // false = bei programmatischen Datumsänderungen (z.B. Sprachsteuerung), damit
+  // diktierte Blöcke beim Datumswechsel nicht überschrieben werden.
+  const resetBlocksOnDateChange = useRef(true);
   const entryMode = "zeitraum" as const;
   const [voiceTranscription, setVoiceTranscription] = useState<string>("");
   const [projectListOpen, setProjectListOpen] = useState<boolean>(() => {
@@ -163,6 +177,11 @@ const TimeTracking = () => {
     setVoiceTranscription(result.transcription);
     const t = result.extracted?.time;
     if (!t) return;
+    // Reihenfolge wichtig: Datum ZUERST setzen (programmatisch, ohne
+    // resetBlocksOnDateChange zu setzen). Der [selectedDate]-Effekt lädt dann nur
+    // die bestehenden Tageseinträge für das Info-Banner und setzt die Zeitblöcke
+    // NICHT zurück. Dadurch überleben die weiter unten aus der Sprache gesetzten
+    // Blöcke (setTimeBlocks) den Datumswechsel.
     if (t.date && /^\d{4}-\d{2}-\d{2}$/.test(t.date)) {
       setSelectedDate(t.date);
     }
@@ -229,8 +248,11 @@ const TimeTracking = () => {
     }
   };
 
-  // Fetch existing entries for selected date
-  const fetchExistingDayEntries = async (date: string) => {
+  // Fetch existing entries for selected date.
+  // resetBlocks steuert, ob die Zeitblöcke auf Standard zurückgesetzt werden.
+  // Der [selectedDate]-Effekt übergibt hier false bei programmatischen
+  // Datumswechseln (Sprachsteuerung), damit diktierte Blöcke erhalten bleiben.
+  const fetchExistingDayEntries = async (date: string, resetBlocks = true) => {
     setLoadingDayEntries(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -265,36 +287,47 @@ const TimeTracking = () => {
         pause_start: entry.pause_start || null,
       }));
       setExistingDayEntries(entries);
-      
-      // If entries exist, suggest next time slot for first block
-      if (entries.length > 0 && !entries.some(e => ["Urlaub", "Krankenstand", "Weiterbildung", "Feiertag", "Zeitausgleich"].includes(e.taetigkeit))) {
-        const lastEntry = entries[entries.length - 1];
-        const [lastEndHours, lastEndMinutes] = lastEntry.end_time.split(':').map(Number);
-        const nextStartMinutes = lastEndHours * 60 + lastEndMinutes + 30;
-        const suggestedStart = `${String(Math.floor(nextStartMinutes / 60)).padStart(2, '0')}:${String(nextStartMinutes % 60).padStart(2, '0')}`;
-        
-        setTimeBlocks([createDefaultBlock(suggestedStart)]);
-      } else if (!entries.some(e => ["Urlaub", "Krankenstand", "Weiterbildung", "Feiertag", "Zeitausgleich"].includes(e.taetigkeit))) {
-        // Auto-fill default work times for the selected date
-        const dateObj = new Date(date);
-        const defaults = getDefaultWorkTimes(dateObj);
-        if (defaults) {
-          setTimeBlocks([createDefaultBlock(defaults.startTime, defaults.endTime, defaults.pauseStart, defaults.pauseEnd)]);
-        } else {
-          setTimeBlocks([createDefaultBlock()]);
+
+      // Zeitblöcke nur zurücksetzen, wenn erlaubt (nicht bei Sprach-Datumswechsel).
+      if (resetBlocks) {
+        // If entries exist, suggest next time slot for first block
+        if (entries.length > 0 && !entries.some(e => ["Urlaub", "Krankenstand", "Weiterbildung", "Feiertag", "Zeitausgleich"].includes(e.taetigkeit))) {
+          const lastEntry = entries[entries.length - 1];
+          const [lastEndHours, lastEndMinutes] = lastEntry.end_time.split(':').map(Number);
+          const nextStartMinutes = lastEndHours * 60 + lastEndMinutes + 30;
+          const suggestedStart = `${String(Math.floor(nextStartMinutes / 60)).padStart(2, '0')}:${String(nextStartMinutes % 60).padStart(2, '0')}`;
+
+          setTimeBlocks([createDefaultBlock(suggestedStart)]);
+        } else if (!entries.some(e => ["Urlaub", "Krankenstand", "Weiterbildung", "Feiertag", "Zeitausgleich"].includes(e.taetigkeit))) {
+          // Auto-fill default work times for the selected date
+          const dateObj = new Date(date);
+          const defaults = getDefaultWorkTimes(dateObj);
+          if (defaults) {
+            setTimeBlocks([createDefaultBlock(defaults.startTime, defaults.endTime, defaults.pauseStart, defaults.pauseEnd)]);
+          } else {
+            setTimeBlocks([createDefaultBlock()]);
+          }
         }
       }
     } else {
       setExistingDayEntries([]);
-      // Reset to empty default for new day
-      setTimeBlocks([createDefaultBlock()]);
+      // Reset to empty default for new day (nur wenn erlaubt)
+      if (resetBlocks) {
+        setTimeBlocks([createDefaultBlock()]);
+      }
     }
     setLoadingDayEntries(false);
   };
 
-  // Load existing entries when date changes
+  // Load existing entries when date changes (Info-Banner).
+  // Die Zeitblöcke werden nur zurückgesetzt, wenn der Wechsel vom initialen Mount
+  // oder einer manuellen Datumsänderung stammt (resetBlocksOnDateChange). Bei
+  // programmatischen Wechseln aus der Sprachsteuerung bleibt das Flag false, damit
+  // die dort gesetzten Blöcke nicht überschrieben werden.
   useEffect(() => {
-    fetchExistingDayEntries(selectedDate);
+    const resetBlocks = resetBlocksOnDateChange.current;
+    resetBlocksOnDateChange.current = false;
+    fetchExistingDayEntries(selectedDate, resetBlocks);
   }, [selectedDate]);
 
   useEffect(() => {
@@ -348,8 +381,19 @@ const TimeTracking = () => {
       return;
     }
 
+    // Standardordner anlegen (leere Ordner via .keep-Platzhalter), damit der
+    // Projektordner konsistent zu den anderen Erstellungspfaden (Projects.tsx /
+    // ErstaufnahmeDialog) aufgebaut ist.
+    await Promise.all(
+      STANDARD_PROJECT_FOLDERS.map((folder) =>
+        supabase.storage
+          .from("project-files")
+          .upload(`${data.id}/${folder}/.keep`, new Blob([""], { type: "text/plain" }))
+      )
+    );
+
     sonnerToast.success("Projekt erfolgreich erstellt");
-    
+
     // Set the project in the pending block
     if (pendingBlockIdForNewProject) {
       updateBlock(pendingBlockIdForNewProject, { projectId: data.id });
@@ -907,12 +951,16 @@ const TimeTracking = () => {
               {/* Date picker */}
               <div className="space-y-2">
                 <Label htmlFor="date">Datum</Label>
-                <Input 
-                  id="date" 
-                  type="date" 
-                  value={selectedDate} 
-                  onChange={(e) => setSelectedDate(e.target.value)} 
-                  required 
+                <Input
+                  id="date"
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => {
+                    // Manuelle Datumsänderung: Zeitblöcke auf Standard zurücksetzen.
+                    resetBlocksOnDateChange.current = true;
+                    setSelectedDate(e.target.value);
+                  }}
+                  required
                 />
                 {selectedDate && (
                   <p className="text-sm text-muted-foreground">

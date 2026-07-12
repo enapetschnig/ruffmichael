@@ -31,6 +31,26 @@ type TimeEntry = {
   project_id: string | null;
 };
 
+// "HH:MM" (auch "HH:MM:SS") -> Minuten seit Mitternacht
+const parseTimeToMinutes = (time: string | null): number | null => {
+  if (!time) return null;
+  const [h, m] = time.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return null;
+  return h * 60 + m;
+};
+
+// Reale Stundenberechnung aus den tatsächlichen Feldern
+const computeHours = (
+  start: string | null,
+  end: string | null,
+  pauseMinutes: number | null,
+): number => {
+  const startMin = parseTimeToMinutes(start);
+  const endMin = parseTimeToMinutes(end);
+  if (startMin === null || endMin === null) return 0;
+  return Math.max(0, (endMin - startMin - (pauseMinutes || 0)) / 60);
+};
+
 const MyHours = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -118,32 +138,25 @@ const MyHours = () => {
   const handleUpdateEntry = async () => {
     if (!editingEntry || savingEdit) return;
 
+    // Zeitausgleich-Einträge sind an das Zeitkonto gekoppelt und dürfen
+    // nicht bearbeitet werden (sonst würde das Zeitkonto inkonsistent).
+    if (editingEntry.taetigkeit === "Zeitausgleich") {
+      toast({
+        variant: "destructive",
+        title: "Bearbeitung nicht möglich",
+        description: "Zeitausgleich-Einträge können nicht bearbeitet werden — bitte löschen und neu anlegen",
+      });
+      return;
+    }
+
     setSavingEdit(true);
 
-    // Berechne Stunden basierend auf Vormittag und Nachmittag
-    const morningStart = editingEntry.start_time ? new Date(`2000-01-01T${editingEntry.start_time}`) : null;
-    // Morning End: immer 12:00
-    const morningEndTime = "12:00";
-    const morningEnd = new Date(`2000-01-01T${morningEndTime}`);
-    
-    let calculatedHours = 0;
-    
-    if (morningStart) {
-      // Vormittagsstunden
-      const morningMs = morningEnd.getTime() - morningStart.getTime();
-      const morningMinutes = morningMs / (1000 * 60);
-      calculatedHours += morningMinutes / 60;
-      
-      // Nachmittagsstunden (wenn vorhanden)
-      if (editingEntry.end_time) {
-        const afternoonEnd = new Date(`2000-01-01T${editingEntry.end_time}`);
-        const pauseMinutes = editingEntry.pause_minutes || 0;
-        const afternoonStartTime = new Date(morningEnd.getTime() + pauseMinutes * 60 * 1000);
-        const afternoonMs = afternoonEnd.getTime() - afternoonStartTime.getTime();
-        const afternoonMinutes = Math.max(0, afternoonMs / (1000 * 60));
-        calculatedHours += afternoonMinutes / 60;
-      }
-    }
+    // Reale Stundenberechnung aus Beginn, Ende und Pause
+    const calculatedHours = computeHours(
+      editingEntry.start_time,
+      editingEntry.end_time,
+      editingEntry.pause_minutes,
+    );
 
     const { error } = await supabase
       .from("time_entries")
@@ -153,7 +166,7 @@ const MyHours = () => {
         end_time: editingEntry.end_time,
         pause_minutes: editingEntry.pause_minutes || 0,
         notizen: editingEntry.notizen?.trim() || null,
-        stunden: Math.max(0, calculatedHours),
+        stunden: calculatedHours,
       })
       .eq("id", editingEntry.id);
 
@@ -175,13 +188,68 @@ const MyHours = () => {
     setSavingEdit(false);
   };
 
-  const handleDeleteEntry = async (id: string) => {
+  const handleDeleteEntry = async (entry: TimeEntry) => {
     if (!confirm("Möchtest du diesen Eintrag wirklich löschen?")) return;
+
+    // Zeitausgleich: Stunden zurück auf das Zeitkonto buchen, bevor gelöscht wird
+    if (entry.taetigkeit === "Zeitausgleich" && entry.stunden > 0) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          variant: "destructive",
+          title: "Fehler",
+          description: "Nicht angemeldet. Eintrag wurde nicht gelöscht.",
+        });
+        return;
+      }
+
+      const { data: timeAccount, error: taError } = await supabase
+        .from("time_accounts")
+        .select("id, balance_hours")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (taError || !timeAccount) {
+        toast({
+          variant: "destructive",
+          title: "Fehler",
+          description: "Zeitkonto konnte nicht gefunden werden. Eintrag wurde nicht gelöscht.",
+        });
+        return;
+      }
+
+      const balanceBefore = Number(timeAccount.balance_hours);
+      const balanceAfter = balanceBefore + entry.stunden;
+
+      const { error: updateErr } = await supabase
+        .from("time_accounts")
+        .update({ balance_hours: balanceAfter, updated_at: new Date().toISOString() })
+        .eq("id", timeAccount.id);
+
+      if (updateErr) {
+        toast({
+          variant: "destructive",
+          title: "Fehler",
+          description: "ZA-Stunden konnten nicht zurückgebucht werden. Eintrag wurde nicht gelöscht.",
+        });
+        return;
+      }
+
+      await supabase.from("time_account_transactions").insert({
+        user_id: user.id,
+        changed_by: user.id,
+        change_type: "za_rueckerstattung",
+        hours: entry.stunden,
+        balance_before: balanceBefore,
+        balance_after: balanceAfter,
+        reason: `Zeitausgleich-Eintrag gelöscht am ${entry.datum}`,
+      });
+    }
 
     const { error } = await supabase
       .from("time_entries")
       .delete()
-      .eq("id", id);
+      .eq("id", entry.id);
 
     if (error) {
       toast({
@@ -395,85 +463,58 @@ const MyHours = () => {
                 />
               </div>
 
-              {/* Vormittag */}
+              {/* Arbeitszeit */}
               <div className="space-y-3 p-4 rounded-lg border bg-muted/30">
-                <h3 className="font-semibold text-sm">Vormittag</h3>
+                <h3 className="font-semibold text-sm">Arbeitszeit</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="edit-morning-start">Beginn</Label>
+                    <Label htmlFor="edit-start">Beginn</Label>
                     <Input
-                      id="edit-morning-start"
+                      id="edit-start"
                       type="time"
-                      value={editingEntry.start_time || '07:30'}
+                      value={editingEntry.start_time?.substring(0, 5) || ''}
                       onChange={(e) => setEditingEntry({...editingEntry, start_time: e.target.value})}
                     />
                   </div>
                   <div>
-                    <Label htmlFor="edit-morning-end">Ende</Label>
+                    <Label htmlFor="edit-end">Ende</Label>
                     <Input
-                      id="edit-morning-end"
+                      id="edit-end"
                       type="time"
-                      value="12:00"
-                      disabled
-                      className="bg-muted"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Unterbrechung */}
-              <div className="space-y-3 p-4 rounded-lg border bg-muted/30">
-                <h3 className="font-semibold text-sm">Unterbrechung</h3>
-                <div>
-                  <Label htmlFor="edit-pause">Dauer (Minuten)</Label>
-                  <Input
-                    id="edit-pause"
-                    type="number"
-                    min="0"
-                    value={editingEntry.pause_minutes || 0}
-                    onChange={(e) => setEditingEntry({...editingEntry, pause_minutes: parseInt(e.target.value) || 0})}
-                  />
-                </div>
-              </div>
-
-              {/* Nachmittag */}
-              <div className="space-y-3 p-4 rounded-lg border bg-muted/30">
-                <h3 className="font-semibold text-sm">Nachmittag</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="edit-afternoon-start">Beginn</Label>
-                    <Input
-                      id="edit-afternoon-start"
-                      type="time"
-                      value={(() => {
-                        const dayOfWeek = new Date(editingEntry.datum).getDay();
-                        const isFriday = dayOfWeek === 5;
-                        const morningEnd = isFriday ? "12:30" : "12:00";
-                        const [hours, minutes] = morningEnd.split(':').map(Number);
-                        const pauseMinutes = editingEntry.pause_minutes || 0;
-                        const totalMinutes = hours * 60 + minutes + pauseMinutes;
-                        return `${String(Math.floor(totalMinutes / 60)).padStart(2, '0')}:${String(totalMinutes % 60).padStart(2, '0')}`;
-                      })()}
-                      disabled
-                      className="bg-muted"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="edit-afternoon-end">Ende</Label>
-                    <Input
-                      id="edit-afternoon-end"
-                      type="time"
-                      value={editingEntry.end_time || ''}
+                      value={editingEntry.end_time?.substring(0, 5) || ''}
                       onChange={(e) => setEditingEntry({...editingEntry, end_time: e.target.value})}
                     />
                   </div>
                 </div>
-                {new Date(editingEntry.datum).getDay() === 5 && (
-                  <p className="text-xs text-muted-foreground">
-                    Freitags ist die Normalarbeitszeit 7:30-12:30 Uhr. Nachmittag nur bei Überstunden.
-                  </p>
-                )}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="edit-pause">Pause (Minuten)</Label>
+                    <Input
+                      id="edit-pause"
+                      type="number"
+                      min="0"
+                      value={editingEntry.pause_minutes ?? 0}
+                      onChange={(e) => setEditingEntry({...editingEntry, pause_minutes: parseInt(e.target.value) || 0})}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-stunden">Stunden (berechnet)</Label>
+                    <Input
+                      id="edit-stunden"
+                      value={`${computeHours(editingEntry.start_time, editingEntry.end_time, editingEntry.pause_minutes).toFixed(2)} h`}
+                      readOnly
+                      disabled
+                      className="bg-muted"
+                    />
+                  </div>
+                </div>
               </div>
+
+              {editingEntry.taetigkeit === "Zeitausgleich" && (
+                <p className="text-xs text-destructive">
+                  Zeitausgleich-Einträge können nicht bearbeitet werden — bitte löschen und neu anlegen.
+                </p>
+              )}
 
               {/* Notizen */}
               <div>
@@ -493,7 +534,7 @@ const MyHours = () => {
                 </Button>
                 <Button 
                   variant="destructive"
-                  onClick={() => editingEntry && handleDeleteEntry(editingEntry.id)}
+                  onClick={() => editingEntry && handleDeleteEntry(editingEntry)}
                   className="flex-1"
                   disabled={savingEdit}
                 >

@@ -331,13 +331,19 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const logoBase64 = await fetchLogoAsBase64();
     const pdfArrayBuffer = generatePDF(uebernahme as Uebernahme, logoBase64);
 
-    // Build storage path: {project_id}/Abnahme Protokoll/Uebernahmebestaetigung_{kunde}_{datum}.pdf
-    const kundeSafe = (uebernahme.kunde_name || "Kunde").replace(
-      /[^a-zA-Z0-9äöüÄÖÜß_-]/g,
-      "_"
-    );
+    // Build storage path. Supabase Storage lehnt Nicht-ASCII-Keys ab, daher
+    // Umlaute/ß transliterieren statt sie im Key zu belassen.
+    const transliterate = (s: string) =>
+      s
+        .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue")
+        .replace(/Ä/g, "Ae").replace(/Ö/g, "Oe").replace(/Ü/g, "Ue")
+        .replace(/ß/g, "ss");
+    const kundeSafe = transliterate(uebernahme.kunde_name || "Kunde").replace(/[^a-zA-Z0-9_-]/g, "_");
     const datumSafe = formatDateShort(uebernahme.datum).replace(/\./g, "-");
-    const path = `${uebernahme.project_id}/Abnahme Protokoll/Uebernahmebestaetigung_${kundeSafe}_${datumSafe}.pdf`;
+    // Eindeutiger Zeitstempel, damit eine spätere Übernahme (gleicher Kunde+Datum)
+    // eine bereits unterschriebene PDF nicht überschreibt.
+    const stamp = uebernahme.id.slice(0, 8);
+    const path = `${uebernahme.project_id}/Abnahme Protokoll/Uebernahmebestaetigung_${kundeSafe}_${datumSafe}_${stamp}.pdf`;
 
     // Upload PDF to the project files bucket
     const { error: uploadError } = await supabaseAdmin.storage

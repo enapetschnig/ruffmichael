@@ -69,8 +69,19 @@ type StorageEntry = {
 
 type ItemRef = { kind: "folder" | "file"; name: string };
 
-const sanitizeFileName = (name: string) =>
-  name.replace(/[^a-zA-Z0-9._ ()äöüÄÖÜß-]/g, "_");
+// Wandelt einen benutzerfreundlichen Namen in einen gültigen Supabase-Storage-Key um.
+// Supabase Storage lehnt Nicht-ASCII-Object-Keys ab ("Invalid key"), daher werden
+// Umlaute/ß zuerst transliteriert und danach alle übrigen Sonderzeichen entfernt.
+const toStorageKey = (name: string) =>
+  name
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/Ä/g, "Ae")
+    .replace(/Ö/g, "Oe")
+    .replace(/Ü/g, "Ue")
+    .replace(/ß/g, "ss")
+    .replace(/[^a-zA-Z0-9._ ()-]/g, "_");
 
 const formatBytes = (bytes?: number | null) => {
   if (bytes === undefined || bytes === null) return "";
@@ -236,7 +247,17 @@ const ProjectFiles = () => {
   };
 
   const handleCreateFolder = async () => {
-    const name = createName.trim();
+    const rawName = createName.trim();
+    if (rawName.includes("/")) {
+      toast({
+        variant: "destructive",
+        title: "Ungültiger Name",
+        description: 'Der Name darf kein "/" enthalten.',
+      });
+      return;
+    }
+    // Ordnername wird als Storage-Key gespeichert (Umlaute -> ae/oe/ue ...)
+    const name = toStorageKey(rawName);
     const validationError = validateFolderName(name);
     if (validationError) {
       toast({
@@ -279,8 +300,16 @@ const ProjectFiles = () => {
   const handleRename = async () => {
     if (!renameTarget) return;
     const rawName = renameValue.trim();
-    const newName =
-      renameTarget.kind === "file" ? sanitizeFileName(rawName) : rawName;
+    if (rawName.includes("/")) {
+      toast({
+        variant: "destructive",
+        title: "Ungültiger Name",
+        description: 'Der Name darf kein "/" enthalten.',
+      });
+      return;
+    }
+    // Sowohl Datei- als auch Ordnernamen werden als Storage-Key gespeichert
+    const newName = toStorageKey(rawName);
 
     if (newName === renameTarget.name) {
       setRenameTarget(null);
@@ -376,7 +405,12 @@ const ProjectFiles = () => {
         return;
       }
 
-      await moveAllUnder(`${basePath}/${moveTarget}`, `${destPrefix}/${moveTarget}`);
+      // Zielsegment ebenfalls als Storage-Key aufbauen (bestehende Namen sind
+      // bereits ASCII, daher idempotent – schützt aber vor ungültigen Keys)
+      await moveAllUnder(
+        `${basePath}/${moveTarget}`,
+        `${destPrefix}/${toStorageKey(moveTarget)}`
+      );
       toast({
         title: "Verschoben",
         description: `"${moveTarget}" wurde nach ${destRel ? `"${destRel}"` : "den Projektstamm"} verschoben.`,
@@ -431,7 +465,7 @@ const ProjectFiles = () => {
 
     let successCount = 0;
     for (const file of Array.from(fileList)) {
-      const safeName = sanitizeFileName(file.name) || "datei";
+      const safeName = toStorageKey(file.name) || "datei";
       const { error } = await supabase.storage
         .from(BUCKET)
         .upload(`${basePath}/${safeName}`, file);

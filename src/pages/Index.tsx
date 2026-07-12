@@ -103,9 +103,15 @@ export default function Index() {
 
     const [{ data: profileData }, { data: roleData }] = await Promise.all([profileReq, roleReq]);
 
-    // Falls Profil noch nicht existiert (Trigger hat noch nicht ausgeführt), trotzdem weitermachen
-    setIsActivated(true);
-    
+    const role = roleData?.role ?? null;
+    setUserRole(role);
+    const isAdminUser = role === "administrator";
+
+    // Deaktivierte Benutzer sperren – Administratoren können sich niemals selbst aussperren.
+    // Fehlende Profilzeile (Trigger noch nicht gelaufen, Erstanmeldung) wird als "nicht gesperrt" behandelt.
+    const isBlocked = profileData ? profileData.is_active === false && !isAdminUser : false;
+    setIsActivated(!isBlocked);
+
     if (profileData) {
       setUserName(`${profileData.vorname} ${profileData.nachname}`.trim());
     } else {
@@ -115,9 +121,6 @@ export default function Index() {
         setUserName(`${user.user_metadata.vorname || ''} ${user.user_metadata.nachname || ''}`.trim() || 'Neuer Benutzer');
       }
     }
-
-    const role = roleData?.role ?? null;
-    setUserRole(role);
 
     await Promise.all([
       fetchProjects(),
@@ -179,31 +182,41 @@ export default function Index() {
       })
       .subscribe();
 
-    // Realtime subscription for time entries
-    const entriesChannel = supabase
-      .channel("dashboard-entries")
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+      supabase.removeChannel(projectsChannel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigate]);
+
+  // Realtime subscription for time entries – separater Effekt, damit die tatsächliche
+  // (authentifizierte) User-ID verwendet und bei Wechsel neu abonniert wird.
+  useEffect(() => {
+    if (!user?.id) return;
+    const isAdminUser = userRole === "administrator";
+    const channel = supabase
+      .channel(`dashboard-entries-${user.id}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "time_entries",
-          filter: user ? `user_id=eq.${user.id}` : undefined,
+          // Admins sehen alle Buchungen, Mitarbeiter nur eigene.
+          ...(isAdminUser ? {} : { filter: `user_id=eq.${user.id}` }),
         },
         () => {
-          if (user) fetchRecentEntries(user.id, userRole);
+          fetchRecentEntries(user.id, userRole);
         }
       )
       .subscribe();
 
     return () => {
-      isMounted = false;
-      subscription.unsubscribe();
-      supabase.removeChannel(projectsChannel);
-      supabase.removeChannel(entriesChannel);
+      supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigate]);
+  }, [user?.id, userRole]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut({ scope: "local" });
@@ -226,6 +239,28 @@ export default function Index() {
 
   if (!user) {
     return null;
+  }
+
+  // Gesperrte (deaktivierte) Benutzer erhalten keinen Zugriff auf das Dashboard.
+  if (isActivated === false) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="max-w-md w-full">
+          <CardHeader>
+            <CardTitle>Zugang deaktiviert</CardTitle>
+            <CardDescription>
+              Dein Zugang wurde deaktiviert. Bitte wende dich an die Verwaltung.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button className="w-full" onClick={handleLogout}>
+              <LogOut className="mr-2 h-4 w-4" />
+              Abmelden
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   const isAdmin = userRole === "administrator";
@@ -546,7 +581,9 @@ export default function Index() {
                   key={entry.id} 
                   className="hover:shadow-md transition-shadow cursor-pointer"
                   onClick={() => {
-                    if (entry.disturbance_id) {
+                    // Nur Admins dürfen Regieberichte anderer öffnen (RLS). Mitarbeiter
+                    // würden auf einer leeren/fehlerhaften Seite landen -> zu "Meine Stunden".
+                    if (isAdmin && entry.disturbance_id) {
                       navigate(`/disturbances/${entry.disturbance_id}`);
                     } else {
                       navigate("/my-hours");

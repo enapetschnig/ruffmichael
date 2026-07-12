@@ -16,6 +16,9 @@ export function MobilePhotoCapture({ open, onClose, onPhotoCapture }: MobilePhot
   const [uploading, setUploading] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Hält den aktiven Stream unabhängig vom State-Closure, damit das Cleanup
+  // beim Unmount garantiert den zuletzt gestarteten Stream stoppt.
+  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -26,7 +29,14 @@ export function MobilePhotoCapture({ open, onClose, onPhotoCapture }: MobilePhot
     } else {
       stopCamera();
     }
-    return () => stopCamera();
+    // Cleanup nutzt bewusst die Ref (nicht den State-Closure), damit beim Unmount
+    // wirklich der aktuelle Stream freigegeben wird (Kamera-LED bleibt sonst an).
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+    };
   }, [open]);
 
   const startCamera = async () => {
@@ -39,6 +49,7 @@ export function MobilePhotoCapture({ open, onClose, onPhotoCapture }: MobilePhot
         },
         audio: false,
       });
+      streamRef.current = stream;
       setCameraStream(stream);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -54,10 +65,13 @@ export function MobilePhotoCapture({ open, onClose, onPhotoCapture }: MobilePhot
   };
 
   const stopCamera = () => {
-    if (cameraStream) {
-      cameraStream.getTracks().forEach(track => track.stop());
-      setCameraStream(null);
+    // Immer über die Ref stoppen, damit auch ein veralteter State-Closure
+    // den tatsächlich aktiven Stream freigibt.
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
     }
+    setCameraStream(null);
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }

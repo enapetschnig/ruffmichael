@@ -172,9 +172,20 @@ export default function HoursReport() {
     return days;
   };
 
-  const calculateOvertime = (date: Date, totalHours: number): number => {
-    const normalHours = getNormalWorkingHours(date);
-    return Math.max(0, totalHours - normalHours);
+  // Tätigkeiten, die als Abwesenheit gelten und NICHT als Überstunden zählen
+  const ABSENCE_TAETIGKEITEN = ["Urlaub", "Krankenstand", "Weiterbildung", "Feiertag"];
+  const isAbsenceEntry = (entry: TimeEntry): boolean =>
+    ABSENCE_TAETIGKEITEN.includes(entry.taetigkeit);
+
+  // Überstunden PRO TAG: Summe der (Nicht-Abwesenheits-)Stunden aller Blöcke
+  // eines Tages abzüglich der Normalarbeitszeit. Ein Tag kann mehrere
+  // time_entries-Zeilen (Blöcke) haben – daher muss die Berechnung pro Tag und
+  // nicht pro Eintrag erfolgen. Abwesenheiten zählen nicht als Überstunden.
+  const calculateDayOvertime = (date: Date, entries: TimeEntry[]): number => {
+    const workHours = entries
+      .filter((e) => !isAbsenceEntry(e))
+      .reduce((sum, e) => sum + e.stunden, 0);
+    return Math.max(0, workHours - getNormalWorkingHours(date));
   };
 
   const calculateLunchBreak = (entry: TimeEntry) => {
@@ -201,10 +212,19 @@ export default function HoursReport() {
 
   const monthDays = generateMonthDays();
   const totalHours = timeEntries.reduce((sum, entry) => sum + entry.stunden, 0);
-  const totalOvertime = timeEntries.reduce((sum, entry) => {
-    const entryDate = parseISO(entry.datum);
-    return sum + calculateOvertime(entryDate, entry.stunden);
-  }, 0);
+
+  // Einträge nach Tag gruppieren (ein Tag kann mehrere Blöcke haben)
+  const entriesByDay = timeEntries.reduce((map, entry) => {
+    if (!map[entry.datum]) map[entry.datum] = [];
+    map[entry.datum].push(entry);
+    return map;
+  }, {} as Record<string, TimeEntry[]>);
+
+  // Überstunden PRO TAG summieren (nicht pro Eintrag)
+  const totalOvertime = Object.entries(entriesByDay).reduce(
+    (sum, [datum, entries]) => sum + calculateDayOvertime(parseISO(datum), entries),
+    0
+  );
 
   const addBordersToCell = (cell: any, thick: boolean = false, centered: boolean = false) => {
     const borderStyle = thick ? "medium" : "thin";
@@ -266,7 +286,8 @@ export default function HoursReport() {
       const dayDate = new Date(year, month - 1, day);
       // Finde alle Einträge für diesen Tag
       const dayEntries = timeEntries.filter((e) => isSameDay(parseISO(e.datum), dayDate));
-      
+      // Überstunden PRO TAG (über alle Blöcke des Tages)
+      const dayOvertime = calculateDayOvertime(dayDate, dayEntries);
 
       if (dayEntries.length === 0) {
         worksheetData.push([day, "", "", "", "", "", "", "", "", "", "", ""]);
@@ -308,8 +329,9 @@ export default function HoursReport() {
               ? `${lunchBreak.start} - ${lunchBreak.end}` 
               : "";
             
-            const overtime = calculateOvertime(dayDate, entry.stunden);
-            const overtimeText = overtime > 0 ? overtime.toFixed(2) : "";
+            // Überstunden einmal pro Tag: bei Einzeleintrag in der Zeile,
+            // bei mehreren Blöcken in der Tagessumme-Zeile (siehe unten).
+            const overtimeText = dayEntries.length === 1 && dayOvertime > 0 ? dayOvertime.toFixed(2) : "";
 
             worksheetData.push([
               displayDay,
@@ -346,7 +368,8 @@ export default function HoursReport() {
               regelPause,
               regelAfternoonStart,
               regelEnd,
-              regelarbeitszeit.toFixed(2),
+              // Regelarbeitszeit nur einmal pro Tag (erste Zeile des Tages)
+              entryIndex === 0 ? regelarbeitszeit.toFixed(2) : "",
               ortText,
               projektName,
               entry.taetigkeit,
@@ -359,17 +382,15 @@ export default function HoursReport() {
         // Tagessumme wenn mehrere Einträge am Tag
         if (dayEntries.length > 1) {
           const dayTotalHours = dayEntries.reduce((sum, e) => sum + e.stunden, 0);
-          const dayTotalOvertime = dayEntries.reduce((sum, e) => sum + calculateOvertime(dayDate, e.stunden), 0);
           if (includeOvertime) {
-            worksheetData.push(["", "", "", "", "", "Tagessumme:", dayTotalHours.toFixed(2), dayTotalOvertime > 0 ? dayTotalOvertime.toFixed(2) : "", "", "", "", ""]);
+            worksheetData.push(["", "", "", "", "", "Tagessumme:", dayTotalHours.toFixed(2), dayOvertime > 0 ? dayOvertime.toFixed(2) : "", "", "", "", ""]);
           } else {
-            // Tagessumme mit Regelarbeitszeit
+            // Tagessumme mit Regelarbeitszeit (einmal pro Tag, NICHT × Anzahl Blöcke)
             const dayOfWeek = dayDate.getDay();
             const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
             const isFridayCheck = dayOfWeek === 5;
             const regelarbeitszeitTag = isWeekend ? 0 : (isFridayCheck ? 5 : 8.5);
-            // Bei mehreren Einträgen pro Tag: Regelarbeitszeit * Anzahl Einträge oder einfach die Tagessumme der Regelarbeitszeit
-            worksheetData.push(["", "", "", "", "", "Tagessumme:", (regelarbeitszeitTag * dayEntries.length).toFixed(2), "", "", "", "", ""]);
+            worksheetData.push(["", "", "", "", "", "Tagessumme:", regelarbeitszeitTag.toFixed(2), "", "", "", "", ""]);
           }
         }
       }
@@ -386,7 +407,8 @@ export default function HoursReport() {
           const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
           const isFridayCheck = dayOfWeek === 5;
           const regelarbeitszeit = isWeekend ? 0 : (isFridayCheck ? 5 : 8.5);
-          summe += regelarbeitszeit * dayEntries.length;
+          // Regelarbeitszeit einmal pro Tag-mit-Einträgen (NICHT × Anzahl Blöcke)
+          summe += regelarbeitszeit;
         }
       }
       return summe;
@@ -669,6 +691,8 @@ export default function HoursReport() {
                             const dayEntries = timeEntries.filter((e) => isSameDay(parseISO(e.datum), day.date));
                             const dayTotalHours = dayEntries.reduce((sum, e) => sum + e.stunden, 0);
                             const hasMultipleEntries = dayEntries.length > 1;
+                            // Überstunden PRO TAG (über alle Blöcke)
+                            const dayOvertime = calculateDayOvertime(day.date, dayEntries);
 
                             if (dayEntries.length === 0) {
                               return (
@@ -691,7 +715,6 @@ export default function HoursReport() {
 
                             return dayEntries.map((entry, entryIndex) => {
                               const lunchBreak = calculateLunchBreak(entry);
-                              const overtime = calculateOvertime(day.date, entry.stunden);
                               const project = projects[entry.project_id];
                               const ortIcon = entry.location_type === "baustelle" ? "🏗️" : entry.location_type === "werkstatt" ? "🔧" : "";
                               const ortText = entry.location_type === "baustelle" ? "Baustelle" : entry.location_type === "werkstatt" ? "Werkstatt" : "";
@@ -749,9 +772,9 @@ export default function HoursReport() {
                                     )}
                                   </TableCell>
                                   <TableCell className="text-right">
-                                    {overtime > 0 && (
+                                    {isLastEntry && dayOvertime > 0 && (
                                       <span className="text-orange-600 font-medium">
-                                        +{overtime.toFixed(2)} h
+                                        +{dayOvertime.toFixed(2)} h
                                       </span>
                                     )}
                                   </TableCell>

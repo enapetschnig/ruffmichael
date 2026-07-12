@@ -144,28 +144,45 @@ const ProjectDetail = () => {
     if (!e.target.files || e.target.files.length === 0 || !projectId || !type) return;
 
     setUploading(true);
-    const file = e.target.files[0];
     const bucket = bucketMap[type];
-    const filePath = `${projectId}/${Date.now()}_${file.name}`;
+    const selectedFiles = Array.from(e.target.files);
 
-    const { error } = await supabase
-      .storage
-      .from(bucket)
-      .upload(filePath, file);
+    let successCount = 0;
+    let firstError: string | null = null;
 
-    if (error) {
-      toast({
-        variant: "destructive",
-        title: "Fehler",
-        description: "Datei konnte nicht hochgeladen werden",
-      });
-    } else {
+    for (let i = 0; i < selectedFiles.length; i++) {
+      const file = selectedFiles[i];
+      // Index im Pfad verhindert Kollisionen bei mehreren Uploads in derselben Millisekunde
+      const filePath = `${projectId}/${Date.now()}_${i}_${file.name}`;
+
+      const { error } = await supabase
+        .storage
+        .from(bucket)
+        .upload(filePath, file);
+
+      if (error) {
+        if (!firstError) firstError = error.message;
+      } else {
+        successCount++;
+      }
+    }
+
+    if (successCount > 0) {
       toast({
         title: "Erfolg",
-        description: "Datei wurde hochgeladen",
+        description: `${successCount} ${successCount === 1 ? "Datei wurde" : "Dateien wurden"} hochgeladen`,
       });
       fetchFiles();
     }
+
+    if (successCount < selectedFiles.length) {
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: firstError || "Einige Dateien konnten nicht hochgeladen werden",
+      });
+    }
+
     setUploading(false);
     e.target.value = "";
   };

@@ -158,16 +158,54 @@ const DisturbanceDetail = () => {
 
   const handleDelete = async () => {
     if (!disturbance) return;
-    
+
+    if (!currentUserId) {
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Löschen konnte nicht geprüft werden. Bitte laden Sie die Seite neu.",
+      });
+      return;
+    }
+
     setDeleting(true);
 
-    // Delete associated time entry first
+    // Guard: time entries of OTHER users cannot be deleted from the client (RLS
+    // restricts deletes to the owner's own rows). Deleting the disturbance would
+    // orphan those booked hours, so we block deletion when foreign entries exist.
+    const { count: foreignEntries, error: countError } = await supabase
+      .from("time_entries")
+      .select("id", { count: "exact", head: true })
+      .eq("disturbance_id", disturbance.id)
+      .neq("user_id", currentUserId);
+
+    if (countError) {
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Verknüpfte Stundeneinträge konnten nicht geprüft werden",
+      });
+      setDeleting(false);
+      return;
+    }
+
+    if ((foreignEntries ?? 0) > 0) {
+      toast({
+        variant: "destructive",
+        title: "Löschen nicht möglich",
+        description: "Diesem Regiebericht sind Stundeneinträge von Team-Mitgliedern zugeordnet, die nicht entfernt werden können. Bitte behalten Sie den Bericht, da die gebuchten Team-Stunden sonst erhalten bleiben würden.",
+      });
+      setDeleting(false);
+      return;
+    }
+
+    // Only the author's own time entries are linked — delete them first.
     await supabase
       .from("time_entries")
       .delete()
       .eq("disturbance_id", disturbance.id);
 
-    // Delete the disturbance (materials will cascade)
+    // Delete the disturbance (materials/workers/photos cascade)
     const { error } = await supabase
       .from("disturbances")
       .delete()

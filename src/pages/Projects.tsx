@@ -47,6 +47,7 @@ type Project = {
     materials: number;
     photos: number;
     chef: number;
+    dateien: number;
   };
 };
 
@@ -189,17 +190,18 @@ const Projects = () => {
     // Fetch file counts for each project
     const projectsWithCounts = await Promise.all(
       (data || []).map(async (project) => {
-        const [plans, reports, materials, photos, chef] = await Promise.all([
+        const [plans, reports, materials, photos, chef, dateien] = await Promise.all([
           getFileCount(project.id, 'project-plans'),
           getFileCount(project.id, 'project-reports'),
           getFileCount(project.id, 'project-materials'),
           getFileCount(project.id, 'project-photos'),
           getFileCount(project.id, 'project-chef'),
+          getProjectFilesCount(project.id),
         ]);
 
         return {
           ...project,
-          fileCount: { plans, reports, materials, photos, chef },
+          fileCount: { plans, reports, materials, photos, chef, dateien },
         };
       })
     );
@@ -367,19 +369,20 @@ const Projects = () => {
 
   // Ampel: Status eines Projekts setzen (auch für Nicht-Admins)
   const handleSetProjectAmpel = async (projectId: string, statusId: string | null) => {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("projects")
       .update({ status_id: statusId })
-      .eq("id", projectId);
+      .eq("id", projectId)
+      .select("id");
 
-    if (error) {
+    if (error || !data || data.length === 0) {
       toast({
         variant: "destructive",
         title: "Fehler",
-        description: "Status konnte nicht gesetzt werden",
+        description: "Status konnte nicht gespeichert werden",
       });
-      return;
     }
+    // In jedem Fall neu laden, damit die UI den tatsächlichen DB-Stand zeigt
     fetchProjects();
   };
 
@@ -552,35 +555,69 @@ const Projects = () => {
     const { id, name } = projectToDelete;
 
     try {
-      // Unterschriebene Nachträge blockieren das Löschen (rechtlich relevante Dokumente)
-      const { count: signedCount, error: signedError } = await supabase
-        .from('nachtraege')
-        .select('id', { count: 'exact', head: true })
-        .eq('project_id', id)
-        .eq('status', 'unterschrieben');
+      // Sicherheitsprüfung: Ein Projekt darf nur gelöscht werden, wenn keine
+      // rechtlich/fachlich relevanten Daten daran hängen. reports, uebernahmen und
+      // nachtraege haben project_id NOT NULL mit ON DELETE CASCADE – ein Löschen
+      // würde diese Datensätze (Regieberichte, Übernahmen) unwiederbringlich
+      // mitlöschen. time_entries würden fremden Mitarbeitenden verloren gehen.
+      // Deshalb VOR dem Löschen zählen und bei Blockern abbrechen.
+      const [
+        timeRes,
+        reportsRes,
+        signedRes,
+        uebernahmenRes,
+      ] = await Promise.all([
+        supabase
+          .from('time_entries')
+          .select('id', { count: 'exact', head: true })
+          .eq('project_id', id),
+        supabase
+          .from('reports')
+          .select('id', { count: 'exact', head: true })
+          .eq('project_id', id),
+        supabase
+          .from('nachtraege')
+          .select('id', { count: 'exact', head: true })
+          .eq('project_id', id)
+          .eq('status', 'unterschrieben'),
+        supabase
+          .from('uebernahmen')
+          .select('id', { count: 'exact', head: true })
+          .eq('project_id', id),
+      ]);
 
-      if (signedError) throw signedError;
+      const firstError =
+        timeRes.error || reportsRes.error || signedRes.error || uebernahmenRes.error;
+      if (firstError) throw firstError;
 
-      if ((signedCount ?? 0) > 0) {
+      const timeN = timeRes.count ?? 0;
+      const reportsN = reportsRes.count ?? 0;
+      const signedN = signedRes.count ?? 0;
+      const uebernahmenN = uebernahmenRes.count ?? 0;
+
+      if (timeN + reportsN + signedN + uebernahmenN > 0) {
+        const blockers: string[] = [];
+        if (timeN > 0) blockers.push(timeN === 1 ? '1 gebuchter Zeiteintrag' : `${timeN} gebuchte Zeiteinträge`);
+        if (reportsN > 0) blockers.push(reportsN === 1 ? '1 Regiebericht' : `${reportsN} Regieberichte`);
+        if (signedN > 0) blockers.push(signedN === 1 ? '1 unterschriebener Nachtrag' : `${signedN} unterschriebene Nachträge`);
+        if (uebernahmenN > 0) blockers.push(uebernahmenN === 1 ? '1 Übernahmebestätigung' : `${uebernahmenN} Übernahmebestätigungen`);
+
         toast({
           title: "Löschen nicht möglich",
-          description:
-            signedCount === 1
-              ? "Projekt hat 1 unterschriebenen Nachtrag und kann nicht gelöscht werden"
-              : `Projekt hat ${signedCount} unterschriebene Nachträge und kann nicht gelöscht werden`,
+          description: `Projekt kann nicht gelöscht werden: ${blockers.join(', ')}. Bitte zuerst diese Einträge entfernen oder das Projekt stattdessen schließen.`,
           variant: "destructive",
         });
         return;
       }
 
-      // Delete all files from storage buckets
-      const buckets = ['project-plans', 'project-reports', 'project-materials', 'project-photos'];
-      
+      // Ab hier stehen keine Blocker mehr im Weg → alle Storage-Buckets aufräumen.
+      const buckets = ['project-plans', 'project-reports', 'project-materials', 'project-photos', 'project-chef'];
+
       for (const bucket of buckets) {
         const { data: files } = await supabase.storage
           .from(bucket)
           .list(id);
-        
+
         if (files && files.length > 0) {
           const filePaths = files.map(file => `${id}/${file.name}`);
           await supabase.storage
@@ -589,21 +626,19 @@ const Projects = () => {
         }
       }
 
+      // 'project-files' enthält den kompletten Projektordner-Baum (verschachtelt) →
+      // rekursiv alle Schlüssel sammeln und in Blöcken entfernen.
+      const projectFileKeys = await listProjectFilesRecursive(`${id}`);
+      for (let i = 0; i < projectFileKeys.length; i += 100) {
+        await supabase.storage
+          .from('project-files')
+          .remove(projectFileKeys.slice(i, i + 100));
+      }
+
       // Delete documents entries
       await supabase
         .from('documents')
         .delete()
-        .eq('project_id', id);
-
-      // Set project_id to null in time_entries and reports
-      await supabase
-        .from('time_entries')
-        .update({ project_id: null })
-        .eq('project_id', id);
-
-      await supabase
-        .from('reports')
-        .update({ project_id: null })
         .eq('project_id', id);
 
       // Finally delete the project
@@ -685,6 +720,41 @@ const Projects = () => {
     }
 
     return data?.length || 0;
+  };
+
+  // Der Bucket 'project-files' speichert den kompletten Projektordner-Baum unter
+  // verschachtelten Pfaden (`${id}/Ordner/.../datei`). Wir listen rekursiv alle
+  // Dateischlüssel auf – Einträge mit id === null sind Ordner.
+  const listProjectFilesRecursive = async (prefix: string): Promise<string[]> => {
+    const keys: string[] = [];
+    const { data, error } = await supabase.storage
+      .from('project-files')
+      .list(prefix, { limit: 1000 });
+
+    if (error || !data) {
+      if (error) console.error(`Error listing project-files at "${prefix}":`, error);
+      return keys;
+    }
+
+    for (const entry of data) {
+      const path = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.id === null) {
+        // Ordner → rekursiv weiter
+        const nested = await listProjectFilesRecursive(path);
+        keys.push(...nested);
+      } else {
+        keys.push(path);
+      }
+    }
+
+    return keys;
+  };
+
+  // Anzahl echter Dateien (ohne Ordner und ohne .keep-Platzhalter) im
+  // Projektordner-Baum von 'project-files'.
+  const getProjectFilesCount = async (projectId: string): Promise<number> => {
+    const keys = await listProjectFilesRecursive(`${projectId}`);
+    return keys.filter((k) => k.split('/').pop() !== '.keep').length;
   };
 
   const formatDate = (dateString: string) => {
@@ -1003,7 +1073,7 @@ const Projects = () => {
                   </p>
                 )}
                 
-                <div className={`grid ${isAdmin ? 'grid-cols-5' : 'grid-cols-2 sm:grid-cols-4'} gap-2 sm:gap-3 mb-4`}>
+                <div className={`grid ${isAdmin ? 'grid-cols-3 sm:grid-cols-6' : 'grid-cols-2 sm:grid-cols-5'} gap-2 sm:gap-3 mb-4`}>
                   <div className="flex flex-col items-center gap-1 p-2">
                     <FileText className="w-5 h-5 text-primary" />
                     <span className="text-xs font-medium">Pläne</span>
@@ -1041,6 +1111,13 @@ const Projects = () => {
                       </span>
                     </div>
                   )}
+                  <div className="flex flex-col items-center gap-1 p-2">
+                    <FolderOpen className="w-5 h-5 text-primary" />
+                    <span className="text-xs font-medium">Dateien</span>
+                    <span className="text-xs text-muted-foreground">
+                      {project.fileCount?.dateien || 0}
+                    </span>
+                  </div>
                 </div>
 
                 <DropdownMenu>
@@ -1198,7 +1275,7 @@ const Projects = () => {
                         </p>
                       )}
                       
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4">
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3 mb-4">
                         <div className="flex flex-col items-center gap-1 p-2">
                           <FileText className="w-5 h-5 text-primary" />
                           <span className="text-xs font-medium">Pläne</span>
@@ -1225,6 +1302,13 @@ const Projects = () => {
                           <span className="text-xs font-medium">Fotos</span>
                           <span className="text-xs text-muted-foreground">
                             {project.fileCount?.photos || 0}
+                          </span>
+                        </div>
+                        <div className="flex flex-col items-center gap-1 p-2">
+                          <FolderOpen className="w-5 h-5 text-primary" />
+                          <span className="text-xs font-medium">Dateien</span>
+                          <span className="text-xs text-muted-foreground">
+                            {project.fileCount?.dateien || 0}
                           </span>
                         </div>
                       </div>
@@ -1324,7 +1408,9 @@ const Projects = () => {
             <AlertDialogDescription>
               Bist du sicher, dass du das Projekt <strong>{projectToDelete?.name}</strong> unwiderruflich löschen möchtest?
               <br /><br />
-              <span className="text-destructive font-semibold">Alle zugehörigen Dateien, Dokumente, Ordner, Nachträge und Zuweisungen des Projekts werden ebenfalls gelöscht.</span>
+              <span className="text-destructive font-semibold">Alle zugehörigen Dateien, Dokumente und Ordner des Projekts werden ebenfalls gelöscht.</span>
+              <br /><br />
+              Projekte mit gebuchten Zeiten, Regieberichten, Übernahmen oder unterschriebenen Nachträgen können zum Schutz dieser Daten nicht gelöscht werden. Entferne diese Einträge zuerst oder schließe das Projekt stattdessen.
               <br /><br />
               Diese Aktion kann nicht rückgängig gemacht werden!
             </AlertDialogDescription>

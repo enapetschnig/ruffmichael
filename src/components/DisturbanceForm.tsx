@@ -17,6 +17,7 @@ type MaterialEntry = {
   id: string;
   material: string;
   menge: string;
+  notizen: string;
 };
 
 type CustomerSuggestion = {
@@ -204,6 +205,7 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
           id: crypto.randomUUID(),
           material: String(m.material ?? ""),
           menge: String(m.menge ?? ""),
+          notizen: String(m.notizen ?? ""),
         })).filter((m: MaterialEntry) => m.material.trim()),
       ]);
     }
@@ -230,14 +232,15 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
   const loadExistingMaterials = async (disturbanceId: string) => {
     const { data } = await supabase
       .from("disturbance_materials")
-      .select("id, material, menge")
+      .select("id, material, menge, notizen")
       .eq("disturbance_id", disturbanceId);
-    
+
     if (data) {
       setMaterials(data.map(m => ({
         id: m.id,
         material: m.material,
         menge: m.menge || "",
+        notizen: m.notizen || "",
       })));
     }
   };
@@ -250,7 +253,7 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
   };
 
   const addMaterial = () => {
-    setMaterials([...materials, { id: crypto.randomUUID(), material: "", menge: "" }]);
+    setMaterials([...materials, { id: crypto.randomUUID(), material: "", menge: "", notizen: "" }]);
   };
 
   const removeMaterial = (id: string) => {
@@ -295,8 +298,10 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
 
     const stunden = calculateHours();
 
+    // NOTE: user_id is intentionally NOT part of this shared payload. It is only set
+    // on INSERT (create). On UPDATE it must never be sent, otherwise an admin editing
+    // someone else's Regiebericht would overwrite (steal) the original owner's user_id.
     const disturbanceData = {
-      user_id: user.id,
       datum: formData.datum,
       start_time: formData.startTime,
       end_time: formData.endTime,
@@ -311,7 +316,17 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
     };
 
     if (editData) {
-      // Update existing
+      // Did the scheduled date/times change? Team members' time entries cannot be
+      // updated from the client (RLS restricts updates to the owner's own rows), so
+      // we warn the user afterwards instead of silently leaving them out of sync.
+      const timesChanged =
+        editData.datum !== formData.datum ||
+        editData.start_time.slice(0, 5) !== formData.startTime ||
+        editData.end_time.slice(0, 5) !== formData.endTime ||
+        editData.pause_minutes !== formData.pauseMinutes;
+
+      // Update existing. disturbanceData does NOT contain user_id, so ownership is
+      // preserved even when an admin edits another user's Regiebericht (BUG 1).
       const { error } = await supabase
         .from("disturbances")
         .update(disturbanceData)
@@ -325,19 +340,27 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
 
       // Update time entries for all workers
       await updateTimeEntriesForAllWorkers(editData.id, user.id, stunden);
-      
+
       // Update workers
       await updateDisturbanceWorkers(editData.id, user.id, selectedEmployees);
-      
+
       // Update materials
       await updateMaterials(editData.id, user.id);
 
-      toast({ title: "Erfolg", description: "Regiebericht wurde aktualisiert" });
+      if (timesChanged && selectedEmployees.length > 0) {
+        // Time entries of team members could not be updated here (RLS). Make it explicit.
+        toast({
+          title: "Regiebericht aktualisiert",
+          description: "Zeiten des Regieberichts geändert — die Stundeneinträge der Team-Mitglieder müssen ggf. manuell angepasst werden",
+        });
+      } else {
+        toast({ title: "Erfolg", description: "Regiebericht wurde aktualisiert" });
+      }
     } else {
-      // Create new disturbance
+      // Create new disturbance (user_id set here only — this user becomes the owner)
       const { data: newDisturbance, error } = await supabase
         .from("disturbances")
-        .insert(disturbanceData)
+        .insert({ ...disturbanceData, user_id: user.id })
         .select()
         .single();
 
@@ -416,6 +439,7 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
             user_id: user.id,
             material: m.material.trim(),
             menge: m.menge.trim() || null,
+            notizen: m.notizen?.trim() || null,
           }))
         );
       }
@@ -435,8 +459,11 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
   };
 
   const updateTimeEntriesForAllWorkers = async (disturbanceId: string, mainUserId: string, stunden: number) => {
-    // Update existing time entries
-    await supabase
+    // RLS only allows a user to update their OWN time_entries. We therefore scope the
+    // update to the current user's entry and actually check for errors instead of
+    // failing silently. Team members' entries cannot be updated from the client — the
+    // caller shows a warning toast when times change and team workers are involved.
+    const { error } = await supabase
       .from("time_entries")
       .update({
         datum: formData.datum,
@@ -446,7 +473,17 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
         stunden,
         taetigkeit: `Regiebericht: ${formData.kundeName.trim()}`,
       })
-      .eq("disturbance_id", disturbanceId);
+      .eq("disturbance_id", disturbanceId)
+      .eq("user_id", mainUserId);
+
+    if (error) {
+      console.error("Error updating own time entry:", error);
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Ihr Stundeneintrag konnte nicht aktualisiert werden",
+      });
+    }
   };
 
   const updateDisturbanceWorkers = async (disturbanceId: string, mainUserId: string, newWorkerIds: string[]) => {
@@ -543,24 +580,32 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
   };
 
   const updateMaterials = async (disturbanceId: string, userId: string) => {
-    // Delete existing materials
+    const validMaterials = materials.filter(m => m.material.trim());
+
+    // Guard: if the form currently has no materials, do NOT delete existing rows.
+    // An empty form during an edit is far more likely a load/RLS artefact than an
+    // intentional wipe, and the delete could also be RLS-blocked for rows added by
+    // other users (leaving duplicates). Skipping avoids destroying valid data.
+    if (validMaterials.length === 0) {
+      return;
+    }
+
+    // Replace existing materials, preserving each material's notizen so an edit
+    // never silently loses per-material notes.
     await supabase
       .from("disturbance_materials")
       .delete()
       .eq("disturbance_id", disturbanceId);
 
-    // Add new materials
-    const validMaterials = materials.filter(m => m.material.trim());
-    if (validMaterials.length > 0) {
-      await supabase.from("disturbance_materials").insert(
-        validMaterials.map(m => ({
-          disturbance_id: disturbanceId,
-          user_id: userId,
-          material: m.material.trim(),
-          menge: m.menge.trim() || null,
-        }))
-      );
-    }
+    await supabase.from("disturbance_materials").insert(
+      validMaterials.map(m => ({
+        disturbance_id: disturbanceId,
+        user_id: userId,
+        material: m.material.trim(),
+        menge: m.menge.trim() || null,
+        notizen: m.notizen?.trim() || null,
+      }))
+    );
   };
 
   return (
@@ -785,6 +830,7 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
                         id: crypto.randomUUID(),
                         material: m.einheit ? `${m.name} (${m.einheit})` : m.name,
                         menge: "",
+                        notizen: "",
                       },
                     ])
                   }

@@ -105,13 +105,14 @@ export const SignatureDialog = ({
     setSending(true);
 
     try {
-      // Save signature to disturbance
+      // Save signature to disturbance. IMPORTANT: do NOT flip status to "gesendet"
+      // here — the status must only change AFTER the email was sent successfully,
+      // otherwise a failed send leaves the report stuck as "gesendet" (BUG 5).
       const { error: updateError } = await supabase
         .from("disturbances")
         .update({
           unterschrift_kunde: signature,
           unterschrift_am: new Date().toISOString(),
-          status: "gesendet",
         })
         .eq("id", disturbance.id);
 
@@ -162,7 +163,7 @@ export const SignatureDialog = ({
         technicianNames = ["Techniker"];
       }
 
-      // Send email via edge function
+      // Send email via edge function FIRST — only flip the status on success.
       const { error: sendError } = await supabase.functions.invoke("send-disturbance-report", {
         body: {
           disturbance: {
@@ -177,10 +178,27 @@ export const SignatureDialog = ({
 
       if (sendError) {
         console.error("Email send error:", sendError);
-        // Still mark as success since signature was saved
+        // Keep the old status so the user can retry sending. Do NOT close the dialog.
         toast({
-          title: "Unterschrift gespeichert",
-          description: "Die Unterschrift wurde gespeichert, aber die E-Mail konnte nicht gesendet werden.",
+          variant: "destructive",
+          title: "Senden fehlgeschlagen",
+          description: "Der Bericht konnte nicht gesendet werden. Der Status bleibt unverändert — bitte erneut versuchen.",
+        });
+        return;
+      }
+
+      // Send succeeded — now mark the report as "gesendet".
+      const { error: statusError } = await supabase
+        .from("disturbances")
+        .update({ status: "gesendet" })
+        .eq("id", disturbance.id);
+
+      if (statusError) {
+        console.error("Status update error:", statusError);
+        toast({
+          variant: "destructive",
+          title: "Hinweis",
+          description: "Der Bericht wurde gesendet, aber der Status konnte nicht auf „Gesendet\" gesetzt werden.",
         });
       } else {
         toast({

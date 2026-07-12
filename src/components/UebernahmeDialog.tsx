@@ -143,7 +143,9 @@ export function UebernahmeDialog({
     if (u.auftragNr) setAuftragNr(String(u.auftragNr));
     if (u.zusatzLeistungen) setZusatzLeistungen(String(u.zusatzLeistungen));
     if (u.leistungsverzeichnis) setLeistungsverzeichnis(String(u.leistungsverzeichnis));
-    if (typeof u.bedienungsanleitung === "boolean") setBedienungsanleitung(u.bedienungsanleitung);
+    // Schalter nur einschalten, wenn per Sprache ausdrücklich bestätigt.
+    // Niemals einen bereits gesetzten Schalter durch fehlende/false-Werte zurücksetzen.
+    if (u.bedienungsanleitung === true) setBedienungsanleitung(true);
     if (u.ort) setOrt(String(u.ort));
     if (u.datum) setDatum(String(u.datum));
     // Kundenfelder nur überschreiben, wenn per Sprache etwas erkannt wurde

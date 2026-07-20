@@ -8,6 +8,7 @@ import { NachtragDialog } from "@/components/NachtragDialog";
 import { PageHeader } from "@/components/PageHeader";
 import { VoiceInputButton, type VoiceContext } from "@/components/VoiceInputButton";
 import { resolveTimeBlocks } from "@/lib/timeBlockResolver";
+import { enqueue } from "@/lib/offlineQueue";
 import { format, startOfWeek } from "date-fns";
 import { de } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -794,8 +795,11 @@ const TimeTracking = () => {
       }
     }
 
-    // Insert all blocks with team members via Edge Function
+    // Insert all blocks with team members via Edge Function.
+    // Ohne Netz (oder wenn die Anfrage am Netz scheitert) landet der Block in der
+    // Offline-Warteschlange und wird automatisch gesendet, sobald wieder Netz da ist.
     let totalEntriesCreated = 0;
+    let queuedCount = 0;
     let hasError = false;
 
     for (const block of blocksToSave) {
@@ -836,34 +840,52 @@ const TimeTracking = () => {
         week_type: null,
       }));
 
-      // Call Edge Function to create entries (bypasses RLS for team members)
-      const { data: result, error: functionError } = await supabase.functions.invoke(
-        "create-team-time-entries",
-        {
-          body: {
-            mainEntry,
-            teamEntries,
-            createWorkerLinks: true,
-          },
-        }
-      );
+      const body = { mainEntry, teamEntries, createWorkerLinks: true };
+      const label = `Zeiteintrag ${format(new Date(selectedDate), "dd.MM.yyyy")} ${block.startTime}-${block.endTime}`;
 
-      if (functionError || !result?.success) {
-        hasError = true;
-        console.error("Error creating time entries:", functionError || result?.error);
+      // Offline? Direkt in die Warteschlange.
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        await enqueue("time-entries", body, label);
+        queuedCount++;
         continue;
       }
 
-      totalEntriesCreated += result.totalCreated || 1;
+      // Online: versuchen; bei Netzwerkfehler in die Warteschlange ausweichen.
+      try {
+        const { data: result, error: functionError } = await supabase.functions.invoke(
+          "create-team-time-entries",
+          { body }
+        );
+        if (functionError || !result?.success) {
+          // Netzwerkbedingt? -> Warteschlange. Sonst echter Fehler.
+          const msg = functionError?.message || result?.error || "";
+          if (/fetch|network|Failed to fetch|load failed/i.test(msg) || !navigator.onLine) {
+            await enqueue("time-entries", body, label);
+            queuedCount++;
+          } else {
+            hasError = true;
+            console.error("Error creating time entries:", functionError || result?.error);
+          }
+          continue;
+        }
+        totalEntriesCreated += result.totalCreated || 1;
+      } catch (err) {
+        // Verbindung mittendrin weg -> Warteschlange
+        await enqueue("time-entries", body, label);
+        queuedCount++;
+      }
     }
 
-    if (!hasError) {
-      const teamInfo = timeBlocks.some(b => b.selectedEmployees.length > 0)
-        ? ` (inkl. Team-Mitglieder)`
-        : "";
+    const teamInfo = timeBlocks.some(b => b.selectedEmployees.length > 0) ? " (inkl. Team-Mitglieder)" : "";
+    if (queuedCount > 0 && !hasError) {
+      toast({
+        title: "Offline gespeichert",
+        description: `${queuedCount} Eintrag/Einträge werden automatisch gesendet, sobald wieder Internet da ist${totalEntriesCreated > 0 ? ` (${totalEntriesCreated} bereits gesendet)` : ""}.`,
+      });
+      // Formular zurücksetzen wie bei Erfolg
+      setTimeBlocks([createDefaultBlock()]);
+    } else if (!hasError) {
       toast({ title: "Erfolg", description: `${totalEntriesCreated} Eintrag/Einträge gespeichert${teamInfo}` });
-      
-      // Refresh existing entries
       await fetchExistingDayEntries(selectedDate);
     } else {
       toast({ variant: "destructive", title: "Fehler", description: "Einige Einträge konnten nicht gespeichert werden" });

@@ -17,6 +17,7 @@ import { MobilePhotoCapture } from "@/components/MobilePhotoCapture";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CustomerFormFields, customerFormToRow, customerAddress, customerDisplayName, type Customer } from "./Customers";
+import { enqueue } from "@/lib/offlineQueue";
 
 type ProjectCustomer = Pick<Customer, "id" | "vorname" | "nachname" | "strasse" | "ort">;
 
@@ -672,38 +673,57 @@ const Projects = () => {
     }
 
     const timestamp = Date.now();
-    const filePath = `${quickUploadProject.projectId}/${timestamp}_${file.name}`;
-    
-    const { error: uploadError } = await supabase
-      .storage
-      .from('project-photos')
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false
-      });
-
-    if (uploadError) throw uploadError;
-
-    const { data: { publicUrl } } = supabase
-      .storage
-      .from('project-photos')
-      .getPublicUrl(filePath);
-
+    const projectId = quickUploadProject.projectId;
+    const filePath = `${projectId}/${timestamp}_${file.name}`;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Nicht angemeldet");
 
-    const { error: dbError } = await supabase
-      .from('documents')
-      .insert({
-        user_id: user.id,
-        project_id: quickUploadProject.projectId,
-        typ: 'photos',
-        name: file.name,
-        file_url: publicUrl,
-        beschreibung: 'Foto hochgeladen',
-      });
+    // Öffentliche URL ist bei public Buckets deterministisch – auch offline bildbar
+    const { data: { publicUrl } } = supabase.storage.from('project-photos').getPublicUrl(filePath);
+    const documentRow = {
+      user_id: user.id,
+      project_id: projectId,
+      typ: 'photos',
+      name: file.name,
+      file_url: publicUrl,
+      beschreibung: 'Foto hochgeladen',
+    };
 
-    if (dbError) throw dbError;
+    // Offline? Foto lokal in die Warteschlange (Upload + documents-Eintrag folgen automatisch)
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      await enqueue(
+        "upload",
+        { bucket: 'project-photos', path: filePath, blob: file, contentType: file.type || undefined, upsert: false, followInsert: { table: 'documents', row: documentRow } },
+        `Foto ${file.name}`
+      );
+      toast({ title: "Offline gespeichert", description: "Das Foto wird hochgeladen, sobald wieder Internet da ist." });
+      setQuickUploadProject(null);
+      return;
+    }
+
+    try {
+      const { error: uploadError } = await supabase.storage
+        .from('project-photos')
+        .upload(filePath, file, { cacheControl: '3600', upsert: false });
+      if (uploadError) throw uploadError;
+
+      const { error: dbError } = await supabase.from('documents').insert(documentRow);
+      if (dbError) throw dbError;
+    } catch (err) {
+      // Verbindung weg -> Warteschlange statt Fehler
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/fetch|network|failed to fetch|load failed/i.test(msg) || !navigator.onLine) {
+        await enqueue(
+          "upload",
+          { bucket: 'project-photos', path: filePath, blob: file, contentType: file.type || undefined, upsert: false, followInsert: { table: 'documents', row: documentRow } },
+          `Foto ${file.name}`
+        );
+        toast({ title: "Offline gespeichert", description: "Das Foto wird hochgeladen, sobald wieder Internet da ist." });
+        setQuickUploadProject(null);
+        return;
+      }
+      throw err;
+    }
 
     setQuickUploadProject(null);
     fetchProjects();

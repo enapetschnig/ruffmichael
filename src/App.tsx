@@ -6,8 +6,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { OnboardingProvider } from "./contexts/OnboardingContext";
 import { InstallPromptDialog } from "./components/InstallPromptDialog";
+import { OfflineBanner } from "./components/OfflineBanner";
 import { useOnboarding } from "./contexts/OnboardingContext";
 import { supabase } from "@/integrations/supabase/client";
+import { startAutoSync } from "@/lib/offlineQueue";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import TimeTracking from "./pages/TimeTracking";
@@ -49,8 +51,14 @@ function AppContent() {
     ensureProfile();
   }, []);
 
+  // Offline-Warteschlange automatisch abarbeiten (bei "online", App-Start, periodisch)
+  useEffect(() => {
+    startAutoSync();
+  }, []);
+
   return (
     <>
+      <OfflineBanner />
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/auth" element={<Auth />} />

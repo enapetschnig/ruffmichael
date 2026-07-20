@@ -14,6 +14,7 @@ import {
   Upload,
 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
+import { enqueue } from "@/lib/offlineQueue";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -464,33 +465,48 @@ const ProjectFiles = () => {
     setUploading(true);
 
     let successCount = 0;
+    let queuedCount = 0;
     for (const file of Array.from(fileList)) {
       const safeName = toStorageKey(file.name) || "datei";
-      const { error } = await supabase.storage
-        .from(BUCKET)
-        .upload(`${basePath}/${safeName}`, file);
+      const targetPath = `${basePath}/${safeName}`;
 
-      if (error) {
-        const alreadyExists =
-          error.message.toLowerCase().includes("already exists") ||
-          error.message.toLowerCase().includes("duplicate");
-        toast({
-          variant: "destructive",
-          title: `Fehler bei "${file.name}"`,
-          description: alreadyExists
-            ? "Eine Datei mit diesem Namen existiert hier bereits."
-            : error.message,
-        });
-      } else {
-        successCount++;
+      // Offline? Direkt in die Warteschlange, Datei bleibt lokal erhalten.
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        await enqueue("upload", { bucket: BUCKET, path: targetPath, blob: file, contentType: file.type || undefined }, `Datei ${file.name}`);
+        queuedCount++;
+        continue;
+      }
+
+      try {
+        const { error } = await supabase.storage.from(BUCKET).upload(targetPath, file);
+        if (error) {
+          const alreadyExists =
+            error.message.toLowerCase().includes("already exists") ||
+            error.message.toLowerCase().includes("duplicate");
+          if (!alreadyExists && (/fetch|network|failed to fetch|load failed/i.test(error.message) || !navigator.onLine)) {
+            await enqueue("upload", { bucket: BUCKET, path: targetPath, blob: file, contentType: file.type || undefined }, `Datei ${file.name}`);
+            queuedCount++;
+          } else {
+            toast({
+              variant: "destructive",
+              title: `Fehler bei "${file.name}"`,
+              description: alreadyExists ? "Eine Datei mit diesem Namen existiert hier bereits." : error.message,
+            });
+          }
+        } else {
+          successCount++;
+        }
+      } catch {
+        await enqueue("upload", { bucket: BUCKET, path: targetPath, blob: file, contentType: file.type || undefined }, `Datei ${file.name}`);
+        queuedCount++;
       }
     }
 
     if (successCount > 0) {
-      toast({
-        title: "Hochgeladen",
-        description: `${successCount} Datei(en) erfolgreich hochgeladen.`,
-      });
+      toast({ title: "Hochgeladen", description: `${successCount} Datei(en) erfolgreich hochgeladen.` });
+    }
+    if (queuedCount > 0) {
+      toast({ title: "Offline gespeichert", description: `${queuedCount} Datei(en) werden hochgeladen, sobald wieder Internet da ist.` });
     }
 
     setUploading(false);

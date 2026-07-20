@@ -18,6 +18,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CustomerFormFields, customerFormToRow, customerAddress, customerDisplayName, type Customer } from "./Customers";
 import { enqueue } from "@/lib/offlineQueue";
+import { newId, saveInsert, saveUpload } from "@/lib/offlineData";
 
 type ProjectCustomer = Pick<Customer, "id" | "vorname" | "nachname" | "strasse" | "ort">;
 
@@ -255,21 +256,22 @@ const Projects = () => {
       let customerId: string | null = null;
       let customerForAddress: { strasse: string | null; ort: string | null } | null = null;
 
+      const { data: { user } } = await supabase.auth.getUser();
+      let anyQueued = false;
+      const label = `Projekt ${newProject.name.trim()}`;
+
+      // Kunde: neu anlegen (client-ID) oder bestehenden verwenden
       if (showNewCustomerForm) {
-        const { data: { user } } = await supabase.auth.getUser();
         const row = customerFormToRow(newCustomer);
-        const { data: created, error: custError } = await supabase
-          .from("customers")
-          .insert({ ...row, created_by: user?.id ?? null })
-          .select("id, strasse, ort")
-          .single();
-        if (custError || !created) {
+        customerId = newId();
+        const cr = await saveInsert("customers", { ...row, id: customerId, created_by: user?.id ?? null }, `Kunde ${row.nachname}`);
+        if (cr.error) {
           toast({ variant: "destructive", title: "Fehler", description: "Kunde konnte nicht angelegt werden" });
           setCreating(false);
           return;
         }
-        customerId = created.id;
-        customerForAddress = created;
+        anyQueued = anyQueued || cr.queued;
+        customerForAddress = { strasse: row.strasse, ort: row.ort };
       } else if (selectedCustomerId !== "none") {
         customerId = selectedCustomerId;
         const c = customers.find((c) => c.id === selectedCustomerId);
@@ -280,41 +282,39 @@ const Projects = () => {
       const derivedAdresse = newProject.adresse.trim()
         || (customerForAddress ? [customerForAddress.strasse, customerForAddress.ort].filter(Boolean).join(", ") : "");
 
-      const { data: createdProject, error } = await supabase
-        .from("projects")
-        .insert({
-          name: newProject.name.trim(),
-          beschreibung: newProject.beschreibung.trim() || null,
-          adresse: derivedAdresse || null,
-          plz: newProject.plz.trim(),
-          customer_id: customerId,
-          status_id: newProjectStatusId !== "none" ? newProjectStatusId : null,
-        })
-        .select("id")
-        .single();
-
-      if (error || !createdProject) {
-        toast({
-          variant: "destructive",
-          title: "Fehler",
-          description: "Projekt konnte nicht erstellt werden",
-        });
+      // Projekt (client-ID); sobald Kunde in der Warteschlange ist, auch Projekt (force)
+      const projectId = newId();
+      const pr = await saveInsert("projects", {
+        id: projectId,
+        name: newProject.name.trim(),
+        beschreibung: newProject.beschreibung.trim() || null,
+        adresse: derivedAdresse || null,
+        plz: newProject.plz.trim(),
+        customer_id: customerId,
+        status_id: newProjectStatusId !== "none" ? newProjectStatusId : null,
+      }, label, anyQueued);
+      if (pr.error) {
+        toast({ variant: "destructive", title: "Fehler", description: "Projekt konnte nicht erstellt werden" });
         setCreating(false);
         return;
       }
+      anyQueued = anyQueued || pr.queued;
 
-      // Standardordner anlegen (leere Ordner via .keep-Platzhalter)
-      await Promise.all(
-        STANDARD_PROJECT_FOLDERS.map((folder) =>
-          supabase.storage
-            .from("project-files")
-            .upload(`${createdProject.id}/${folder}/.keep`, new Blob([""], { type: "text/plain" }))
-        )
-      );
+      // Standardordner anlegen (bei anyQueued -> force in die Warteschlange)
+      for (const folder of STANDARD_PROJECT_FOLDERS) {
+        const fr = await saveUpload(
+          { bucket: "project-files", path: `${projectId}/${folder}/.keep`, blob: new Blob([""], { type: "text/plain" }) },
+          label,
+          anyQueued
+        );
+        anyQueued = anyQueued || fr.queued;
+      }
 
       toast({
-        title: "Erfolg",
-        description: "Projekt wurde erstellt (inkl. Standardordner)",
+        title: anyQueued ? "Offline gespeichert" : "Erfolg",
+        description: anyQueued
+          ? "Projekt wird angelegt, sobald wieder Internet da ist."
+          : "Projekt wurde erstellt (inkl. Standardordner)",
       });
       setNewProject({ name: "", beschreibung: "", adresse: "", plz: "" });
       setNewProjectStatusId("none");
@@ -681,6 +681,7 @@ const Projects = () => {
     // Öffentliche URL ist bei public Buckets deterministisch – auch offline bildbar
     const { data: { publicUrl } } = supabase.storage.from('project-photos').getPublicUrl(filePath);
     const documentRow = {
+      id: newId(), // client-ID -> idempotent beim erneuten Sync
       user_id: user.id,
       project_id: projectId,
       typ: 'photos',

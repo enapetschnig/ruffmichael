@@ -24,6 +24,7 @@ import { MaterialPicker, type CatalogMaterial } from "@/components/MaterialPicke
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { projectLabel } from "@/lib/projectLabel";
+import { newId, saveInsert } from "@/lib/offlineData";
 
 // WICHTIG: Diese Komponente wird von Mitarbeitern und Kunden gesehen.
 // Es dürfen hier NIEMALS Preise geladen oder angezeigt werden.
@@ -233,11 +234,19 @@ export function NachtragDialog({
     return true;
   };
 
-  const insertNachtrag = async (withSignature: boolean) => {
+  // Legt Nachtrag + Materialien offline-fähig an (Client-IDs, Eltern vor Kindern).
+  // Rückgabe: queued=true, wenn (mind.) ein Schritt in die Warteschlange ging.
+  const insertNachtrag = async (
+    withSignature: boolean
+  ): Promise<{ queued: boolean; error?: string }> => {
     const { data: { user } } = await supabase.auth.getUser();
-    const { data: inserted, error } = await supabase
-      .from("nachtraege")
-      .insert({
+    const nachtragId = newId();
+    const label = `Nachtrag ${titel.trim()}`;
+
+    const res = await saveInsert(
+      "nachtraege",
+      {
+        id: nachtragId,
         project_id: selectedProjectId,
         titel: titel.trim(),
         beschreibung: beschreibung.trim() || null,
@@ -245,24 +254,41 @@ export function NachtragDialog({
         status: withSignature ? "unterschrieben" : "offen",
         unterschrift_kunde: withSignature ? signature : null,
         unterschrieben_am: withSignature ? new Date().toISOString() : null,
-      })
-      .select("id")
-      .single();
-    if (error) throw error;
+      },
+      label
+    );
+    if (res.error) return res;
+    let queued = res.queued;
 
-    const materialInserts = materialRowsToInserts(inserted.id, materials);
+    const materialInserts = materialRowsToInserts(nachtragId, materials).map((r) => ({
+      ...r,
+      id: newId(),
+    }));
     if (materialInserts.length > 0) {
-      const { error: matError } = await supabase.from("nachtrag_materials").insert(materialInserts);
-      if (matError) throw matError;
+      const matRes = await saveInsert("nachtrag_materials", materialInserts, label, queued);
+      if (matRes.error) return matRes;
+      queued = queued || matRes.queued;
     }
+    return { queued };
   };
 
   const handleSave = async () => {
     if (!validate()) return;
     setSaving(true);
     try {
-      await insertNachtrag(false);
-      toast({ title: "Nachtrag angelegt", description: titel.trim() });
+      const res = await insertNachtrag(false);
+      if (res.error) {
+        toast({ variant: "destructive", title: "Fehler", description: res.error });
+        return;
+      }
+      if (res.queued) {
+        toast({
+          title: "Offline gespeichert",
+          description: "Wird automatisch gesendet, sobald wieder Internet da ist.",
+        });
+      } else {
+        toast({ title: "Nachtrag angelegt", description: titel.trim() });
+      }
       onOpenChange(false);
       onCreated?.();
     } catch (error: unknown) {
@@ -294,11 +320,22 @@ export function NachtragDialog({
     }
     setSaving(true);
     try {
-      await insertNachtrag(true);
-      toast({
-        title: "Nachtrag unterschrieben",
-        description: "Die Unterschrift des Kunden wurde gespeichert.",
-      });
+      const res = await insertNachtrag(true);
+      if (res.error) {
+        toast({ variant: "destructive", title: "Fehler", description: res.error });
+        return;
+      }
+      if (res.queued) {
+        toast({
+          title: "Offline gespeichert",
+          description: "Wird automatisch gesendet, sobald wieder Internet da ist.",
+        });
+      } else {
+        toast({
+          title: "Nachtrag unterschrieben",
+          description: "Die Unterschrift des Kunden wurde gespeichert.",
+        });
+      }
       onOpenChange(false);
       onCreated?.();
     } catch (error: unknown) {

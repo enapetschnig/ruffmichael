@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
+import { isOffline } from "@/lib/offlineData";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
@@ -159,6 +160,12 @@ const DisturbanceDetail = () => {
   const handleDelete = async () => {
     if (!disturbance) return;
 
+    // Löschen bleibt online-only.
+    if (isOffline()) {
+      toast({ variant: "destructive", title: "Nur mit Internet möglich", description: "Bitte später erneut versuchen." });
+      return;
+    }
+
     if (!currentUserId) {
       toast({
         variant: "destructive",
@@ -255,7 +262,13 @@ const DisturbanceDetail = () => {
 
   const handleToggleVerrechnet = async () => {
     if (!disturbance) return;
-    
+
+    // Bearbeiten bestehender Berichte bleibt online-only.
+    if (isOffline()) {
+      toast({ variant: "destructive", title: "Nur mit Internet möglich", description: "Bitte später erneut versuchen." });
+      return;
+    }
+
     const { error } = await supabase
       .from("disturbances")
       .update({ is_verrechnet: !disturbance.is_verrechnet })

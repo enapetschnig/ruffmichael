@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { isOffline, saveUpload } from "@/lib/offlineData";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -100,16 +101,27 @@ export default function EmployeeDocumentsManager({ employeeId, userId }: Props) 
     setUploading(type);
 
     try {
-      const uploadPromises = Array.from(files).map(async (file) => {
+      let successCount = 0;
+      let queuedCount = 0;
+
+      for (const file of Array.from(files)) {
         const filePath = `${userId || employeeId}/${type}/${Date.now()}_${file.name}`;
-        const { error } = await supabase.storage.from("employee-documents").upload(filePath, file);
+        // Offline-fähiger Upload: ohne Netz landet die Datei in der Warteschlange.
+        const res = await saveUpload(
+          { bucket: "employee-documents", path: filePath, blob: file, contentType: file.type || undefined },
+          `Dokument ${file.name}`
+        );
+        if (res.error) throw new Error(res.error);
+        if (res.queued) queuedCount++;
+        else successCount++;
+      }
 
-        if (error) throw error;
-      });
-
-      await Promise.all(uploadPromises);
-
-      toast({ title: "Erfolg", description: `${files.length} Dokument(e) hochgeladen` });
+      if (queuedCount > 0) {
+        toast({ title: "Offline gespeichert", description: `${queuedCount} Dokument(e) werden automatisch gesendet, sobald wieder Internet da ist.` });
+      }
+      if (successCount > 0) {
+        toast({ title: "Erfolg", description: `${successCount} Dokument(e) hochgeladen` });
+      }
       fetchDocuments();
     } catch (error: any) {
       toast({ title: "Fehler", description: error.message, variant: "destructive" });
@@ -142,6 +154,11 @@ export default function EmployeeDocumentsManager({ employeeId, userId }: Props) 
   const handleDelete = async (type: DocumentType, fileName: string) => {
     if (!isAdmin) {
       toast({ title: "Keine Berechtigung", variant: "destructive" });
+      return;
+    }
+
+    if (isOffline()) {
+      toast({ title: "Nur mit Internet möglich", description: "Dokumente können nur mit Internetverbindung gelöscht werden.", variant: "destructive" });
       return;
     }
 

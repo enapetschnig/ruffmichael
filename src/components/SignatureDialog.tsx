@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { SignaturePad } from "./SignaturePad";
 import { supabase } from "@/integrations/supabase/client";
+import { isOffline, saveUpdate, saveInvoke } from "@/lib/offlineData";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
@@ -105,20 +106,8 @@ export const SignatureDialog = ({
     setSending(true);
 
     try {
-      // Save signature to disturbance. IMPORTANT: do NOT flip status to "gesendet"
-      // here — the status must only change AFTER the email was sent successfully,
-      // otherwise a failed send leaves the report stuck as "gesendet" (BUG 5).
-      const { error: updateError } = await supabase
-        .from("disturbances")
-        .update({
-          unterschrift_kunde: signature,
-          unterschrift_am: new Date().toISOString(),
-        })
-        .eq("id", disturbance.id);
-
-      if (updateError) throw updateError;
-
-      // Get all technicians assigned to this disturbance
+      // Techniker-Namen für den Bericht ermitteln (nur Lesezugriffe — offline aus dem
+      // Service-Worker-Cache; die Fallback-Kette fängt fehlende Daten ab).
       const { data: workers } = await supabase
         .from("disturbance_workers")
         .select("user_id, is_main")
@@ -163,17 +152,61 @@ export const SignatureDialog = ({
         technicianNames = ["Techniker"];
       }
 
+      const label = `Regiebericht senden: ${disturbance.kunde_name}`;
+      const signatureTimestamp = new Date().toISOString();
+      const sendBody = {
+        disturbance: {
+          ...disturbance,
+          unterschrift_kunde: signature,
+        },
+        materials,
+        technicianNames,
+        photos,
+      };
+
+      if (isOffline()) {
+        // Offline: Vor-Ort-Unterschrift (gleicher User, geringes Konfliktrisiko) —
+        // alle drei Schritte in der Reihenfolge sig → send → status einreihen, damit
+        // der Sync sie korrekt nacheinander ausführt.
+        // force=true auf ALLEN drei Schritten: einmal offline entschieden, müssen sie
+        // gemeinsam in die Warteschlange (sig → send → status) und dürfen niemals
+        // teils online / teils offline laufen (sonst z.B. Status „gesendet" ohne Mail).
+        await saveUpdate(
+          "disturbances",
+          { id: disturbance.id },
+          { unterschrift_kunde: signature, unterschrift_am: signatureTimestamp },
+          label,
+          true
+        );
+        await saveInvoke("send-disturbance-report", sendBody, label, true);
+        await saveUpdate("disturbances", { id: disturbance.id }, { status: "gesendet" }, label, true);
+
+        toast({
+          title: "Offline gespeichert",
+          description: "Bericht wird gesendet, sobald wieder Internet da ist.",
+        });
+        onSuccess();
+        onOpenChange(false);
+        return;
+      }
+
+      // ONLINE — bisheriges Verhalten unverändert:
+      // Unterschrift speichern. IMPORTANT: do NOT flip status to "gesendet" here — the
+      // status must only change AFTER the email was sent successfully, otherwise a
+      // failed send leaves the report stuck as "gesendet" (BUG 5).
+      const { error: updateError } = await supabase
+        .from("disturbances")
+        .update({
+          unterschrift_kunde: signature,
+          unterschrift_am: signatureTimestamp,
+        })
+        .eq("id", disturbance.id);
+
+      if (updateError) throw updateError;
+
       // Send email via edge function FIRST — only flip the status on success.
       const { error: sendError } = await supabase.functions.invoke("send-disturbance-report", {
-        body: {
-          disturbance: {
-            ...disturbance,
-            unterschrift_kunde: signature,
-          },
-          materials,
-          technicianNames,
-          photos,
-        },
+        body: sendBody,
       });
 
       if (sendError) {

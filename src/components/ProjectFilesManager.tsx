@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Upload, Download, Trash2, Camera, FileText, Package, Lock, ClipboardList } from "lucide-react";
 import { toast } from "sonner";
 import { useToast } from "@/hooks/use-toast";
+import { isOffline, newId, saveUpload } from "@/lib/offlineData";
 
 type DocumentType = 'photos' | 'plans' | 'reports' | 'materials' | 'chef' | 'notizen';
 
@@ -123,39 +124,54 @@ export function ProjectFilesManager({ projectId, defaultTab = 'photos' }: Projec
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Nicht authentifiziert');
 
+      let successCount = 0;
+      let queuedCount = 0;
+
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const fileExt = file.name.split('.').pop();
         const fileName = `${Date.now()}-${i}.${fileExt}`;
         const filePath = `${projectId}/${fileName}`;
 
-        // Upload zu Supabase Storage
-        const { error: uploadError } = await supabase.storage
-          .from(bucketName)
-          .upload(filePath, file);
-
-        if (uploadError) throw uploadError;
-
-        // Public URL holen
+        // Public URL kann synchron (ohne Netz) gebildet werden.
         const { data: urlData } = supabase.storage
           .from(bucketName)
           .getPublicUrl(filePath);
 
-        // Dokument in DB eintragen
-        const { error: dbError } = await supabase
-          .from('documents')
-          .insert({
-            project_id: projectId,
-            user_id: user.id,
-            typ: type,
-            name: file.name,
-            file_url: urlData.publicUrl,
-          });
+        // Offline-fähiger Upload inkl. Folge-Eintrag in "documents". Die
+        // clientseitige id sorgt dafür, dass der Eintrag beim Sync eindeutig ist.
+        const res = await saveUpload(
+          {
+            bucket: bucketName,
+            path: filePath,
+            blob: file,
+            contentType: file.type || undefined,
+            followInsert: {
+              table: "documents",
+              row: {
+                id: newId(),
+                project_id: projectId,
+                user_id: user.id,
+                typ: type,
+                name: file.name,
+                file_url: urlData.publicUrl,
+              },
+            },
+          },
+          `Datei ${file.name}`
+        );
 
-        if (dbError) throw dbError;
+        if (res.error) throw new Error(res.error);
+        if (res.queued) queuedCount++;
+        else successCount++;
       }
 
-      toast.success(`${files.length} Datei(en) hochgeladen`);
+      if (queuedCount > 0) {
+        toast.success(`${queuedCount} Datei(en) offline gespeichert – werden automatisch gesendet, sobald wieder Internet da ist.`);
+      }
+      if (successCount > 0) {
+        toast.success(`${successCount} Datei(en) hochgeladen`);
+      }
       fetchDocuments();
     } catch (error) {
       console.error('Upload error:', error);
@@ -187,6 +203,11 @@ export function ProjectFilesManager({ projectId, defaultTab = 'photos' }: Projec
   const deleteFile = async (docId: string, fileUrl: string, type: DocumentType) => {
     if (!isAdmin) {
       toast.error('Keine Berechtigung zum Löschen');
+      return;
+    }
+
+    if (isOffline()) {
+      toast.error('Löschen nur mit Internetverbindung möglich');
       return;
     }
 

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
+import { newId, isOffline, saveInsert, saveInvoke } from "@/lib/offlineData";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { MultiEmployeeSelect } from "@/components/MultiEmployeeSelect";
@@ -316,6 +317,14 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
     };
 
     if (editData) {
+      // EDIT-existing bleibt online-only: Änderungen an bestehenden Berichten werden
+      // NICHT offline in die Warteschlange gelegt (zu hohes Konfliktrisiko).
+      if (isOffline()) {
+        toast({ variant: "destructive", title: "Nur mit Internet möglich", description: "Bitte später erneut versuchen." });
+        setSaving(false);
+        return;
+      }
+
       // Did the scheduled date/times change? Team members' time entries cannot be
       // updated from the client (RLS restricts updates to the owner's own rows), so
       // we warn the user afterwards instead of silently leaving them out of sync.
@@ -357,21 +366,72 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
         toast({ title: "Erfolg", description: "Regiebericht wurde aktualisiert" });
       }
     } else {
-      // Create new disturbance (user_id set here only — this user becomes the owner)
-      const { data: newDisturbance, error } = await supabase
-        .from("disturbances")
-        .insert({ ...disturbanceData, user_id: user.id })
-        .select()
-        .single();
+      // Create new disturbance — offline-fähig. Die id wird clientseitig erzeugt und
+      // in die Eltern-Zeile geschrieben, damit Kind-Zeilen (Worker/Material/Zeiten)
+      // schon offline auf sie verweisen und der Sync die FK-Reihenfolge wahrt.
+      const disturbanceId = newId();
+      const label = `Regiebericht: ${formData.kundeName.trim()}`;
+      let anyQueued = false;
 
-      if (error) {
+      // 1) Eltern: disturbance (user_id NUR beim Insert — dieser User wird Eigentümer)
+      const distRes = await saveInsert(
+        "disturbances",
+        { ...disturbanceData, user_id: user.id, id: disturbanceId },
+        label
+      );
+      if (distRes.error) {
         toast({ variant: "destructive", title: "Fehler", description: "Regiebericht konnte nicht erstellt werden" });
         setSaving(false);
         return;
       }
+      if (distRes.queued) anyQueued = true;
 
-      // Prepare main entry for current user
+      // 2) Kind: Worker (Ersteller als Haupt-Techniker + zusätzliche Mitarbeiter)
+      const workerRows = [
+        { id: newId(), disturbance_id: disturbanceId, user_id: user.id, is_main: true },
+        ...selectedEmployees.map(workerId => ({
+          id: newId(),
+          disturbance_id: disturbanceId,
+          user_id: workerId,
+          is_main: false,
+        })),
+      ];
+      const workersRes = await saveInsert("disturbance_workers", workerRows, label, anyQueued);
+      if (workersRes.error) {
+        toast({ variant: "destructive", title: "Fehler", description: "Regiebericht konnte nicht erstellt werden" });
+        setSaving(false);
+        return;
+      }
+      if (workersRes.queued) anyQueued = true;
+
+      // 3) Kind: Materialien (notizen je Material bleiben erhalten)
+      const validMaterials = materials.filter(m => m.material.trim());
+      if (validMaterials.length > 0) {
+        const matRes = await saveInsert(
+          "disturbance_materials",
+          validMaterials.map(m => ({
+            id: m.id,
+            disturbance_id: disturbanceId,
+            user_id: user.id,
+            material: m.material.trim(),
+            menge: m.menge.trim() || null,
+            notizen: m.notizen?.trim() || null,
+          })),
+          label,
+          anyQueued
+        );
+        if (matRes.error) {
+          toast({ variant: "destructive", title: "Fehler", description: "Regiebericht konnte nicht erstellt werden" });
+          setSaving(false);
+          return;
+        }
+        if (matRes.queued) anyQueued = true;
+      }
+
+      // 4) Zeiteinträge über Edge Function (umgeht RLS für Team-Mitglieder).
+      //    mainEntry/teamEntries tragen die disturbance_id bereits.
       const mainEntry = {
+        id: newId(),
         user_id: user.id,
         datum: formData.datum,
         start_time: formData.startTime,
@@ -379,13 +439,12 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
         pause_minutes: formData.pauseMinutes,
         stunden,
         project_id: null,
-        disturbance_id: newDisturbance.id,
+        disturbance_id: disturbanceId,
         taetigkeit: `Regiebericht: ${formData.kundeName.trim()}`,
         location_type: "baustelle",
       };
-
-      // Prepare team entries for additional workers
       const teamEntries = selectedEmployees.map(workerId => ({
+        id: newId(),
         user_id: workerId,
         datum: formData.datum,
         start_time: formData.startTime,
@@ -393,64 +452,42 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
         pause_minutes: formData.pauseMinutes,
         stunden,
         project_id: null,
-        disturbance_id: newDisturbance.id,
+        disturbance_id: disturbanceId,
         taetigkeit: `Regiebericht: ${formData.kundeName.trim()}`,
         location_type: "baustelle",
       }));
-
-      // Call Edge Function to create time entries (bypasses RLS for team members)
-      const { data: timeResult, error: timeError } = await supabase.functions.invoke(
+      const timeRes = await saveInvoke(
         "create-team-time-entries",
-        {
-          body: {
-            mainEntry,
-            teamEntries,
-            createWorkerLinks: false, // Disturbances use disturbance_workers instead
-          },
-        }
+        { mainEntry, teamEntries, createWorkerLinks: false }, // Disturbances nutzen disturbance_workers
+        label,
+        anyQueued
       );
+      if (timeRes.error) {
+        toast({ variant: "destructive", title: "Fehler", description: "Regiebericht konnte nicht erstellt werden" });
+        setSaving(false);
+        return;
+      }
+      if (timeRes.queued) anyQueued = true;
 
-      if (timeError || !timeResult?.success) {
-        console.error("Time entry creation failed:", timeError || timeResult?.error);
+      if (anyQueued) {
+        toast({ title: "Offline gespeichert", description: "Wird automatisch gesendet, sobald wieder Internet da ist." });
+      } else {
+        toast({ title: "Erfolg", description: "Regiebericht wurde erfasst" });
       }
 
-      // Add main worker entry
-      await supabase.from("disturbance_workers").insert({
-        disturbance_id: newDisturbance.id,
-        user_id: user.id,
-        is_main: true,
-      });
-
-      // Add worker entries for additional workers
-      for (const workerId of selectedEmployees) {
-        await supabase.from("disturbance_workers").insert({
-          disturbance_id: newDisturbance.id,
-          user_id: workerId,
-          is_main: false,
-        });
-      }
-
-      // Create materials
-      const validMaterials = materials.filter(m => m.material.trim());
-      if (validMaterials.length > 0) {
-        await supabase.from("disturbance_materials").insert(
-          validMaterials.map(m => ({
-            disturbance_id: newDisturbance.id,
-            user_id: user.id,
-            material: m.material.trim(),
-            menge: m.menge.trim() || null,
-            notizen: m.notizen?.trim() || null,
-          }))
-        );
-      }
-
-      toast({ title: "Erfolg", description: "Regiebericht wurde erfasst" });
-      
       setSaving(false);
       onOpenChange(false);
-      
-      // Navigate to detail page with signature dialog open
-      navigate(`/disturbances/${newDisturbance.id}?openSignature=true`);
+
+      if (anyQueued) {
+        // Offline: Der Regiebericht liegt nur in der lokalen Warteschlange — die
+        // Detailseite (/disturbances/:id) wäre nicht erreichbar/leer. Deshalb zur
+        // gecachten Liste navigieren; die Kundenunterschrift kann später nachgetragen
+        // werden, sobald wieder synchronisiert/online.
+        navigate("/disturbances");
+      } else {
+        // Online: zur Detailseite mit direkt geöffnetem Unterschrifts-Dialog.
+        navigate(`/disturbances/${disturbanceId}?openSignature=true`);
+      }
       return;
     }
 

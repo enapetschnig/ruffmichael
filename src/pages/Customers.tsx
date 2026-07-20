@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { isOffline, newId, saveInsert } from "@/lib/offlineData";
 
 export interface Customer {
   id: string;
@@ -259,6 +260,17 @@ const Customers = () => {
       toast({ variant: "destructive", title: "Fehler", description: "Bitte Nachname eingeben" });
       return;
     }
+
+    // Bestehenden Kunden bearbeiten geht nur mit Internet.
+    if (editing && isOffline()) {
+      toast({
+        variant: "destructive",
+        title: "Nur mit Internet möglich",
+        description: "Bestehende Kunden können nur mit Internetverbindung bearbeitet werden.",
+      });
+      return;
+    }
+
     setSaving(true);
     const row = customerFormToRow(form);
 
@@ -272,12 +284,21 @@ const Customers = () => {
         await fetchCustomers();
       }
     } else {
+      // Neuen Kunden anlegen (offline-fähig, mit clientseitiger id).
       const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from("customers").insert({ ...row, created_by: user?.id ?? null });
-      if (error) {
-        toast({ variant: "destructive", title: "Fehler", description: error.message });
+      const res = await saveInsert(
+        "customers",
+        { id: newId(), ...row, created_by: user?.id ?? null },
+        `Kunde ${customerDisplayName(row)}`
+      );
+      if (res.error) {
+        toast({ variant: "destructive", title: "Fehler", description: res.error });
       } else {
-        toast({ title: "Kunde angelegt", description: customerDisplayName(row) });
+        toast(
+          res.queued
+            ? { title: "Offline gespeichert", description: "Wird automatisch gesendet, sobald wieder Internet da ist." }
+            : { title: "Kunde angelegt", description: customerDisplayName(row) }
+        );
         setDialogOpen(false);
         await fetchCustomers();
       }
@@ -287,6 +308,15 @@ const Customers = () => {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
+    if (isOffline()) {
+      toast({
+        variant: "destructive",
+        title: "Nur mit Internet möglich",
+        description: "Kunden können nur mit Internetverbindung gelöscht werden.",
+      });
+      setDeleteTarget(null);
+      return;
+    }
     const { error } = await supabase.from("customers").delete().eq("id", deleteTarget.id);
     if (error) {
       toast({ variant: "destructive", title: "Fehler", description: error.message });

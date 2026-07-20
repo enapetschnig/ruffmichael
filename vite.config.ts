@@ -46,7 +46,34 @@ export default defineConfig(({ mode }) => ({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024 // 5 MB
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB
+        navigateFallback: 'index.html',
+        // Offline-Lesen: zuletzt online gesehene Supabase-Daten & Dateien bleiben verfügbar.
+        runtimeCaching: [
+          {
+            // Supabase REST (Tabellen-Daten) – NetworkFirst: online frisch, offline aus Cache.
+            urlPattern: ({ url }) => url.hostname.endsWith('.supabase.co') && url.pathname.startsWith('/rest/v1/'),
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'supabase-rest',
+              networkTimeoutSeconds: 5,
+              expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 14 }, // 14 Tage
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            // Supabase Storage (Fotos, PDFs, Pläne) – einmal geladen offline verfügbar.
+            urlPattern: ({ url }) => url.hostname.endsWith('.supabase.co') && url.pathname.startsWith('/storage/v1/object/'),
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'supabase-files',
+              expiration: { maxEntries: 300, maxAgeSeconds: 60 * 60 * 24 * 30 }, // 30 Tage
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
+        // Auth & Edge Functions niemals cachen.
+        navigateFallbackDenylist: [/^\/auth/, /\/functions\//],
       }
     })
   ].filter(Boolean),

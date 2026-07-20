@@ -25,6 +25,7 @@ import { VoiceInputButton } from "@/components/VoiceInputButton";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { projectLabel } from "@/lib/projectLabel";
+import { newId, saveInsert, saveInvoke } from "@/lib/offlineData";
 
 // WICHTIG: Diese Komponente wird von Mitarbeitern und Kunden gesehen.
 // Es dürfen hier NIEMALS Preise geladen oder angezeigt werden.
@@ -188,9 +189,13 @@ export function UebernahmeDialog({
     setSaving(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const { data: inserted, error } = await supabase
-        .from("uebernahmen")
-        .insert({
+      const uebId = newId();
+      const label = `Übernahmebestätigung ${kundeName.trim()}`;
+
+      const res = await saveInsert(
+        "uebernahmen",
+        {
+          id: uebId,
           project_id: selectedProjectId,
           kunde_name: kundeName.trim(),
           strasse: strasse.trim() || null,
@@ -203,18 +208,32 @@ export function UebernahmeDialog({
           datum: datum || todayISO(),
           unterschrift: signature,
           created_by: user?.id ?? null,
-        })
-        .select("id")
-        .single();
-      if (error) throw error;
+        },
+        label
+      );
+      if (res.error) {
+        toast({ variant: "destructive", title: "Fehler", description: res.error });
+        return;
+      }
 
-      // PDF erzeugen – die Edge Function speichert das PDF selbst im Projektordner
-      const { data: pdfData, error: pdfError } = await supabase.functions.invoke(
+      // PDF erzeugen – die Edge Function speichert das PDF selbst im Projektordner.
+      // Wurde der Insert eingereiht (offline), MUSS auch der PDF-Aufruf in die
+      // Warteschlange (force = res.queued), sonst liefe die Edge Function online
+      // gegen einen Übernahme-Datensatz, der erst später synchronisiert wird.
+      const pdfRes = await saveInvoke(
         "generate-uebernahme-pdf",
-        { body: { uebernahmeId: inserted.id } }
+        { uebernahmeId: uebId },
+        label,
+        res.queued
       );
 
-      if (pdfError || !pdfData?.success) {
+      if (res.queued || pdfRes.queued) {
+        toast({
+          title: "Offline gespeichert",
+          description:
+            "Die Übernahmebestätigung samt PDF wird erstellt, sobald wieder Internet da ist.",
+        });
+      } else if (pdfRes.error) {
         toast({
           variant: "destructive",
           title: "PDF-Erstellung fehlgeschlagen",
@@ -227,9 +246,6 @@ export function UebernahmeDialog({
           description:
             "Übernahmebestätigung als PDF im Projektordner (Abnahme Protokoll) gespeichert",
         });
-        if (pdfData.signedUrl) {
-          window.open(pdfData.signedUrl, "_blank");
-        }
       }
 
       onOpenChange(false);

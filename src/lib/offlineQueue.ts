@@ -14,7 +14,13 @@ const DB_NAME = "ruff-offline";
 const STORE = "outbox";
 const DB_VERSION = 1;
 
-export type OutboxKind = "time-entries" | "upload";
+export type OutboxKind =
+  | "time-entries"
+  | "upload"
+  | "db-insert"
+  | "db-update"
+  | "db-delete"
+  | "edge-invoke";
 
 export interface TimeEntriesPayload {
   // exakt der Body, den die Edge Function "create-team-time-entries" erwartet
@@ -34,15 +40,47 @@ export interface UploadPayload {
   followInsert?: { table: string; row: Record<string, unknown> };
 }
 
+export interface DbInsertPayload {
+  table: string;
+  rows: Record<string, unknown>[];
+}
+export interface DbUpdatePayload {
+  table: string;
+  match: Record<string, unknown>; // eq-Bedingungen (z.B. { id })
+  patch: Record<string, unknown>;
+}
+export interface DbDeletePayload {
+  table: string;
+  match: Record<string, unknown>;
+}
+export interface EdgeInvokePayload {
+  fn: string;
+  body: unknown;
+}
+
+export type OutboxPayload =
+  | TimeEntriesPayload
+  | UploadPayload
+  | DbInsertPayload
+  | DbUpdatePayload
+  | DbDeletePayload
+  | EdgeInvokePayload;
+
 export interface OutboxItem {
   id: string;
   kind: OutboxKind;
-  payload: TimeEntriesPayload | UploadPayload;
+  payload: OutboxPayload;
   label: string; // menschenlesbar für die UI, z.B. "Zeiteintrag 12.07."
   createdAt: number;
+  seq: number; // monotoner Tie-Breaker: garantiert Eltern-vor-Kind-Reihenfolge
   tries: number;
   lastError?: string;
 }
+
+// Monoton steigende Sequenz über die Session – bricht createdAt-Gleichstände auf,
+// damit die FIFO-Reihenfolge (und damit Foreign-Key-Reihenfolge) exakt der
+// Einfüge-Reihenfolge im Code entspricht.
+let seqCounter = 0;
 
 // ---- IndexedDB-Grundlagen ----
 
@@ -99,15 +137,16 @@ function makeId(): string {
   }
 }
 
-export async function enqueue(kind: OutboxKind, payload: TimeEntriesPayload | UploadPayload, label: string): Promise<void> {
-  const item: OutboxItem = { id: makeId(), kind, payload, label, createdAt: Date.now(), tries: 0 };
+export async function enqueue(kind: OutboxKind, payload: OutboxPayload, label: string): Promise<void> {
+  const item: OutboxItem = { id: makeId(), kind, payload, label, createdAt: Date.now(), seq: ++seqCounter, tries: 0 };
   await tx("readwrite", (s) => s.put(item));
   notify();
 }
 
 export async function getAll(): Promise<OutboxItem[]> {
   const items = await tx<OutboxItem[]>("readonly", (s) => s.getAll() as IDBRequest<OutboxItem[]>);
-  return (items || []).sort((a, b) => a.createdAt - b.createdAt);
+  // Reihenfolge = Einfüge-Reihenfolge: erst nach Zeit, bei Gleichstand nach seq.
+  return (items || []).sort((a, b) => (a.createdAt - b.createdAt) || ((a.seq ?? 0) - (b.seq ?? 0)));
 }
 
 export async function count(): Promise<number> {
@@ -151,6 +190,38 @@ async function executeItem(item: OutboxItem): Promise<void> {
     if (up.followInsert) {
       const { error: insErr } = await supabase.from(up.followInsert.table as never).insert(up.followInsert.row as never);
       if (insErr && !/duplicate/i.test(insErr.message)) throw insErr;
+    }
+    return;
+  }
+  if (item.kind === "db-insert") {
+    const p = item.payload as DbInsertPayload;
+    const { error } = await supabase.from(p.table as never).insert(p.rows as never);
+    // Bereits vorhanden (z.B. Wiederholung nach Absturz) → als erledigt werten
+    if (error && !/duplicate key|already exists/i.test(error.message)) throw error;
+    return;
+  }
+  if (item.kind === "db-update") {
+    const p = item.payload as DbUpdatePayload;
+    let q = supabase.from(p.table as never).update(p.patch as never);
+    for (const [col, val] of Object.entries(p.match)) q = (q as any).eq(col, val);
+    const { error } = await q;
+    if (error) throw error;
+    return;
+  }
+  if (item.kind === "db-delete") {
+    const p = item.payload as DbDeletePayload;
+    let q = supabase.from(p.table as never).delete();
+    for (const [col, val] of Object.entries(p.match)) q = (q as any).eq(col, val);
+    const { error } = await q;
+    if (error) throw error;
+    return;
+  }
+  if (item.kind === "edge-invoke") {
+    const p = item.payload as EdgeInvokePayload;
+    const { data, error } = await supabase.functions.invoke(p.fn, { body: p.body });
+    if (error) throw new Error(error.message || `${p.fn} fehlgeschlagen`);
+    if (data && typeof data === "object" && "success" in data && !(data as any).success) {
+      throw new Error((data as any).error || `${p.fn} fehlgeschlagen`);
     }
     return;
   }

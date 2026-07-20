@@ -45,6 +45,7 @@ import {
 } from "@/components/NachtragDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { isOffline } from "@/lib/offlineData";
 
 type NachtragMaterial = {
   id: string;
@@ -288,6 +289,15 @@ const Nachtraege = () => {
 
   const handleSaveEdits = async () => {
     if (!detail) return;
+    // Bearbeiten eines bestehenden Nachtrags nur mit Internet.
+    if (isOffline()) {
+      toast({
+        variant: "destructive",
+        title: "Nur mit Internet möglich",
+        description: "Bestehende Nachträge können nur mit Internetverbindung bearbeitet werden.",
+      });
+      return;
+    }
     if (!editTitel.trim()) {
       toast({ variant: "destructive", title: "Fehler", description: "Bitte einen Titel eingeben" });
       return;
@@ -315,6 +325,15 @@ const Nachtraege = () => {
 
   const handleSign = async () => {
     if (!detail) return;
+    // Unterschreiben eines bestehenden Nachtrags nur mit Internet.
+    if (isOffline()) {
+      toast({
+        variant: "destructive",
+        title: "Nur mit Internet möglich",
+        description: "Bestehende Nachträge können nur mit Internetverbindung unterschrieben werden.",
+      });
+      return;
+    }
     if (!signature) {
       toast({
         variant: "destructive",

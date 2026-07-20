@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { isOffline, newId, saveInsert } from "@/lib/offlineData";
 
 interface Material {
   id: string;
@@ -206,6 +207,16 @@ const MaterialCatalog = () => {
       return;
     }
 
+    // Bestehendes Material/Preise bearbeiten geht nur mit Internet.
+    if (editing && isOffline()) {
+      toast({
+        variant: "destructive",
+        title: "Nur mit Internet möglich",
+        description: "Bestehende Materialien können nur mit Internetverbindung bearbeitet werden.",
+      });
+      return;
+    }
+
     setSaving(true);
     const row = {
       name,
@@ -215,49 +226,63 @@ const MaterialCatalog = () => {
     const einkaufspreis = parsePrice(form.einkaufspreis);
     const verkaufspreis = parsePrice(form.verkaufspreis);
 
-    let materialId = editing?.id ?? null;
-    let error = null as { message: string } | null;
-
     if (editing) {
-      ({ error } = await supabase.from("materials").update(row).eq("id", editing.id));
-    } else {
-      const { data, error: insertError } = await supabase
-        .from("materials")
-        .insert(row)
-        .select("id")
-        .single();
-      error = insertError;
-      materialId = data?.id ?? null;
+      const { error } = await supabase.from("materials").update(row).eq("id", editing.id);
+      if (error) {
+        toast({ variant: "destructive", title: "Fehler", description: error.message });
+        setSaving(false);
+        return;
+      }
+      // Preise nur schreiben, wenn welche angegeben sind oder bereits existieren
+      if (einkaufspreis !== null || verkaufspreis !== null || prices.has(editing.id)) {
+        const { error: priceError } = await supabase
+          .from("material_prices")
+          .upsert({ material_id: editing.id, einkaufspreis, verkaufspreis });
+        if (priceError) {
+          toast({
+            variant: "destructive",
+            title: "Fehler",
+            description: "Preise konnten nicht gespeichert werden: " + priceError.message,
+          });
+        }
+      }
+      toast({ title: "Material aktualisiert", description: name });
+      setDialogOpen(false);
+      setSaving(false);
+      await fetchMaterials(true);
+      return;
     }
 
-    if (error || !materialId) {
-      toast({
-        variant: "destructive",
-        title: "Fehler",
-        description: error?.message ?? "Material konnte nicht gespeichert werden",
-      });
+    // Neues Material anlegen (offline-fähig). IDs clientseitig erzeugen, damit der
+    // Preis schon offline auf das Material verweisen kann und beim Sync alles passt.
+    const matId = newId();
+    const res = await saveInsert("materials", { id: matId, ...row }, `Material ${name}`);
+    if (res.error) {
+      toast({ variant: "destructive", title: "Fehler", description: res.error });
       setSaving(false);
       return;
     }
 
-    // Preise nur schreiben, wenn welche angegeben sind oder bereits existieren
-    if (einkaufspreis !== null || verkaufspreis !== null || prices.has(materialId)) {
-      const { error: priceError } = await supabase
-        .from("material_prices")
-        .upsert({ material_id: materialId, einkaufspreis, verkaufspreis });
-      if (priceError) {
+    if (einkaufspreis !== null || verkaufspreis !== null) {
+      const priceRes = await saveInsert(
+        "material_prices",
+        { material_id: matId, einkaufspreis, verkaufspreis },
+        `Materialpreis ${name}`
+      );
+      if (priceRes.error) {
         toast({
           variant: "destructive",
           title: "Fehler",
-          description: "Preise konnten nicht gespeichert werden: " + priceError.message,
+          description: "Preise konnten nicht gespeichert werden: " + priceRes.error,
         });
       }
     }
 
-    toast({
-      title: editing ? "Material aktualisiert" : "Material angelegt",
-      description: name,
-    });
+    toast(
+      res.queued
+        ? { title: "Offline gespeichert", description: "Wird automatisch gesendet, sobald wieder Internet da ist." }
+        : { title: "Material angelegt", description: name }
+    );
     setDialogOpen(false);
     setSaving(false);
     await fetchMaterials(true);
@@ -265,6 +290,15 @@ const MaterialCatalog = () => {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
+    if (isOffline()) {
+      toast({
+        variant: "destructive",
+        title: "Nur mit Internet möglich",
+        description: "Materialien können nur mit Internetverbindung gelöscht werden.",
+      });
+      setDeleteTarget(null);
+      return;
+    }
     const target = deleteTarget;
     setDeleteTarget(null);
 

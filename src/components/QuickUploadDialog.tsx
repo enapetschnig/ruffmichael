@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Upload, X, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { saveUpload } from "@/lib/offlineData";
 import { Progress } from "@/components/ui/progress";
 
 type DocumentType = "plans" | "reports" | "materials" | "photos";
@@ -62,31 +62,24 @@ export function QuickUploadDialog({
 
     const bucket = bucketMap[documentType];
     let successCount = 0;
+    let queuedCount = 0;
+    let firstError: string | null = null;
 
     for (let i = 0; i < selectedFiles.length; i++) {
       const file = selectedFiles[i];
       const filePath = `${projectId}/${Date.now()}_${file.name}`;
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from(bucket)
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
+      // Offline-fähiger Upload: ohne Netz landet die Datei in der Warteschlange.
+      const res = await saveUpload(
+        { bucket, path: filePath, blob: file, contentType: file.type || undefined, upsert: false },
+        `${titleMap[documentType]}: ${file.name}`
+      );
 
-      if (uploadError) {
-        console.error('Storage-Upload-Fehler:', uploadError);
-        console.error('Datei:', file.name, 'Größe:', file.size, 'bytes');
-        toast({
-          variant: "destructive",
-          title: "Upload fehlgeschlagen",
-          description: `${file.name} (${(file.size / 1024).toFixed(0)} KB): ${uploadError.message}`
-        });
-        setUploading(false);
-        return;
-      }
-
-      if (uploadData) {
+      if (res.error) {
+        if (!firstError) firstError = res.error;
+      } else if (res.queued) {
+        queuedCount++;
+      } else {
         successCount++;
       }
 
@@ -95,22 +88,39 @@ export function QuickUploadDialog({
 
     setUploading(false);
 
+    if (firstError) {
+      toast({
+        variant: "destructive",
+        title: "Upload fehlgeschlagen",
+        description: firstError,
+      });
+    }
+
+    if (queuedCount > 0) {
+      toast({
+        title: "Offline gespeichert",
+        description: `${queuedCount} Datei(en) werden automatisch gesendet, sobald wieder Internet da ist.`,
+      });
+    }
+
     if (successCount > 0) {
       toast({
         title: "Erfolg",
         description: `${successCount} von ${selectedFiles.length} Datei(en) hochgeladen`,
       });
-      
+    }
+
+    if (successCount > 0 || queuedCount > 0) {
       if (onSuccess) {
         onSuccess();
       }
-      
+
       setTimeout(() => {
         setSelectedFiles([]);
         setUploadProgress(0);
         onClose();
       }, 500);
-    } else {
+    } else if (!firstError) {
       toast({
         variant: "destructive",
         title: "Fehler",

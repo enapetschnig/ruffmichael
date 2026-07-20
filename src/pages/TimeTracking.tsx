@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { VoiceInputButton, type VoiceContext } from "@/components/VoiceInputButton";
 import { resolveTimeBlocks } from "@/lib/timeBlockResolver";
 import { enqueue } from "@/lib/offlineQueue";
+import { isOffline, newId, saveInsert, saveUpload } from "@/lib/offlineData";
 import { format, startOfWeek } from "date-fns";
 import { de } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -361,45 +362,44 @@ const TimeTracking = () => {
 
     setCreatingProject(true);
 
-    const { data, error } = await supabase
-      .from('projects')
-      .insert({
-        name: newProjectName.trim(),
-        plz: newProjectPlz.trim(),
-        adresse: newProjectAddress.trim() || null,
-        status: 'aktiv'
-      })
-      .select()
-      .single();
-
-    if (error) {
-      if (error.code === '23505') {
-        sonnerToast.error("Ein Projekt mit diesem Namen und PLZ existiert bereits");
-      } else {
-        sonnerToast.error("Projekt konnte nicht erstellt werden");
-      }
+    // Client-ID -> offline-fähig; abhängige Ordner referenzieren dieselbe ID.
+    const projectId = newId();
+    let anyQueued = false;
+    const label = `Projekt ${newProjectName.trim()}`;
+    const r = await saveInsert("projects", {
+      id: projectId,
+      name: newProjectName.trim(),
+      plz: newProjectPlz.trim(),
+      adresse: newProjectAddress.trim() || null,
+      status: "aktiv",
+    }, label);
+    if (r.error) {
+      sonnerToast.error(/23505|duplicate/i.test(r.error) ? "Ein Projekt mit diesem Namen und PLZ existiert bereits" : "Projekt konnte nicht erstellt werden");
       setCreatingProject(false);
       return;
     }
+    anyQueued = r.queued;
 
-    // Standardordner anlegen (leere Ordner via .keep-Platzhalter), damit der
-    // Projektordner konsistent zu den anderen Erstellungspfaden (Projects.tsx /
-    // ErstaufnahmeDialog) aufgebaut ist.
-    await Promise.all(
-      STANDARD_PROJECT_FOLDERS.map((folder) =>
-        supabase.storage
-          .from("project-files")
-          .upload(`${data.id}/${folder}/.keep`, new Blob([""], { type: "text/plain" }))
-      )
-    );
-
-    sonnerToast.success("Projekt erfolgreich erstellt");
-
-    // Set the project in the pending block
-    if (pendingBlockIdForNewProject) {
-      updateBlock(pendingBlockIdForNewProject, { projectId: data.id });
+    // Standardordner anlegen (leere Ordner via .keep-Platzhalter). Sobald das
+    // Projekt in der Warteschlange steckt, gehen auch die Ordner in die
+    // Warteschlange (force), damit sie nicht online gegen ein noch nicht
+    // synchronisiertes Projekt laufen.
+    for (const folder of STANDARD_PROJECT_FOLDERS) {
+      const fr = await saveUpload(
+        { bucket: "project-files", path: `${projectId}/${folder}/.keep`, blob: new Blob([""], { type: "text/plain" }) },
+        label,
+        anyQueued
+      );
+      anyQueued = anyQueued || fr.queued;
     }
-    
+
+    sonnerToast.success(anyQueued ? "Projekt offline gespeichert – wird gesendet, sobald wieder Internet da ist" : "Projekt erfolgreich erstellt");
+
+    // Set the project in the pending block (client-ID ist stabil)
+    if (pendingBlockIdForNewProject) {
+      updateBlock(pendingBlockIdForNewProject, { projectId });
+    }
+
     setShowNewProjectDialog(false);
     setNewProjectName("");
     setNewProjectPlz("");
@@ -563,12 +563,18 @@ const TimeTracking = () => {
     let documentPath = null;
     if (absenceData.type === "krankenstand" && absenceData.document) {
       const fileName = `${user.id}/${Date.now()}_${absenceData.document.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from("employee-documents")
-        .upload(fileName, absenceData.document);
+      const uploadRes = await saveUpload(
+        {
+          bucket: "employee-documents",
+          path: fileName,
+          blob: absenceData.document,
+          contentType: absenceData.document.type || undefined,
+        },
+        `Krankmeldung ${absenceData.document.name}`
+      );
 
-      if (uploadError) {
-        toast({ variant: "destructive", title: "Fehler", description: `Dokument konnte nicht hochgeladen werden: ${uploadError.message}` });
+      if (uploadRes.error) {
+        toast({ variant: "destructive", title: "Fehler", description: `Dokument konnte nicht hochgeladen werden: ${uploadRes.error}` });
         setSubmittingAbsence(false);
         return;
       }
@@ -604,6 +610,12 @@ const TimeTracking = () => {
 
     // ZA: Check and deduct from time account
     if (absenceData.type === "za") {
+      // Zeitausgleich braucht den aktuellen Zeitkonto-Stand -> nur mit Internet.
+      if (isOffline()) {
+        toast({ variant: "destructive", title: "Zeitausgleich nur mit Internet möglich", description: "Für Zeitausgleich wird der aktuelle Zeitkonto-Stand benötigt." });
+        setSubmittingAbsence(false);
+        return;
+      }
       const { data: timeAccount, error: taError } = await supabase
         .from("time_accounts")
         .select("id, balance_hours")
@@ -649,22 +661,34 @@ const TimeTracking = () => {
 
     const absenceLabel = absenceData.type === "urlaub" ? "Urlaub" : absenceData.type === "krankenstand" ? "Krankenstand" : absenceData.type === "weiterbildung" ? "Weiterbildung" : absenceData.type === "za" ? "Zeitausgleich" : "Feiertag";
 
-    const { error } = await supabase.from("time_entries").insert({
-      user_id: user.id,
-      datum: absenceData.date,
-      project_id: null,
-      taetigkeit: absenceLabel,
-      stunden: workingHours,
-      start_time: entryStartTime,
-      end_time: entryEndTime,
-      pause_minutes: entryPauseMinutes,
-      location_type: "baustelle",
-      notizen: documentPath ? `Krankmeldung: ${documentPath}` : null,
-      week_type: null,
-    });
+    // Abwesenheit als Zeiteintrag speichern. Für urlaub/krankenstand/weiterbildung/
+    // feiertag offline-fähig (clientseitige id); ZA ist oben bereits auf Online
+    // beschränkt, läuft hier also direkt online durch.
+    const res = await saveInsert(
+      "time_entries",
+      {
+        id: newId(),
+        user_id: user.id,
+        datum: absenceData.date,
+        project_id: null,
+        taetigkeit: absenceLabel,
+        stunden: workingHours,
+        start_time: entryStartTime,
+        end_time: entryEndTime,
+        pause_minutes: entryPauseMinutes,
+        location_type: "baustelle",
+        notizen: documentPath ? `Krankmeldung: ${documentPath}` : null,
+        week_type: null,
+      },
+      `${absenceLabel} ${absenceData.date}`
+    );
 
-    if (!error) {
-      toast({ title: "Erfolg", description: `${absenceLabel} erfasst` });
+    if (!res.error) {
+      toast(
+        res.queued
+          ? { title: "Offline gespeichert", description: "Wird automatisch gesendet, sobald wieder Internet da ist." }
+          : { title: "Erfolg", description: `${absenceLabel} erfasst` }
+      );
       setShowAbsenceDialog(false);
       setAbsenceData({
         date: new Date().toISOString().split('T')[0],
@@ -806,8 +830,9 @@ const TimeTracking = () => {
       const blockHours = calculateBlockHours(block);
       const pauseMinutes = calculateBlockPauseMinutes(block);
 
-      // Prepare main entry for current user
+      // Prepare main entry for current user (client-ID -> idempotenter Offline-Sync)
       const mainEntry = {
+        id: newId(),
         user_id: user.id,
         datum: selectedDate,
         project_id: block.locationType === "werkstatt" ? null : (block.projectId || null),
@@ -823,8 +848,9 @@ const TimeTracking = () => {
         week_type: null,
       };
 
-      // Prepare team entries
+      // Prepare team entries (je Mitarbeiter eigene client-ID)
       const teamEntries = block.selectedEmployees.map(workerId => ({
+        id: newId(),
         user_id: workerId,
         datum: selectedDate,
         project_id: block.locationType === "werkstatt" ? null : (block.projectId || null),

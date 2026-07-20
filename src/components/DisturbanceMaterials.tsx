@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
+import { newId, isOffline, saveInsert } from "@/lib/offlineData";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
@@ -107,6 +108,13 @@ export const DisturbanceMaterials = ({ disturbanceId, canEdit }: DisturbanceMate
     };
 
     if (editingMaterial) {
+      // Bearbeiten eines bestehenden Materials bleibt online-only.
+      if (isOffline()) {
+        toast({ variant: "destructive", title: "Nur mit Internet möglich", description: "Bitte später erneut versuchen." });
+        setSaving(false);
+        return;
+      }
+
       const { error } = await supabase
         .from("disturbance_materials")
         .update({
@@ -124,14 +132,20 @@ export const DisturbanceMaterials = ({ disturbanceId, canEdit }: DisturbanceMate
         fetchMaterials();
       }
     } else {
-      const { error } = await supabase
-        .from("disturbance_materials")
-        .insert(materialData);
+      // Neues Material anlegen → offline-fähig. disturbance_id existiert bereits
+      // (bestehender Regiebericht); die id wird clientseitig erzeugt.
+      const res = await saveInsert(
+        "disturbance_materials",
+        { ...materialData, id: newId() },
+        `Material: ${materialData.material}`
+      );
 
-      if (error) {
+      if (res.error) {
         toast({ variant: "destructive", title: "Fehler", description: "Material konnte nicht hinzugefügt werden" });
       } else {
-        toast({ title: "Erfolg", description: "Material wurde hinzugefügt" });
+        toast(res.queued
+          ? { title: "Offline gespeichert", description: "Wird automatisch gesendet, sobald wieder Internet da ist." }
+          : { title: "Erfolg", description: "Material wurde hinzugefügt" });
         setShowForm(false);
         fetchMaterials();
       }
@@ -141,6 +155,12 @@ export const DisturbanceMaterials = ({ disturbanceId, canEdit }: DisturbanceMate
   };
 
   const handleDelete = async (materialId: string) => {
+    // Löschen eines bestehenden Materials bleibt online-only.
+    if (isOffline()) {
+      toast({ variant: "destructive", title: "Nur mit Internet möglich", description: "Bitte später erneut versuchen." });
+      return;
+    }
+
     setDeleting(materialId);
 
     const { error } = await supabase

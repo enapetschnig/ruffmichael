@@ -11,6 +11,7 @@ import { UebernahmeDialog } from "@/components/UebernahmeDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { projectLabel } from "@/lib/projectLabel";
+import { isOffline } from "@/lib/offlineData";
 
 // WICHTIG: Diese Seite wird von Mitarbeitern gesehen. Keine Preise anzeigen.
 
@@ -80,6 +81,15 @@ const Uebernahmen = () => {
 
   const openPdf = async (u: Uebernahme) => {
     if (!u.pdf_path) return;
+    // Signierte URL / PDF-Öffnen braucht Internet.
+    if (isOffline()) {
+      toast({
+        variant: "destructive",
+        title: "Nur mit Internet möglich",
+        description: "Das PDF kann nur mit Internetverbindung geöffnet werden.",
+      });
+      return;
+    }
     setPdfBusyId(u.id);
     const { data, error } = await supabase.storage
       .from("project-files")
@@ -97,6 +107,15 @@ const Uebernahmen = () => {
   };
 
   const createPdf = async (u: Uebernahme) => {
+    // Nachträgliche PDF-Erstellung für einen bestehenden Eintrag nur mit Internet.
+    if (isOffline()) {
+      toast({
+        variant: "destructive",
+        title: "Nur mit Internet möglich",
+        description: "Das PDF kann nur mit Internetverbindung erstellt werden.",
+      });
+      return;
+    }
     setPdfBusyId(u.id);
     try {
       const { data, error } = await supabase.functions.invoke("generate-uebernahme-pdf", {

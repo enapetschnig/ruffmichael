@@ -34,6 +34,7 @@ import {
 } from "@/pages/Customers";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { newId, isOffline, saveInsert, saveUpload } from "@/lib/offlineData";
 
 // WICHTIG: Diese Komponente wird von Mitarbeitern und Kunden gesehen.
 // Es dürfen hier NIEMALS Preise geladen oder angezeigt werden.
@@ -234,6 +235,16 @@ export function ErstaufnahmeDialog({
     setChecklistItems((items) => items.map((i) => (i.id === id ? { ...i, ...patch } : i)));
 
   const persistItemText = async (item: ChecklistItem) => {
+    // Checklisten-Vorlage (Einstellung) nur mit Internet ändern.
+    if (isOffline()) {
+      toast({
+        variant: "destructive",
+        title: "Nur mit Internet möglich",
+        description: "Die Checklisten-Vorlage kann nur mit Internetverbindung geändert werden.",
+      });
+      await fetchChecklistItems();
+      return;
+    }
     const text = item.text.trim();
     if (!text) {
       // Leeren Text nicht speichern – Stand aus der Datenbank wiederherstellen
@@ -255,6 +266,15 @@ export function ErstaufnahmeDialog({
   };
 
   const toggleItemActive = async (item: ChecklistItem, isActive: boolean) => {
+    // Checklisten-Vorlage (Einstellung) nur mit Internet ändern.
+    if (isOffline()) {
+      toast({
+        variant: "destructive",
+        title: "Nur mit Internet möglich",
+        description: "Die Checklisten-Vorlage kann nur mit Internetverbindung geändert werden.",
+      });
+      return;
+    }
     updateItemLocal(item.id, { is_active: isActive });
     const { error } = await supabase
       .from("erstaufnahme_checklist_items")
@@ -273,6 +293,15 @@ export function ErstaufnahmeDialog({
   const handleAddItem = async () => {
     const text = newItemText.trim();
     if (!text) return;
+    // Checklisten-Vorlage (Einstellung) nur mit Internet ändern.
+    if (isOffline()) {
+      toast({
+        variant: "destructive",
+        title: "Nur mit Internet möglich",
+        description: "Die Checklisten-Vorlage kann nur mit Internetverbindung geändert werden.",
+      });
+      return;
+    }
     const maxSort = checklistItems.reduce((m, i) => Math.max(m, i.sort_order), 0);
     const { data, error } = await supabase
       .from("erstaufnahme_checklist_items")
@@ -356,24 +385,30 @@ export function ErstaufnahmeDialog({
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
-      // (a) Kunde anlegen oder bestehenden verwenden
-      let customer: {
-        id: string;
+      // Verfolgt, ob (mind.) ein Schritt in die Offline-Warteschlange ging.
+      let queued = false;
+
+      // (a) Kunde anlegen (Client-ID) oder bestehenden verwenden.
+      // Für die Zusammenfassung brauchen wir die Kundendaten auch offline lokal.
+      let customerId: string;
+      const customer: {
         vorname: string | null;
         nachname: string | null;
         strasse: string | null;
         ort: string | null;
         telefon: string | null;
         email: string | null;
-      };
+      } = { vorname: null, nachname: null, strasse: null, ort: null, telefon: null, email: null };
+
       if (newCustomerMode) {
         const row = customerFormToRow(customerForm);
-        const { data: created, error: custError } = await supabase
-          .from("customers")
-          .insert({ ...row, created_by: user?.id ?? null })
-          .select("id, vorname, nachname, strasse, ort, telefon, email")
-          .single();
-        if (custError || !created) {
+        customerId = newId();
+        const custRes = await saveInsert(
+          "customers",
+          { id: customerId, ...row, created_by: user?.id ?? null },
+          `Kunde ${row.nachname || row.vorname || ""}`.trim()
+        );
+        if (custRes.error) {
           toast({
             variant: "destructive",
             title: "Fehler",
@@ -381,7 +416,13 @@ export function ErstaufnahmeDialog({
           });
           return;
         }
-        customer = created;
+        queued = queued || custRes.queued;
+        customer.vorname = row.vorname;
+        customer.nachname = row.nachname;
+        customer.strasse = row.strasse;
+        customer.ort = row.ort;
+        customer.telefon = row.telefon;
+        customer.email = row.email;
       } else {
         const c = customers.find((c) => c.id === selectedCustomerId);
         if (!c) {
@@ -392,16 +433,28 @@ export function ErstaufnahmeDialog({
           });
           return;
         }
-        customer = c;
+        customerId = c.id;
+        customer.vorname = c.vorname;
+        customer.nachname = c.nachname;
+        customer.strasse = c.strasse;
+        customer.ort = c.ort;
+        customer.telefon = c.telefon;
+        customer.email = c.email;
       }
 
-      // (b) Projekt anlegen (Status: "Warte auf Angebotsbestätigung")
-      const { data: statusRows } = await supabase
-        .from("project_statuses")
-        .select("id")
-        .ilike("name", "%angebotsbest%")
-        .limit(1);
-      const statusId = statusRows?.[0]?.id ?? null;
+      // (b) Projekt anlegen (Client-ID, Status: "Warte auf Angebotsbestätigung").
+      // Status-Lesevorgang kann offline scheitern → dann einfach null.
+      let statusId: string | null = null;
+      try {
+        const { data: statusRows } = await supabase
+          .from("project_statuses")
+          .select("id")
+          .ilike("name", "%angebotsbest%")
+          .limit(1);
+        statusId = statusRows?.[0]?.id ?? null;
+      } catch {
+        statusId = null;
+      }
 
       const plzMatch = (customer.ort ?? "").match(/\b(\d{4,5})\b/);
       const plz = plzMatch?.[1] ?? "0000";
@@ -411,18 +464,21 @@ export function ErstaufnahmeDialog({
         [customer.nachname, customer.vorname].filter(Boolean).join(" ").trim() ||
         "Erstaufnahme";
 
-      const { data: project, error: projError } = await supabase
-        .from("projects")
-        .insert({
+      const projectId = newId();
+      const projRes = await saveInsert(
+        "projects",
+        {
+          id: projectId,
           name: projectName,
           plz,
           adresse,
-          customer_id: customer.id,
+          customer_id: customerId,
           status_id: statusId,
-        })
-        .select("id")
-        .single();
-      if (projError || !project) {
+        },
+        `Projekt ${projectName}`,
+        queued
+      );
+      if (projRes.error) {
         toast({
           variant: "destructive",
           title: "Fehler",
@@ -430,37 +486,45 @@ export function ErstaufnahmeDialog({
         });
         return;
       }
+      queued = queued || projRes.queued;
 
-      // (c) Standardordner anlegen (leere Ordner via .keep-Platzhalter)
-      const folderResults = await Promise.all(
-        STANDARD_PROJECT_FOLDERS.map((folder) =>
-          supabase.storage
-            .from("project-files")
-            .upload(`${project.id}/${folder}/.keep`, new Blob([""], { type: "text/plain" }))
-        )
-      );
-      if (folderResults.some((r) => r.error)) {
-        toast({
-          variant: "destructive",
-          title: "Hinweis",
-          description: "Standardordner konnten nicht vollständig angelegt werden",
-        });
+      // (c) Standardordner anlegen (leere Ordner via .keep-Platzhalter), sequenziell.
+      for (const folder of STANDARD_PROJECT_FOLDERS) {
+        const folderRes = await saveUpload(
+          {
+            bucket: "project-files",
+            path: `${projectId}/${folder}/.keep`,
+            blob: new Blob([""], { type: "text/plain" }),
+            contentType: "text/plain",
+          },
+          `Ordner ${folder}`,
+          queued
+        );
+        if (folderRes.queued) queued = true;
       }
 
-      // (d) Erstaufnahme-Datensatz speichern
+      // (d) Erstaufnahme-Datensatz speichern (Client-ID)
       const checklistJson = activeItems.map((item) => {
         const st = entryFor(item.id);
         return { item: item.text, bemerkung: st.bemerkung.trim(), erledigt: st.erledigt };
       });
-      const { error: erstError } = await supabase.from("erstaufnahmen").insert({
-        customer_id: customer.id,
-        project_id: project.id,
-        projekt_name: projectName,
-        notizen: notizen.trim() || null,
-        checklist: checklistJson,
-        created_by: user?.id ?? null,
-      });
-      if (erstError) {
+      const erstRes = await saveInsert(
+        "erstaufnahmen",
+        {
+          id: newId(),
+          customer_id: customerId,
+          project_id: projectId,
+          projekt_name: projectName,
+          notizen: notizen.trim() || null,
+          checklist: checklistJson,
+          created_by: user?.id ?? null,
+        },
+        `Erstaufnahme ${projectName}`,
+        queued
+      );
+      if (erstRes.queued) {
+        queued = true;
+      } else if (erstRes.error) {
         toast({
           variant: "destructive",
           title: "Fehler",
@@ -471,13 +535,19 @@ export function ErstaufnahmeDialog({
       // (e) Zusammenfassung als Textdatei in den Beschreibung-Ordner
       const now = new Date();
       const summary = buildSummary(customer, projectName, now);
-      const { error: uploadError } = await supabase.storage
-        .from("project-files")
-        .upload(
-          `${project.id}/Beschreibung/Erstaufnahme_${fileTimestamp(now)}.txt`,
-          new Blob([summary], { type: "text/plain;charset=utf-8" })
-        );
-      if (uploadError) {
+      const txtRes = await saveUpload(
+        {
+          bucket: "project-files",
+          path: `${projectId}/Beschreibung/Erstaufnahme_${fileTimestamp(now)}.txt`,
+          blob: new Blob([summary], { type: "text/plain;charset=utf-8" }),
+          contentType: "text/plain;charset=utf-8",
+        },
+        `Erstaufnahme-Zusammenfassung ${projectName}`,
+        queued
+      );
+      if (txtRes.queued) {
+        queued = true;
+      } else if (txtRes.error) {
         toast({
           variant: "destructive",
           title: "Fehler",
@@ -486,11 +556,18 @@ export function ErstaufnahmeDialog({
       }
 
       // (f) Fertig
-      toast({
-        title: "Erstaufnahme abgeschlossen",
-        description: "Projekt angelegt (Warte auf Angebotsbestätigung)",
-      });
-      onFinished?.(project.id);
+      if (queued) {
+        toast({
+          title: "Offline gespeichert",
+          description: "Wird automatisch gesendet, sobald wieder Internet da ist.",
+        });
+      } else {
+        toast({
+          title: "Erstaufnahme abgeschlossen",
+          description: "Projekt angelegt (Warte auf Angebotsbestätigung)",
+        });
+      }
+      onFinished?.(projectId);
       onOpenChange(false);
     } finally {
       setSaving(false);

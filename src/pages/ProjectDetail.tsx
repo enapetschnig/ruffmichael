@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/PageHeader";
 import { FileViewer } from "@/components/FileViewer";
+import { saveUpload } from "@/lib/offlineData";
 import { projectLabel, type ProjectLike } from "@/lib/projectLabel";
 
 type DocumentType = "plans" | "reports" | "photos" | "chef";
@@ -148,6 +149,7 @@ const ProjectDetail = () => {
     const selectedFiles = Array.from(e.target.files);
 
     let successCount = 0;
+    let queuedCount = 0;
     let firstError: string | null = null;
 
     for (let i = 0; i < selectedFiles.length; i++) {
@@ -155,31 +157,43 @@ const ProjectDetail = () => {
       // Index im Pfad verhindert Kollisionen bei mehreren Uploads in derselben Millisekunde
       const filePath = `${projectId}/${Date.now()}_${i}_${file.name}`;
 
-      const { error } = await supabase
-        .storage
-        .from(bucket)
-        .upload(filePath, file);
+      // Offline-fähiger Upload: ohne Netz landet die Datei in der Warteschlange.
+      const res = await saveUpload(
+        { bucket, path: filePath, blob: file, contentType: file.type || undefined },
+        `${titleMap[type]}: ${file.name}`
+      );
 
-      if (error) {
-        if (!firstError) firstError = error.message;
+      if (res.error) {
+        if (!firstError) firstError = res.error;
+      } else if (res.queued) {
+        queuedCount++;
       } else {
         successCount++;
       }
     }
 
-    if (successCount > 0) {
+    if (successCount > 0 || queuedCount > 0) {
+      const parts: string[] = [];
+      if (successCount > 0) {
+        parts.push(`${successCount} ${successCount === 1 ? "Datei" : "Dateien"} hochgeladen`);
+      }
+      if (queuedCount > 0) {
+        parts.push(`${queuedCount} offline gespeichert`);
+      }
       toast({
-        title: "Erfolg",
-        description: `${successCount} ${successCount === 1 ? "Datei wurde" : "Dateien wurden"} hochgeladen`,
+        title: successCount > 0 ? "Erfolg" : "Offline gespeichert",
+        description:
+          parts.join(" · ") +
+          (queuedCount > 0 ? " – wird automatisch gesendet, sobald wieder Internet da ist." : ""),
       });
       fetchFiles();
     }
 
-    if (successCount < selectedFiles.length) {
+    if (firstError && successCount + queuedCount < selectedFiles.length) {
       toast({
         variant: "destructive",
         title: "Fehler",
-        description: firstError || "Einige Dateien konnten nicht hochgeladen werden",
+        description: firstError,
       });
     }
 

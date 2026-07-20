@@ -6,6 +6,7 @@ const corsHeaders = {
 };
 
 interface TimeEntryData {
+  id?: string; // optional client-seitige ID -> idempotenter Retry (Offline-Sync)
   user_id: string;
   datum: string;
   project_id?: string | null;
@@ -119,28 +120,33 @@ Deno.serve(async (req: Request) => {
     let mainEntryResult: { id: string } | null = null;
     let totalCreated = 0;
 
-    // Insert main entry for the authenticated user (unless skipMainEntry is true)
+    // Zeile aus TimeEntryData bauen; optionale client-ID mitnehmen (Idempotenz).
+    const rowFrom = (e: TimeEntryData) => ({
+      ...(e.id ? { id: e.id } : {}),
+      user_id: e.user_id,
+      datum: e.datum,
+      project_id: e.project_id || null,
+      disturbance_id: e.disturbance_id || null,
+      taetigkeit: e.taetigkeit,
+      stunden: e.stunden,
+      start_time: e.start_time,
+      end_time: e.end_time,
+      pause_minutes: e.pause_minutes,
+      pause_start: e.pause_start || null,
+      pause_end: e.pause_end || null,
+      location_type: e.location_type,
+      notizen: e.notizen || null,
+      week_type: e.week_type || null,
+    });
+
+    // Insert main entry for the authenticated user (unless skipMainEntry is true).
+    // Bei client-ID: upsert mit ignoreDuplicates -> erneuter Sync legt KEINE Dublette an.
     if (!skipMainEntry) {
-      const { data: mainResult, error: mainError } = await supabaseAdmin
-        .from("time_entries")
-        .insert({
-          user_id: mainEntry.user_id,
-          datum: mainEntry.datum,
-          project_id: mainEntry.project_id || null,
-          disturbance_id: mainEntry.disturbance_id || null,
-          taetigkeit: mainEntry.taetigkeit,
-          stunden: mainEntry.stunden,
-          start_time: mainEntry.start_time,
-          end_time: mainEntry.end_time,
-          pause_minutes: mainEntry.pause_minutes,
-          pause_start: mainEntry.pause_start || null,
-          pause_end: mainEntry.pause_end || null,
-          location_type: mainEntry.location_type,
-          notizen: mainEntry.notizen || null,
-          week_type: mainEntry.week_type || null,
-        })
-        .select()
-        .single();
+      const mainRow = rowFrom(mainEntry);
+      const mainQuery = mainEntry.id
+        ? supabaseAdmin.from("time_entries").upsert(mainRow, { onConflict: "id", ignoreDuplicates: true }).select("id").maybeSingle()
+        : supabaseAdmin.from("time_entries").insert(mainRow).select("id").single();
+      const { data: mainResult, error: mainError } = await mainQuery;
 
       if (mainError) {
         console.error("Error inserting main entry:", mainError);
@@ -150,7 +156,8 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      mainEntryResult = mainResult;
+      // Bei ignoreDuplicates kann mainResult null sein (Zeile existierte schon) -> client-ID nutzen
+      mainEntryResult = mainResult ?? (mainEntry.id ? { id: mainEntry.id } : null);
       totalCreated = 1;
     }
 
@@ -158,26 +165,11 @@ Deno.serve(async (req: Request) => {
 
     // Insert team entries
     for (const teamEntry of teamEntries) {
-      const { data: teamEntryResult, error: teamError } = await supabaseAdmin
-        .from("time_entries")
-        .insert({
-          user_id: teamEntry.user_id,
-          datum: teamEntry.datum,
-          project_id: teamEntry.project_id || null,
-          disturbance_id: teamEntry.disturbance_id || null,
-          taetigkeit: teamEntry.taetigkeit,
-          stunden: teamEntry.stunden,
-          start_time: teamEntry.start_time,
-          end_time: teamEntry.end_time,
-          pause_minutes: teamEntry.pause_minutes,
-          pause_start: teamEntry.pause_start || null,
-          pause_end: teamEntry.pause_end || null,
-          location_type: teamEntry.location_type,
-          notizen: teamEntry.notizen || null,
-          week_type: teamEntry.week_type || null,
-        })
-        .select()
-        .single();
+      const teamRow = rowFrom(teamEntry);
+      const teamQuery = teamEntry.id
+        ? supabaseAdmin.from("time_entries").upsert(teamRow, { onConflict: "id", ignoreDuplicates: true }).select("id").maybeSingle()
+        : supabaseAdmin.from("time_entries").insert(teamRow).select("id").single();
+      const { data: teamEntryResult, error: teamError } = await teamQuery;
 
       if (teamError) {
         console.error("Error inserting team entry:", teamError);
@@ -185,18 +177,19 @@ Deno.serve(async (req: Request) => {
         continue;
       }
 
-      teamEntryIds.push(teamEntryResult.id);
+      const teamEntryId = teamEntryResult?.id ?? teamEntry.id;
+      if (teamEntryId) teamEntryIds.push(teamEntryId);
       totalCreated++;
 
-      // Create worker link if requested and main entry exists
-      if (createWorkerLinks && mainEntryResult) {
+      // Create worker link if requested and main entry exists.
+      // upsert auf (source,target) verhindert Dubletten beim erneuten Sync.
+      if (createWorkerLinks && mainEntryResult && teamEntryId) {
         const { error: linkError } = await supabaseAdmin
           .from("time_entry_workers")
-          .insert({
-            source_entry_id: mainEntryResult.id,
-            user_id: teamEntry.user_id,
-            target_entry_id: teamEntryResult.id,
-          });
+          .upsert(
+            { source_entry_id: mainEntryResult.id, user_id: teamEntry.user_id, target_entry_id: teamEntryId },
+            { onConflict: "source_entry_id,user_id", ignoreDuplicates: true }
+          );
 
         if (linkError) {
           console.error("Error creating worker link:", linkError);

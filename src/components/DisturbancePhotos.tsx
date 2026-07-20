@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
+import { newId, isOffline, saveUpload } from "@/lib/offlineData";
 import { useToast } from "@/hooks/use-toast";
 
 interface DisturbancePhoto {
@@ -68,6 +69,7 @@ export const DisturbancePhotos = ({ disturbanceId, canEdit }: DisturbancePhotosP
     }
 
     let uploadedCount = 0;
+    let anyQueued = false;
 
     for (const file of Array.from(files)) {
       // Validate file type
@@ -92,48 +94,53 @@ export const DisturbancePhotos = ({ disturbanceId, canEdit }: DisturbancePhotosP
 
       const fileName = `${disturbanceId}/${Date.now()}_${file.name}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("disturbance-photos")
-        .upload(fileName, file);
+      // Offline-fähig: Upload + Folge-DB-Eintrag. Offline wird beides eingereiht und
+      // beim nächsten Sync ausgeführt (Foto zuerst, dann der disturbance_photos-Eintrag).
+      const res = await saveUpload(
+        {
+          bucket: "disturbance-photos",
+          path: fileName,
+          blob: file,
+          contentType: file.type,
+          followInsert: {
+            table: "disturbance_photos",
+            row: {
+              id: newId(),
+              disturbance_id: disturbanceId,
+              user_id: user.id,
+              file_path: fileName,
+              file_name: file.name,
+            },
+          },
+        },
+        `Foto: ${file.name}`
+      );
 
-      if (uploadError) {
+      if (res.error) {
         toast({
           variant: "destructive",
           title: "Upload fehlgeschlagen",
-          description: uploadError.message,
+          description: res.error,
         });
         continue;
       }
 
-      // Create database entry
-      const { error: dbError } = await supabase
-        .from("disturbance_photos")
-        .insert({
-          disturbance_id: disturbanceId,
-          user_id: user.id,
-          file_path: fileName,
-          file_name: file.name,
-        });
-
-      if (dbError) {
-        // Clean up storage if db insert failed
-        await supabase.storage.from("disturbance-photos").remove([fileName]);
-        toast({
-          variant: "destructive",
-          title: "Fehler",
-          description: "Foto konnte nicht gespeichert werden",
-        });
-        continue;
-      }
-
+      if (res.queued) anyQueued = true;
       uploadedCount++;
     }
 
     if (uploadedCount > 0) {
-      toast({
-        title: "Erfolg",
-        description: `${uploadedCount} Foto${uploadedCount > 1 ? "s" : ""} hochgeladen`,
-      });
+      if (anyQueued) {
+        toast({
+          title: "Offline gespeichert",
+          description: "Wird automatisch gesendet, sobald wieder Internet da ist.",
+        });
+      } else {
+        toast({
+          title: "Erfolg",
+          description: `${uploadedCount} Foto${uploadedCount > 1 ? "s" : ""} hochgeladen`,
+        });
+      }
       fetchPhotos();
     }
 
@@ -145,6 +152,12 @@ export const DisturbancePhotos = ({ disturbanceId, canEdit }: DisturbancePhotosP
   };
 
   const handleDelete = async (photo: DisturbancePhoto) => {
+    // Löschen bleibt online-only.
+    if (isOffline()) {
+      toast({ variant: "destructive", title: "Nur mit Internet möglich", description: "Bitte später erneut versuchen." });
+      return;
+    }
+
     // Delete from storage
     await supabase.storage.from("disturbance-photos").remove([photo.file_path]);
 

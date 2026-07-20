@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar, Check, X, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { isOffline } from "@/lib/offlineData";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 
@@ -80,6 +81,10 @@ export default function LeaveManagement({ profiles }: LeaveManagementProps) {
   };
 
   const handleReview = async (requestId: string, newStatus: "genehmigt" | "abgelehnt") => {
+    if (isOffline()) {
+      toast({ variant: "destructive", title: "Nur mit Internet möglich", description: "Urlaubsanträge können nur mit Internetverbindung bearbeitet werden." });
+      return;
+    }
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
@@ -130,6 +135,10 @@ export default function LeaveManagement({ profiles }: LeaveManagementProps) {
   };
 
   const ensureBalance = async (userId: string) => {
+    if (isOffline()) {
+      toast({ variant: "destructive", title: "Nur mit Internet möglich", description: "Urlaubskontingente können nur mit Internetverbindung angelegt werden." });
+      return;
+    }
     const existing = balances.find((b) => b.user_id === userId && b.year === selectedYear);
     if (existing) return;
 
@@ -143,6 +152,10 @@ export default function LeaveManagement({ profiles }: LeaveManagementProps) {
   };
 
   const updateTotalDays = async (balanceId: string, totalDays: number) => {
+    if (isOffline()) {
+      toast({ variant: "destructive", title: "Nur mit Internet möglich", description: "Urlaubstage können nur mit Internetverbindung geändert werden." });
+      return;
+    }
     const { error } = await supabase
       .from("leave_balances")
       .update({ total_days: totalDays })

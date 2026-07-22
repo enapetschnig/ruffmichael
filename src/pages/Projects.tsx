@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { ArrowLeft, FolderOpen, Plus, FileText, Image, Package, Lock, Search, Upload, Camera, Trash2, ChevronDown, Home, Settings, Save } from "lucide-react";
+import { ArrowLeft, FolderOpen, Plus, FileText, Image, Package, Lock, Search, Upload, Camera, Trash2, ChevronDown, Home, Settings, Save, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -18,7 +18,9 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CustomerFormFields, customerFormToRow, customerAddress, customerDisplayName, type Customer } from "./Customers";
 import { enqueue } from "@/lib/offlineQueue";
-import { newId, saveInsert, saveUpload } from "@/lib/offlineData";
+import { newId, saveInsert, saveUpload, saveUpdate, isOffline } from "@/lib/offlineData";
+import { getSessionUser } from "@/lib/auth";
+import { projectAddress } from "@/lib/projectLabel";
 
 type ProjectCustomer = Pick<Customer, "id" | "vorname" | "nachname" | "strasse" | "ort">;
 
@@ -53,14 +55,18 @@ type Project = {
   };
 };
 
-// Anzeige: Projektname, dahinter die Adresse des Kunden (Fallback: Projektadresse)
-export const projectDisplayAddress = (p: Pick<Project, "adresse" | "customers">): string => {
-  if (p.customers) {
-    const addr = customerAddress(p.customers);
-    if (addr) return addr;
-  }
-  return p.adresse ?? "";
-};
+// Anzeige: Projektname, dahinter die Adresse des Kunden.
+// Einheitliche Fallback-Kette wie im Rest der App (Kundenadresse → Projektadresse → PLZ).
+export const projectDisplayAddress = (p: Pick<Project, "adresse" | "plz" | "customers">): string =>
+  projectAddress({ name: "", adresse: p.adresse, plz: p.plz, customers: p.customers });
+
+// Umlaute/ß für Storage-Keys transliterieren (Supabase lehnt Nicht-ASCII-Keys ab).
+const toStorageKey = (name: string): string =>
+  name
+    .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue")
+    .replace(/Ä/g, "Ae").replace(/Ö/g, "Oe").replace(/Ü/g, "Ue")
+    .replace(/ß/g, "ss")
+    .replace(/[^a-zA-Z0-9._ ()-]/g, "_");
 
 // Standardordner für neue Projekte (lt. Vorlage der Firma, ohne Vorlagen-Ordner)
 const STANDARD_PROJECT_FOLDERS = [
@@ -124,6 +130,66 @@ const Projects = () => {
   const [newStatusForm, setNewStatusForm] = useState({ name: "", color: "#22c55e" });
   const [statusToDelete, setStatusToDelete] = useState<ProjectStatus | null>(null);
   const [savingStatuses, setSavingStatuses] = useState(false);
+
+  // Projekt bearbeiten
+  const [editProject, setEditProject] = useState<Project | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: "", plz: "", adresse: "", beschreibung: "",
+    customerId: "none" as string, statusId: "none" as string,
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const openEdit = (project: Project) => {
+    setEditProject(project);
+    setEditForm({
+      name: project.name ?? "",
+      plz: project.plz ?? "",
+      adresse: project.adresse ?? "",
+      beschreibung: project.beschreibung ?? "",
+      customerId: project.customer_id ?? "none",
+      statusId: project.status_id ?? "none",
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editProject || savingEdit) return;
+    // Bearbeiten bestehender Daten bleibt online-only (klarer Hinweis statt stillem Fehler).
+    if (isOffline()) {
+      toast({ variant: "destructive", title: "Nur mit Internet möglich", description: "Projekt-Änderungen brauchen eine Internetverbindung." });
+      return;
+    }
+    if (!editForm.name.trim()) {
+      toast({ variant: "destructive", title: "Fehler", description: "Projektname ist erforderlich" });
+      return;
+    }
+    if (!/^\d{4,5}$/.test(editForm.plz.trim())) {
+      toast({ variant: "destructive", title: "Fehler", description: "PLZ muss 4-5 Ziffern enthalten" });
+      return;
+    }
+    setSavingEdit(true);
+    // Adresse: leer -> aus gewähltem Kunden ableiten (wie bei der Anlage)
+    let derivedAdresse = editForm.adresse.trim();
+    if (!derivedAdresse && editForm.customerId !== "none") {
+      const c = customers.find((c) => c.id === editForm.customerId);
+      if (c) derivedAdresse = [c.strasse, c.ort].filter(Boolean).join(", ");
+    }
+    const res = await saveUpdate("projects", { id: editProject.id }, {
+      name: editForm.name.trim(),
+      plz: editForm.plz.trim(),
+      adresse: derivedAdresse || null,
+      beschreibung: editForm.beschreibung.trim() || null,
+      customer_id: editForm.customerId !== "none" ? editForm.customerId : null,
+      status_id: editForm.statusId !== "none" ? editForm.statusId : null,
+    }, `Projekt ${editForm.name.trim()}`);
+    setSavingEdit(false);
+    if (res.error) {
+      toast({ variant: "destructive", title: "Fehler", description: "Projekt konnte nicht gespeichert werden" });
+      return;
+    }
+    toast({ title: "Gespeichert", description: "Projekt wurde aktualisiert." });
+    setEditProject(null);
+    fetchProjects();
+  };
 
   useEffect(() => {
     checkAdminStatus();
@@ -256,7 +322,7 @@ const Projects = () => {
       let customerId: string | null = null;
       let customerForAddress: { strasse: string | null; ort: string | null } | null = null;
 
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getSessionUser();
       let anyQueued = false;
       const label = `Projekt ${newProject.name.trim()}`;
 
@@ -674,8 +740,10 @@ const Projects = () => {
 
     const timestamp = Date.now();
     const projectId = quickUploadProject.projectId;
-    const filePath = `${projectId}/${timestamp}_${file.name}`;
-    const { data: { user } } = await supabase.auth.getUser();
+    // Umlaute/ß im Storage-Key transliterieren (Supabase lehnt Nicht-ASCII-Keys ab),
+    // Originalname bleibt als Anzeigename erhalten.
+    const filePath = `${projectId}/${timestamp}_${toStorageKey(file.name)}`;
+    const user = await getSessionUser();
     if (!user) throw new Error("Nicht angemeldet");
 
     // Öffentliche URL ist bei public Buckets deterministisch – auch offline bildbar
@@ -1200,16 +1268,27 @@ const Projects = () => {
                   <p className="text-xs text-muted-foreground">
                     Aktualisiert: {formatDate(project.updated_at)}
                   </p>
-                  {isAdmin && (
+                  <div className="flex items-center gap-2 self-end sm:self-auto">
                     <Button
-                      variant={project.status === 'aktiv' ? 'ghost' : 'default'}
+                      variant="outline"
                       size="sm"
-                      className="text-xs self-end sm:self-auto"
-                      onClick={() => handleToggleProjectStatus(project.id, project.status, project.name)}
+                      className="text-xs gap-1"
+                      onClick={(e) => { e.stopPropagation(); openEdit(project); }}
                     >
-                      {project.status === 'aktiv' ? 'Projekt schließen' : 'Projekt wiedereröffnen'}
+                      <Pencil className="w-3 h-3" />
+                      Bearbeiten
                     </Button>
-                  )}
+                    {isAdmin && (
+                      <Button
+                        variant={project.status === 'aktiv' ? 'ghost' : 'default'}
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => handleToggleProjectStatus(project.id, project.status, project.name)}
+                      >
+                        {project.status === 'aktiv' ? 'Projekt schließen' : 'Projekt wiedereröffnen'}
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -1373,6 +1452,68 @@ const Projects = () => {
         </Collapsible>
         )}
       </main>
+
+      {/* Projekt bearbeiten */}
+      <Dialog open={!!editProject} onOpenChange={(open) => !open && setEditProject(null)}>
+        <DialogContent className="max-w-sm sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Projekt bearbeiten</DialogTitle>
+            <DialogDescription>Projektdaten, Kunde und Ampel-Status ändern</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Projektname *</Label>
+              <Input id="edit-name" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Kunde</Label>
+              <Select value={editForm.customerId} onValueChange={(v) => setEditForm({ ...editForm, customerId: v })}>
+                <SelectTrigger><SelectValue placeholder="Kunde auswählen" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— Kein Kunde —</SelectItem>
+                  {customers.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {customerDisplayName(c)}{customerAddress(c) ? ` (${customerAddress(c)})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-plz">PLZ *</Label>
+              <Input id="edit-plz" value={editForm.plz} maxLength={5} onChange={(e) => setEditForm({ ...editForm, plz: e.target.value })} placeholder="z.B. 9613" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-adresse">Adresse</Label>
+              <Input id="edit-adresse" value={editForm.adresse} onChange={(e) => setEditForm({ ...editForm, adresse: e.target.value })} placeholder="Leer lassen = Adresse des Kunden" />
+            </div>
+            <div className="space-y-2">
+              <Label>Ampel-Status</Label>
+              <Select value={editForm.statusId} onValueChange={(v) => setEditForm({ ...editForm, statusId: v })}>
+                <SelectTrigger><SelectValue placeholder="Status wählen" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Kein Status</SelectItem>
+                  {statuses.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      <span className="inline-flex items-center gap-2">
+                        <span className="h-3 w-3 rounded-full" style={{ backgroundColor: s.color }} />
+                        {s.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-beschreibung">Beschreibung</Label>
+              <Textarea id="edit-beschreibung" value={editForm.beschreibung} onChange={(e) => setEditForm({ ...editForm, beschreibung: e.target.value })} className="min-h-20" />
+            </div>
+            <Button onClick={handleSaveEdit} disabled={savingEdit} className="w-full">
+              {savingEdit ? "Speichern..." : "Änderungen speichern"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Quick Upload Dialog - Only show when NOT in camera mode */}
       {quickUploadProject && !showCameraDialog && (

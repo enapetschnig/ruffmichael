@@ -8,6 +8,7 @@ import { Upload, Download, Trash2, Camera, FileText, Package, Lock, ClipboardLis
 import { toast } from "sonner";
 import { useToast } from "@/hooks/use-toast";
 import { isOffline, newId, saveUpload } from "@/lib/offlineData";
+import { getSessionUser } from "@/lib/auth";
 
 type DocumentType = 'photos' | 'plans' | 'reports' | 'materials' | 'chef' | 'notizen';
 
@@ -121,7 +122,8 @@ export function ProjectFilesManager({ projectId, defaultTab = 'photos' }: Projec
     const bucketName = bucketMap[type];
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      // Offline-sicher: aktueller Benutzer aus lokaler Session (kein Netz-Call).
+      const user = await getSessionUser();
       if (!user) throw new Error('Nicht authentifiziert');
 
       let successCount = 0;

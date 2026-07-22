@@ -4,7 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Upload, X, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { saveUpload } from "@/lib/offlineData";
+import { newId, saveUpload } from "@/lib/offlineData";
+import { getSessionUser } from "@/lib/auth";
+import { supabase } from "@/integrations/supabase/client";
 import { Progress } from "@/components/ui/progress";
 
 type DocumentType = "plans" | "reports" | "materials" | "photos";
@@ -30,6 +32,20 @@ const titleMap: Record<DocumentType, string> = {
   materials: "Materiallisten",
   photos: "Fotos",
 };
+
+// Wandelt einen benutzerfreundlichen Namen in einen gültigen Supabase-Storage-Key um.
+// Supabase Storage lehnt Nicht-ASCII-Object-Keys ab ("Invalid key"), daher werden
+// Umlaute/ß zuerst transliteriert und danach alle übrigen Sonderzeichen entfernt.
+const toStorageKey = (name: string) =>
+  name
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/Ä/g, "Ae")
+    .replace(/Ö/g, "Oe")
+    .replace(/Ü/g, "Ue")
+    .replace(/ß/g, "ss")
+    .replace(/[^a-zA-Z0-9._ ()-]/g, "_");
 
 export function QuickUploadDialog({ 
   projectId, 
@@ -60,6 +76,18 @@ export function QuickUploadDialog({
     setUploading(true);
     setUploadProgress(0);
 
+    // Offline-sicher: aktueller Benutzer aus lokaler Session (kein Netz-Call).
+    const user = await getSessionUser();
+    if (!user) {
+      setUploading(false);
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Nicht angemeldet",
+      });
+      return;
+    }
+
     const bucket = bucketMap[documentType];
     let successCount = 0;
     let queuedCount = 0;
@@ -67,11 +95,33 @@ export function QuickUploadDialog({
 
     for (let i = 0; i < selectedFiles.length; i++) {
       const file = selectedFiles[i];
-      const filePath = `${projectId}/${Date.now()}_${file.name}`;
+      // Storage-Key ohne Sonderzeichen/Umlaute; Anzeigename bleibt original.
+      const filePath = `${projectId}/${Date.now()}_${toStorageKey(file.name)}`;
 
-      // Offline-fähiger Upload: ohne Netz landet die Datei in der Warteschlange.
+      // Public URL kann synchron (ohne Netz) gebildet werden.
+      const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(filePath);
+
+      // Offline-fähiger Upload inkl. Folge-Eintrag in "documents", damit die Datei
+      // auch in der dokumentenbasierten Dateiverwaltung sichtbar wird.
       const res = await saveUpload(
-        { bucket, path: filePath, blob: file, contentType: file.type || undefined, upsert: false },
+        {
+          bucket,
+          path: filePath,
+          blob: file,
+          contentType: file.type || undefined,
+          upsert: false,
+          followInsert: {
+            table: "documents",
+            row: {
+              id: newId(),
+              project_id: projectId,
+              user_id: user.id,
+              typ: documentType,
+              name: file.name,
+              file_url: urlData.publicUrl,
+            },
+          },
+        },
         `${titleMap[documentType]}: ${file.name}`
       );
 

@@ -34,6 +34,20 @@ const titleMap: Record<DocumentType, string> = {
   chef: "🔒 Chefordner",
 };
 
+// Wandelt einen benutzerfreundlichen Namen in einen gültigen Supabase-Storage-Key um.
+// Supabase Storage lehnt Nicht-ASCII-Object-Keys ab ("Invalid key"), daher werden
+// Umlaute/ß zuerst transliteriert und danach alle übrigen Sonderzeichen entfernt.
+const toStorageKey = (name: string) =>
+  name
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/Ä/g, "Ae")
+    .replace(/Ö/g, "Oe")
+    .replace(/Ü/g, "Ue")
+    .replace(/ß/g, "ss")
+    .replace(/[^a-zA-Z0-9._ ()-]/g, "_");
+
 const ProjectDetail = () => {
   const { projectId, type } = useParams<{ projectId: string; type: DocumentType }>();
   const { toast } = useToast();
@@ -132,6 +146,7 @@ const ProjectDetail = () => {
       .storage
       .from(bucket)
       .list(projectId, {
+        limit: 1000,
         sortBy: { column: "created_at", order: "desc" },
       });
 
@@ -154,8 +169,9 @@ const ProjectDetail = () => {
 
     for (let i = 0; i < selectedFiles.length; i++) {
       const file = selectedFiles[i];
-      // Index im Pfad verhindert Kollisionen bei mehreren Uploads in derselben Millisekunde
-      const filePath = `${projectId}/${Date.now()}_${i}_${file.name}`;
+      // Index im Pfad verhindert Kollisionen bei mehreren Uploads in derselben Millisekunde.
+      // Storage-Key ohne Sonderzeichen/Umlaute (sonst "Invalid key").
+      const filePath = `${projectId}/${Date.now()}_${i}_${toStorageKey(file.name)}`;
 
       // Offline-fähiger Upload: ohne Netz landet die Datei in der Warteschlange.
       const res = await saveUpload(

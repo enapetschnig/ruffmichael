@@ -34,6 +34,7 @@ import {
 } from "@/pages/Customers";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { getSessionUser } from "@/lib/auth";
 import { newId, isOffline, saveInsert, saveUpload } from "@/lib/offlineData";
 
 // WICHTIG: Diese Komponente wird von Mitarbeitern und Kunden gesehen.
@@ -117,6 +118,7 @@ export function ErstaufnahmeDialog({
   const [customerForm, setCustomerForm] = useState(emptyCustomerForm);
 
   const [projektName, setProjektName] = useState("");
+  const [plz, setPlz] = useState("");
   const [notizen, setNotizen] = useState("");
 
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
@@ -201,6 +203,7 @@ export function ErstaufnahmeDialog({
     setNewCustomerMode(false);
     setCustomerForm(emptyCustomerForm);
     setProjektName("");
+    setPlz("");
     setNotizen("");
     setChecklistState({});
     setEditChecklist(false);
@@ -381,9 +384,18 @@ export function ErstaufnahmeDialog({
       return;
     }
 
+    if (!/^\d{4,5}$/.test(plz.trim())) {
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "PLZ muss 4-5 Ziffern enthalten",
+      });
+      return;
+    }
+
     setSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getSessionUser();
 
       // Verfolgt, ob (mind.) ein Schritt in die Offline-Warteschlange ging.
       let queued = false;
@@ -445,19 +457,21 @@ export function ErstaufnahmeDialog({
       // (b) Projekt anlegen (Client-ID, Status: "Warte auf Angebotsbestätigung").
       // Status-Lesevorgang kann offline scheitern → dann einfach null.
       let statusId: string | null = null;
+      let statusName: string | null = null;
       try {
         const { data: statusRows } = await supabase
           .from("project_statuses")
-          .select("id")
+          .select("id, name")
           .ilike("name", "%angebotsbest%")
           .limit(1);
         statusId = statusRows?.[0]?.id ?? null;
+        statusName = statusRows?.[0]?.name ?? null;
       } catch {
         statusId = null;
+        statusName = null;
       }
 
-      const plzMatch = (customer.ort ?? "").match(/\b(\d{4,5})\b/);
-      const plz = plzMatch?.[1] ?? "0000";
+      const projectPlz = plz.trim();
       const adresse = [customer.strasse, customer.ort].filter(Boolean).join(", ") || null;
       const projectName =
         projektName.trim() ||
@@ -470,7 +484,7 @@ export function ErstaufnahmeDialog({
         {
           id: projectId,
           name: projectName,
-          plz,
+          plz: projectPlz,
           adresse,
           customer_id: customerId,
           status_id: statusId,
@@ -557,18 +571,24 @@ export function ErstaufnahmeDialog({
 
       // (f) Fertig
       if (queued) {
+        // Offline: Das Projekt liegt nur in der lokalen Warteschlange — die
+        // Detailseite (/projects/:id) wäre nicht erreichbar/leer. Deshalb NICHT
+        // dorthin navigieren (onFinished), sondern nur den Hinweis zeigen und
+        // den Dialog schließen. Das Formular wird beim nächsten Öffnen zurückgesetzt.
         toast({
           title: "Offline gespeichert",
           description: "Wird automatisch gesendet, sobald wieder Internet da ist.",
         });
+        onOpenChange(false);
       } else {
         toast({
           title: "Erstaufnahme abgeschlossen",
-          description: "Projekt angelegt (Warte auf Angebotsbestätigung)",
+          description: statusId
+            ? `Projekt angelegt (${statusName ?? "Warte auf Angebotsbestätigung"})`
+            : "Projekt angelegt (ohne Status)",
         });
+        onFinished?.(projectId);
       }
-      onFinished?.(projectId);
-      onOpenChange(false);
     } finally {
       setSaving(false);
     }
@@ -651,6 +671,18 @@ export function ErstaufnahmeDialog({
               value={projektName}
               onChange={(e) => setProjektName(e.target.value)}
               placeholder="Leer lassen – wird aus dem Kundennamen gebildet"
+            />
+          </div>
+
+          {/* PLZ */}
+          <div className="space-y-1.5">
+            <Label htmlFor="erstaufnahme-plz">PLZ *</Label>
+            <Input
+              id="erstaufnahme-plz"
+              value={plz}
+              onChange={(e) => setPlz(e.target.value)}
+              inputMode="numeric"
+              placeholder="z. B. 4020"
             />
           </div>
 

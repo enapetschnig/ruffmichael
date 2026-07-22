@@ -512,7 +512,22 @@ Deno.serve(async (req: Request): Promise<Response> => {
       ],
     });
 
+    // Resend meldet Fehler im Feld .error (kein throw) -> NICHT als gesendet markieren,
+    // damit der Versand erneut versucht werden kann.
+    if ((emailResponse as { error?: { message?: string } })?.error) {
+      const msg = (emailResponse as { error?: { message?: string } }).error?.message || "E-Mail-Versand fehlgeschlagen";
+      console.error("Resend error:", msg);
+      return new Response(
+        JSON.stringify({ success: false, error: msg }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
     console.log("Email sent successfully:", emailResponse);
+
+    // Status erst NACH bestätigtem Versand setzen (einzige Quelle der Wahrheit,
+    // gilt online wie beim Offline-Sync).
+    await supabaseAdmin.from("disturbances").update({ status: "gesendet" }).eq("id", disturbance.id);
 
     return new Response(
       JSON.stringify({ success: true, emailResponse }),

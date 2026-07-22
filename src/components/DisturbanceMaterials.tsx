@@ -10,6 +10,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { newId, isOffline, saveInsert } from "@/lib/offlineData";
+import { getSessionUser } from "@/lib/auth";
+import { MaterialPicker } from "@/components/MaterialPicker";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
@@ -92,7 +94,7 @@ export const DisturbanceMaterials = ({ disturbanceId, canEdit }: DisturbanceMate
 
     setSaving(true);
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) {
       toast({ variant: "destructive", title: "Fehler", description: "Sie müssen angemeldet sein" });
       setSaving(false);
@@ -288,7 +290,18 @@ export const DisturbanceMaterials = ({ disturbanceId, canEdit }: DisturbanceMate
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label htmlFor="material">Material *</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="material">Material *</Label>
+                <MaterialPicker
+                  triggerLabel="Aus Katalog"
+                  onSelect={(m) =>
+                    setFormData((f) => ({
+                      ...f,
+                      material: m.einheit ? `${m.name} (${m.einheit})` : m.name,
+                    }))
+                  }
+                />
+              </div>
               <Input
                 id="material"
                 value={formData.material}

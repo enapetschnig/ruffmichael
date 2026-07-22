@@ -24,6 +24,7 @@ import { MaterialPicker, type CatalogMaterial } from "@/components/MaterialPicke
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { projectLabel } from "@/lib/projectLabel";
+import { getSessionUser } from "@/lib/auth";
 import { newId, saveInsert } from "@/lib/offlineData";
 
 // WICHTIG: Diese Komponente wird von Mitarbeitern und Kunden gesehen.
@@ -239,7 +240,7 @@ export function NachtragDialog({
   const insertNachtrag = async (
     withSignature: boolean
   ): Promise<{ queued: boolean; error?: string }> => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     const nachtragId = newId();
     const label = `Nachtrag ${titel.trim()}`;
 

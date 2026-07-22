@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { getSessionUser } from "@/lib/auth";
+import { isOffline, newId, saveInsert } from "@/lib/offlineData";
 import { PageHeader } from "@/components/PageHeader";
 import { projectLabel } from "@/lib/projectLabel";
 
@@ -53,7 +55,8 @@ const MaterialList = () => {
   }, [projectId]);
 
   const checkUserAndFetchData = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    // Offline-sicher: aktueller Benutzer aus lokaler Session (kein Netz-Call).
+    const user = await getSessionUser();
     if (!user) return;
 
     setCurrentUserId(user.id);
@@ -118,27 +121,38 @@ const MaterialList = () => {
 
     setSubmitting(true);
 
-    const { error } = await supabase
-      .from("material_entries")
-      .insert({
+    // Offline-fähig: ohne Netz landet der Eintrag in der Warteschlange.
+    const res = await saveInsert(
+      "material_entries",
+      {
+        id: newId(),
         project_id: projectId,
         user_id: currentUserId,
         material: newMaterial.trim(),
         menge: newMenge.trim() || null,
         notizen: newNotizen.trim() || null,
-      });
+      },
+      `Material: ${newMaterial.trim()}`
+    );
 
-    if (error) {
+    if (res.error) {
       toast({
         variant: "destructive",
         title: "Fehler",
-        description: "Eintrag konnte nicht gespeichert werden",
+        description: res.error,
       });
     } else {
-      toast({
-        title: "Gespeichert",
-        description: "Material wurde hinzugefügt",
-      });
+      toast(
+        res.queued
+          ? {
+              title: "Offline gespeichert",
+              description: "Material wird automatisch gesendet, sobald wieder Internet da ist.",
+            }
+          : {
+              title: "Gespeichert",
+              description: "Material wurde hinzugefügt",
+            }
+      );
       setNewMaterial("");
       setNewMenge("");
       setNewNotizen("");
@@ -150,6 +164,16 @@ const MaterialList = () => {
   };
 
   const handleDelete = async (id: string) => {
+    // Löschen bleibt online-only – offline gibt es den Eintrag evtl. nur lokal.
+    if (isOffline()) {
+      toast({
+        variant: "destructive",
+        title: "Nur mit Internet möglich",
+        description: "Einträge können nur mit Internetverbindung gelöscht werden.",
+      });
+      return;
+    }
+
     const { error } = await supabase
       .from("material_entries")
       .delete()
@@ -186,6 +210,16 @@ const MaterialList = () => {
 
   const saveEdit = async (id: string) => {
     if (!editMaterial.trim()) return;
+
+    // Bearbeiten bleibt online-only.
+    if (isOffline()) {
+      toast({
+        variant: "destructive",
+        title: "Nur mit Internet möglich",
+        description: "Einträge können nur mit Internetverbindung bearbeitet werden.",
+      });
+      return;
+    }
 
     const { error } = await supabase
       .from("material_entries")

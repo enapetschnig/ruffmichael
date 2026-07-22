@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { newId, isOffline, saveInsert, saveInvoke } from "@/lib/offlineData";
+import { getSessionUser } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { MultiEmployeeSelect } from "@/components/MultiEmployeeSelect";
@@ -34,6 +35,7 @@ type DisturbanceFormProps = {
   onSuccess: () => void;
   editData?: {
     id: string;
+    user_id: string;
     datum: string;
     start_time: string;
     end_time: string;
@@ -269,7 +271,7 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
     e.preventDefault();
     setSaving(true);
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) {
       toast({ variant: "destructive", title: "Fehler", description: "Sie müssen angemeldet sein" });
       setSaving(false);
@@ -356,8 +358,10 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
       // Update materials
       await updateMaterials(editData.id, user.id);
 
-      if (timesChanged && selectedEmployees.length > 0) {
-        // Time entries of team members could not be updated here (RLS). Make it explicit.
+      if (timesChanged && (selectedEmployees.length > 0 || editData.user_id !== user.id)) {
+        // Time entries of team members could not be updated here (RLS). An admin
+        // editing another user's Regiebericht also cannot touch that owner's own
+        // entry (RLS), so their booked hours would be left stale. Make it explicit.
         toast({
           title: "Regiebericht aktualisiert",
           description: "Zeiten des Regieberichts geändert — die Stundeneinträge der Team-Mitglieder müssen ggf. manuell angepasst werden",
@@ -560,7 +564,7 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
       const stunden = calculateHours();
       
       // Get current user for main entry validation
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      const currentUser = await getSessionUser();
       if (!currentUser) return;
 
       // Create time entries for new workers via Edge Function

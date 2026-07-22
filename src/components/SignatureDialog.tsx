@@ -166,11 +166,14 @@ export const SignatureDialog = ({
 
       if (isOffline()) {
         // Offline: Vor-Ort-Unterschrift (gleicher User, geringes Konfliktrisiko) —
-        // alle drei Schritte in der Reihenfolge sig → send → status einreihen, damit
-        // der Sync sie korrekt nacheinander ausführt.
-        // force=true auf ALLEN drei Schritten: einmal offline entschieden, müssen sie
-        // gemeinsam in die Warteschlange (sig → send → status) und dürfen niemals
-        // teils online / teils offline laufen (sonst z.B. Status „gesendet" ohne Mail).
+        // die beiden Schritte in der Reihenfolge sig → send einreihen, damit der Sync
+        // sie korrekt nacheinander ausführt.
+        // force=true auf BEIDEN Schritten: einmal offline entschieden, müssen sie
+        // gemeinsam in die Warteschlange (sig → send) und dürfen niemals teils online /
+        // teils offline laufen.
+        // WICHTIG: KEIN separater status='gesendet'-Schritt hier — der würde auch dann
+        // laufen, wenn der Versand später scheitert (Status „gesendet" ohne Mail). Die
+        // Edge Function setzt status='gesendet' selbst, aber nur nach erfolgreichem Versand.
         await saveUpdate(
           "disturbances",
           { id: disturbance.id },
@@ -179,7 +182,6 @@ export const SignatureDialog = ({
           true
         );
         await saveInvoke("send-disturbance-report", sendBody, label, true);
-        await saveUpdate("disturbances", { id: disturbance.id }, { status: "gesendet" }, label, true);
 
         toast({
           title: "Offline gespeichert",

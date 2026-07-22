@@ -1,3 +1,4 @@
+import { getSessionUser } from "@/lib/auth";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -85,7 +86,7 @@ export default function LeaveManagement({ profiles }: LeaveManagementProps) {
       toast({ variant: "destructive", title: "Nur mit Internet möglich", description: "Urlaubsanträge können nur mit Internetverbindung bearbeitet werden." });
       return;
     }
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) return;
 
     const request = requests.find((r) => r.id === requestId);

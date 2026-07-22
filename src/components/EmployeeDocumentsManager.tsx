@@ -64,6 +64,7 @@ export default function EmployeeDocumentsManager({ employeeId, userId }: Props) 
       const { data, error } = await supabase.storage
         .from("employee-documents")
         .list(`${userId || employeeId}/${type.id}`, {
+          limit: 1000,
           sortBy: { column: "created_at", order: "desc" },
         });
 

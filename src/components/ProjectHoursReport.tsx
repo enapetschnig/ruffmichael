@@ -69,7 +69,9 @@ export default function ProjectHoursReport() {
     if (selectedProjectId) {
       fetchProjectHours();
     }
-  }, [selectedProjectId, startDate, endDate]);
+    // profiles in den Dependencies: sobald die Profile geladen sind, erneut
+    // laden, damit die Mitarbeiternamen (statt Platzhalter) angezeigt werden.
+  }, [selectedProjectId, startDate, endDate, profiles]);
 
   useEffect(() => {
     if (!selectedProjectId) return;
@@ -138,18 +140,22 @@ export default function ProjectHoursReport() {
       let total = 0;
 
       data.forEach((entry: any) => {
-        total += entry.stunden;
-
+        // Fallback-Name, falls das Profil (noch) nicht geladen ist. So wird
+        // JEDER gezählte Eintrag auch als Zeile gerendert und total zusammen mit
+        // dem Push hochgezählt -> die Summe stimmt immer mit den sichtbaren
+        // Zeilen überein. Sobald die Profile geladen sind, läuft der Effekt
+        // erneut (profiles in Dependencies) und der echte Name ersetzt "Unbekannt".
         const profile = profiles[entry.user_id];
-        if (!profile) {
-          console.warn(`Profil nicht gefunden für user_id: ${entry.user_id}`);
-          return;
-        }
+        const employeeName = profile
+          ? `${profile.vorname} ${profile.nachname}`
+          : "Unbekannt";
+
+        total += entry.stunden;
 
         detailedEntries.push({
           id: entry.id,
           userId: entry.user_id,
-          employeeName: `${profile.vorname} ${profile.nachname}`,
+          employeeName,
           datum: entry.datum,
           startTime: entry.start_time,
           endTime: entry.end_time,

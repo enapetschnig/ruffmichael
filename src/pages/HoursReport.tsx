@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { getNormalWorkingHours } from "@/lib/workingHours";
 import { projectLabel } from "@/lib/projectLabel";
+import { getSessionUser } from "@/lib/auth";
 
 interface TimeEntry {
   id: string;
@@ -85,7 +86,7 @@ export default function HoursReport() {
   }, [month, year, selectedUserId]);
 
   const checkAdminStatus = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) return;
 
     const { data } = await supabase
@@ -746,7 +747,11 @@ export default function HoursReport() {
                                     <div className="flex items-center gap-1">
                                       <span>{entry.start_time?.substring(0, 5)}</span>
                                       <span>-</span>
-                                      <span>{day.isFriday ? "12:30" : "12:00"}</span>
+                                      {/* Ohne echte Mittagspause: Vormittag = reale Spanne
+                                          Beginn–Ende (kein fabriziertes 12:00). Nur bei einer
+                                          tatsächlichen 12:00–12:30-Pause auf Vormittag/Pause/
+                                          Nachmittag aufteilen. */}
+                                      <span>{lunchBreak && entry.pause_minutes > 0 ? lunchBreak.start : entry.end_time?.substring(0, 5)}</span>
                                     </div>
                                   </TableCell>
                                   <TableCell>
@@ -755,7 +760,7 @@ export default function HoursReport() {
                                     )}
                                   </TableCell>
                                   <TableCell>
-                                    {lunchBreak && (
+                                    {lunchBreak && entry.pause_minutes > 0 && (
                                       <div className="flex items-center gap-1">
                                         <span>{lunchBreak.end}</span>
                                         <span>-</span>

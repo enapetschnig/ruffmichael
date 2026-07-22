@@ -1,3 +1,4 @@
+import { getSessionUser } from "@/lib/auth";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Search, Pencil, Trash2, Phone, Smartphone, Mail, MapPin, Truck, Users } from "lucide-react";
@@ -285,7 +286,7 @@ const Customers = () => {
       }
     } else {
       // Neuen Kunden anlegen (offline-fähig, mit clientseitiger id).
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getSessionUser();
       const res = await saveInsert(
         "customers",
         { id: newId(), ...row, created_by: user?.id ?? null },

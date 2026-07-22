@@ -25,6 +25,7 @@ import { VoiceInputButton } from "@/components/VoiceInputButton";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { projectLabel } from "@/lib/projectLabel";
+import { getSessionUser } from "@/lib/auth";
 import { newId, saveInsert, saveInvoke } from "@/lib/offlineData";
 
 // WICHTIG: Diese Komponente wird von Mitarbeitern und Kunden gesehen.
@@ -188,7 +189,7 @@ export function UebernahmeDialog({
     }
     setSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getSessionUser();
       const uebId = newId();
       const label = `Übernahmebestätigung ${kundeName.trim()}`;
 

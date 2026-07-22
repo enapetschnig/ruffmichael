@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { projectLabel } from "@/lib/projectLabel";
+import { getSessionUser } from "@/lib/auth";
 
 type TimeEntry = {
   id: string;
@@ -70,7 +71,7 @@ const MyHours = () => {
   }, [selectedMonth]);
 
   const fetchEntries = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) return;
 
     const [year, month] = selectedMonth.split('-').map(Number);
@@ -151,23 +152,39 @@ const MyHours = () => {
 
     setSavingEdit(true);
 
-    // Reale Stundenberechnung aus Beginn, Ende und Pause
+    // Abwesenheiten (Urlaub, Krankenstand, Weiterbildung, Feiertag,
+    // Zeitausgleich) haben ggf. einen individuellen/Norm-Stundenwert
+    // (z.B. Freitag 4,5 h), der NICHT aus der 07:00–16:00-Spanne neu berechnet
+    // werden darf. Für solche Einträge nur Tätigkeit/Notizen speichern und die
+    // gespeicherten Stunden unverändert lassen. Reguläre Arbeitseinträge werden
+    // wie gehabt aus Beginn/Ende/Pause neu berechnet.
+    const ABSENCE_TAETIGKEITEN = ["Urlaub", "Krankenstand", "Weiterbildung", "Feiertag", "Zeitausgleich"];
+    const isAbsence = ABSENCE_TAETIGKEITEN.includes(editingEntry.taetigkeit);
+
+    // Reale Stundenberechnung aus Beginn, Ende und Pause (nur Arbeitseinträge)
     const calculatedHours = computeHours(
       editingEntry.start_time,
       editingEntry.end_time,
       editingEntry.pause_minutes,
     );
 
+    const updatePayload = isAbsence
+      ? {
+          taetigkeit: editingEntry.taetigkeit,
+          notizen: editingEntry.notizen?.trim() || null,
+        }
+      : {
+          taetigkeit: editingEntry.taetigkeit,
+          start_time: editingEntry.start_time,
+          end_time: editingEntry.end_time,
+          pause_minutes: editingEntry.pause_minutes || 0,
+          notizen: editingEntry.notizen?.trim() || null,
+          stunden: calculatedHours,
+        };
+
     const { error } = await supabase
       .from("time_entries")
-      .update({
-        taetigkeit: editingEntry.taetigkeit,
-        start_time: editingEntry.start_time,
-        end_time: editingEntry.end_time,
-        pause_minutes: editingEntry.pause_minutes || 0,
-        notizen: editingEntry.notizen?.trim() || null,
-        stunden: calculatedHours,
-      })
+      .update(updatePayload)
       .eq("id", editingEntry.id);
 
     if (error) {
@@ -193,7 +210,7 @@ const MyHours = () => {
 
     // Zeitausgleich: Stunden zurück auf das Zeitkonto buchen, bevor gelöscht wird
     if (entry.taetigkeit === "Zeitausgleich" && entry.stunden > 0) {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getSessionUser();
       if (!user) {
         toast({
           variant: "destructive",

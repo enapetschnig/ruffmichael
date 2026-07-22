@@ -1,3 +1,4 @@
+import { getSessionUser } from "@/lib/auth";
 import { useState, useEffect, useRef } from "react";
 import { Camera, Trash2, X, ZoomIn, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -57,7 +58,7 @@ export const DisturbancePhotos = ({ disturbanceId, canEdit }: DisturbancePhotosP
 
     setUploading(true);
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) {
       toast({
         variant: "destructive",

@@ -45,7 +45,7 @@ import {
 } from "@/components/NachtragDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { isOffline } from "@/lib/offlineData";
+import { isOffline, saveUpdate } from "@/lib/offlineData";
 
 type NachtragMaterial = {
   id: string;
@@ -325,15 +325,6 @@ const Nachtraege = () => {
 
   const handleSign = async () => {
     if (!detail) return;
-    // Unterschreiben eines bestehenden Nachtrags nur mit Internet.
-    if (isOffline()) {
-      toast({
-        variant: "destructive",
-        title: "Nur mit Internet möglich",
-        description: "Bestehende Nachträge können nur mit Internetverbindung unterschrieben werden.",
-      });
-      return;
-    }
     if (!signature) {
       toast({
         variant: "destructive",
@@ -344,7 +335,38 @@ const Nachtraege = () => {
     }
     setSigning(true);
     try {
-      // Persist any pending edits first, then the signature
+      const unterschriebenAm = new Date().toISOString();
+
+      // Unterschreiben ist offline-fähig — wie beim Regiebericht (SignatureDialog).
+      // Offline: Die Unterschrift wird eingereiht. Etwaige offene Bearbeitungen
+      // (Titel/Beschreibung/Material) bleiben bewusst online-only und werden hier
+      // NICHT mitgespeichert. Ein Race-Guard ist offline nicht möglich.
+      if (isOffline()) {
+        const res = await saveUpdate(
+          "nachtraege",
+          { id: detail.id },
+          {
+            unterschrift_kunde: signature,
+            status: "unterschrieben",
+            unterschrieben_am: unterschriebenAm,
+          },
+          `Nachtrag unterschrieben: ${detail.titel}`
+        );
+        if (res.error) {
+          toast({ variant: "destructive", title: "Fehler", description: res.error });
+          return;
+        }
+        toast({
+          title: "Offline gespeichert",
+          description: "Wird automatisch gesendet, sobald wieder Internet da ist.",
+        });
+        setDetail(null);
+        await fetchNachtraege();
+        return;
+      }
+
+      // ONLINE — bisheriges Verhalten: offene Bearbeitungen speichern, dann die
+      // Unterschrift mit Race-Guard (nur solange status = 'offen').
       const saved = await saveEdits(detail.id);
       if (!saved) {
         await handleConcurrentlySigned();
@@ -355,7 +377,7 @@ const Nachtraege = () => {
         .update({
           unterschrift_kunde: signature,
           status: "unterschrieben",
-          unterschrieben_am: new Date().toISOString(),
+          unterschrieben_am: unterschriebenAm,
         })
         .eq("id", detail.id)
         .eq("status", "offen")

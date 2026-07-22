@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Zap, Calendar, Clock, User, Mail, Phone, MapPin, Edit, Trash2, Package, Plus, ArrowLeft, PenLine, Users } from "lucide-react";
+import { Zap, Calendar, Clock, User, Mail, Phone, MapPin, Edit, Trash2, Package, Plus, ArrowLeft, PenLine, Users, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +30,7 @@ type Disturbance = {
   beschreibung: string;
   notizen: string | null;
   status: string;
+  unterschrift_kunde: string | null;
   is_verrechnet: boolean;
   created_at: string;
   updated_at: string;
@@ -287,6 +288,15 @@ const DisturbanceDetail = () => {
 
   const canEdit = disturbance && (currentUserId === disturbance.user_id || isAdmin);
 
+  // Konsistent mit Nachträgen: Sobald der Kunde unterschrieben hat oder der Bericht
+  // gesendet/abgeschlossen ist, wird er schreibgeschützt. Ansehen/PDF bleiben möglich,
+  // aber Bearbeiten und Löschen werden ausgeblendet.
+  const isLocked = !!disturbance && (
+    !!disturbance.unterschrift_kunde ||
+    disturbance.status === "gesendet" ||
+    disturbance.status === "abgeschlossen"
+  );
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -360,7 +370,7 @@ const DisturbanceDetail = () => {
                 Zur Unterschrift
               </Button>
             )}
-            {canEdit && (
+            {canEdit && !isLocked && (
               <>
                 <Button variant="outline" size="sm" onClick={() => setShowEditForm(true)}>
                   <Edit className="h-4 w-4 mr-1" />
@@ -389,6 +399,12 @@ const DisturbanceDetail = () => {
                   </AlertDialogContent>
                 </AlertDialog>
               </>
+            )}
+            {canEdit && isLocked && (
+              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Lock className="h-3 w-3" />
+                Unterschrieben – nicht mehr änderbar
+              </span>
             )}
           </div>
         </div>

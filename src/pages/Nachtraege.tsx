@@ -641,6 +641,7 @@ const Nachtraege = () => {
                       id="edit-titel"
                       value={editTitel}
                       onChange={(e) => setEditTitel(e.target.value)}
+                      disabled={isOffline()}
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -650,8 +651,14 @@ const Nachtraege = () => {
                       value={editBeschreibung}
                       onChange={(e) => setEditBeschreibung(e.target.value)}
                       rows={4}
+                      disabled={isOffline()}
                     />
                   </div>
+                  {isOffline() && (
+                    <p className="text-xs text-muted-foreground">
+                      Ohne Internet können bestehende Nachträge nicht bearbeitet, aber unterschrieben werden.
+                    </p>
+                  )}
                   <MaterialRowsEditor rows={editMaterials} setRows={setEditMaterials} nextKey={nextKey} />
                   <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t">
                     <Button
@@ -664,6 +671,27 @@ const Nachtraege = () => {
                     </Button>
                     <Button
                       onClick={() => {
+                        // Offline sind bestehende Nachträge NICHT speicherbar (handleSaveEdits ist
+                        // offline gesperrt). Damit der Kunde exakt den GESPEICHERTEN Stand unter-
+                        // schreibt und nicht ungespeicherte Änderungen, wird die Zusammenfassung
+                        // offline auf die gespeicherten Werte zurückgesetzt.
+                        if (isOffline() && detail) {
+                          setEditTitel(detail.titel);
+                          setEditBeschreibung(detail.beschreibung ?? "");
+                          setEditMaterials(
+                            detail.nachtrag_materials.map((m) => ({
+                              key: nextKey(),
+                              material: m.material,
+                              menge: m.menge ?? "",
+                              einheit: m.einheit ?? "",
+                              material_id: m.material_id,
+                            }))
+                          );
+                          toast({
+                            title: "Offline",
+                            description: "Es wird der zuletzt gespeicherte Stand unterschrieben — Bearbeiten geht nur mit Internet.",
+                          });
+                        }
                         setSignature(null);
                         setSignMode(true);
                       }}

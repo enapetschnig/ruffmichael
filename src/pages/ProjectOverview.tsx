@@ -251,18 +251,20 @@ const ProjectOverview = () => {
                 onClick={() => navigate("/projects")}
               />
             </div>
-            {isAdmin && (
-              <div className="flex items-center gap-1">
-                <Button variant="outline" size="sm" className="gap-1" onClick={() => setEditOpen(true)}>
-                  <Pencil className="h-4 w-4" />
-                  <span className="hidden sm:inline">Bearbeiten</span>
-                </Button>
+            <div className="flex items-center gap-1">
+              {/* Projekt bearbeiten: wie in der Projektliste für alle sichtbar. */}
+              <Button variant="outline" size="sm" className="gap-1" onClick={() => setEditOpen(true)}>
+                <Pencil className="h-4 w-4" />
+                <span className="hidden sm:inline">Bearbeiten</span>
+              </Button>
+              {/* Ordner konfigurieren: nur Admin. */}
+              {isAdmin && (
                 <Button variant="outline" size="sm" className="gap-1" onClick={openSettings}>
                   <Settings className="h-4 w-4" />
                   <span className="hidden sm:inline">Ordner</span>
                 </Button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </header>

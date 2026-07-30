@@ -73,9 +73,18 @@ const formatPrice = (value: number | null | undefined) =>
 const parsePrice = (value: string): number | null => {
   const trimmed = value.trim();
   if (!trimmed) return null;
-  const normalized = trimmed.includes(",")
-    ? trimmed.replace(/\./g, "").replace(",", ".")
-    : trimmed;
+  // Österreichisches Zahlenformat: "." = Tausendertrennzeichen, "," = Dezimaltrenner
+  let normalized: string;
+  if (trimmed.includes(",")) {
+    // Mit Komma: Punkte sind Tausender (entfernen), Komma wird zum Dezimalpunkt
+    normalized = trimmed.replace(/\./g, "").replace(",", ".");
+  } else if (/^\d{1,3}(\.\d{3})+$/.test(trimmed)) {
+    // Nur Punkte in klaren Tausender-Gruppen (z. B. "1.500", "1.234.567") → Punkte entfernen
+    normalized = trimmed.replace(/\./g, "");
+  } else {
+    // Sonst bleibt ein einzelner Punkt mit 1–2 Nachkommastellen Dezimaltrenner (z. B. "12.5")
+    normalized = trimmed;
+  }
   const num = Number(normalized.replace(/[^0-9.-]/g, ""));
   return Number.isFinite(num) ? num : null;
 };

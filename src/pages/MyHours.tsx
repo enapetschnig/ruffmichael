@@ -21,6 +21,8 @@ type TimeEntry = {
   start_time: string | null;
   end_time: string | null;
   pause_minutes: number | null;
+  pause_start: string | null;
+  pause_end: string | null;
   location_type: string;
   notizen: string | null;
   projects: {
@@ -103,7 +105,9 @@ const MyHours = () => {
     if (!entry.pause_minutes || entry.pause_minutes === 0) {
       return entry.end_time?.substring(0, 5) || '-';
     }
-    // Mo-Do: 12:00, Fr: 12:00 (keine Pause)
+    // Echtes gespeichertes Pausenfenster bevorzugen (statt fixem 12:00).
+    if (entry.pause_start) return entry.pause_start.substring(0, 5);
+    // Fallback für alte Einträge ohne pause_start
     return "12:00";
   };
 
@@ -111,10 +115,13 @@ const MyHours = () => {
     // Fallback für alte Einträge
     if (!entry.start_time || !entry.end_time) return '-';
     if (!entry.pause_minutes || entry.pause_minutes === 0) return '-';
-    
+
+    // Echtes gespeichertes Pausenende bevorzugen.
+    if (entry.pause_end) return entry.pause_end.substring(0, 5);
+
     const morningEnd = calculateMorningEnd(entry);
     if (morningEnd === '-' || morningEnd === "Alte Buchung") return '-';
-    
+
     const [hours, minutes] = morningEnd.split(':').map(Number);
     const totalMinutes = hours * 60 + minutes + entry.pause_minutes;
     return `${String(Math.floor(totalMinutes / 60)).padStart(2, '0')}:${String(totalMinutes % 60).padStart(2, '0')}`;
@@ -159,7 +166,12 @@ const MyHours = () => {
     // gespeicherten Stunden unverändert lassen. Reguläre Arbeitseinträge werden
     // wie gehabt aus Beginn/Ende/Pause neu berechnet.
     const ABSENCE_TAETIGKEITEN = ["Urlaub", "Krankenstand", "Weiterbildung", "Feiertag", "Zeitausgleich"];
-    const isAbsence = ABSENCE_TAETIGKEITEN.includes(editingEntry.taetigkeit);
+    // WICHTIG: Abwesenheit anhand der URSPRÜNGLICHEN Tätigkeit bestimmen, nicht
+    // anhand des frei editierbaren Eingabefelds – sonst würde ein Umbenennen die
+    // gespeicherten Abwesenheits-Stunden fälschlich aus der Zeitspanne neu berechnen.
+    const originalTaetigkeit =
+      entries.find((e) => e.id === editingEntry.id)?.taetigkeit ?? editingEntry.taetigkeit;
+    const isAbsence = ABSENCE_TAETIGKEITEN.includes(originalTaetigkeit);
 
     // Reale Stundenberechnung aus Beginn, Ende und Pause (nur Arbeitseinträge)
     const calculatedHours = computeHours(
@@ -167,6 +179,24 @@ const MyHours = () => {
       editingEntry.end_time,
       editingEntry.pause_minutes,
     );
+
+    // Pausenfenster (pause_start/pause_end) konsistent zur Pausenlänge neu setzen,
+    // damit die Anzeige in MyHours/HoursReport nicht auf ein veraltetes Fenster zeigt.
+    const pauseMin = editingEntry.pause_minutes || 0;
+    const sMin = parseTimeToMinutes(editingEntry.start_time);
+    const eMin = parseTimeToMinutes(editingEntry.end_time);
+    const fmtMin = (min: number) =>
+      `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+    let pauseStartOut: string | null = null;
+    let pauseEndOut: string | null = null;
+    if (pauseMin > 0 && sMin !== null && eMin !== null && eMin - sMin >= pauseMin) {
+      let ps = 12 * 60;                        // Pause bevorzugt ab 12:00 legen
+      if (ps < sMin) ps = sMin;                // nicht vor Blockbeginn
+      if (ps + pauseMin > eMin) ps = eMin - pauseMin; // nicht über Blockende hinaus
+      if (ps < sMin) ps = sMin;
+      pauseStartOut = fmtMin(ps);
+      pauseEndOut = fmtMin(ps + pauseMin);
+    }
 
     const updatePayload = isAbsence
       ? {
@@ -177,7 +207,9 @@ const MyHours = () => {
           taetigkeit: editingEntry.taetigkeit,
           start_time: editingEntry.start_time,
           end_time: editingEntry.end_time,
-          pause_minutes: editingEntry.pause_minutes || 0,
+          pause_minutes: pauseMin,
+          pause_start: pauseStartOut,
+          pause_end: pauseEndOut,
           notizen: editingEntry.notizen?.trim() || null,
           stunden: calculatedHours,
         };

@@ -75,7 +75,15 @@ export interface OutboxItem {
   seq: number; // monotoner Tie-Breaker: garantiert Eltern-vor-Kind-Reihenfolge
   tries: number;
   lastError?: string;
+  // Dauerhaft gescheitert (nach MAX_TRIES): wird nicht mehr automatisch versucht
+  // und zählt nicht mehr als "offen", damit der Sync-Banner nicht ewig hängt und
+  // der Server nicht alle 30s sinnlos angehämmert wird. Der Eintrag bleibt in
+  // IndexedDB erhalten (keine stille Löschung) und kann manuell erneut versucht werden.
+  deadLetter?: boolean;
 }
+
+// Nach so vielen vergeblichen (Nicht-Netz-)Versuchen wird ein Eintrag geparkt.
+const MAX_TRIES = 8;
 
 // Monoton steigende Sequenz über die Session – bricht createdAt-Gleichstände auf,
 // damit die FIFO-Reihenfolge (und damit Foreign-Key-Reihenfolge) exakt der
@@ -149,12 +157,28 @@ export async function getAll(): Promise<OutboxItem[]> {
   return (items || []).sort((a, b) => (a.createdAt - b.createdAt) || ((a.seq ?? 0) - (b.seq ?? 0)));
 }
 
+// Zählt nur OFFENE Einträge (ohne geparkte Dead-Letter), damit der Sync-Banner
+// wieder verschwindet, sobald nichts Sinnvolles mehr zu tun ist.
 export async function count(): Promise<number> {
   try {
-    return await tx<number>("readonly", (s) => s.count());
+    const items = await getAll();
+    return items.filter((i) => !i.deadLetter).length;
   } catch {
     return 0;
   }
+}
+
+// Dauerhaft gescheiterte Einträge (für optionale Anzeige / manuellen Retry).
+export async function getDeadLetters(): Promise<OutboxItem[]> {
+  return (await getAll()).filter((i) => i.deadLetter);
+}
+
+// Parkt alle Dead-Letter wieder ein (tries zurücksetzen), z.B. auf Nutzer-Wunsch.
+export async function retryDeadLetters(): Promise<void> {
+  for (const item of await getDeadLetters()) {
+    await update({ ...item, deadLetter: false, tries: 0 });
+  }
+  void processOutbox();
 }
 
 async function remove(id: string): Promise<void> {
@@ -242,6 +266,7 @@ export async function processOutbox(): Promise<{ done: number; remaining: number
   try {
     const items = await getAll();
     for (const item of items) {
+      if (item.deadLetter) continue; // geparkte Einträge nicht mehr versuchen
       try {
         await executeItem(item);
         await remove(item.id);
@@ -252,8 +277,19 @@ export async function processOutbox(): Promise<{ done: number; remaining: number
         const msg = err instanceof Error ? err.message : String(err);
         // Bei Netzwerkfehlern nicht als endgültigen Fehler werten
         if (/fetch|network|Failed to fetch|load failed/i.test(msg)) break;
-        await update({ ...item, tries: item.tries + 1, lastError: msg });
-        // andere Einträge trotzdem weiter versuchen
+        const tries = item.tries + 1;
+        if (tries >= MAX_TRIES) {
+          // Endgültig geparkt: nicht mehr versuchen (kein Endlos-Retry/Hämmern),
+          // Eintrag bleibt aber gespeichert. Danach mit dem nächsten weitermachen.
+          console.error(`Offline-Sync: Eintrag dauerhaft gescheitert nach ${tries} Versuchen: ${item.label} — ${msg}`);
+          await update({ ...item, tries, lastError: msg, deadLetter: true });
+          continue;
+        }
+        // Sonst diesen Eintrag NICHT überspringen, sondern die Runde abbrechen:
+        // so bleibt die FIFO-/Eltern-vor-Kind-Reihenfolge erhalten (ein per force
+        // verkettetes Kind darf nicht laufen, solange sein Elternteil scheitert).
+        await update({ ...item, tries, lastError: msg });
+        break;
       }
     }
   } finally {

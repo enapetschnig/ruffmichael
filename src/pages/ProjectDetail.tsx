@@ -56,6 +56,7 @@ const ProjectDetail = () => {
   const [uploading, setUploading] = useState(false);
   const [project, setProject] = useState<ProjectLike | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [hiddenCategories, setHiddenCategories] = useState<string[]>([]);
   const [viewerState, setViewerState] = useState<{
     open: boolean;
     fileName: string;
@@ -129,12 +130,13 @@ const ProjectDetail = () => {
 
     const { data } = await supabase
       .from("projects")
-      .select("name, adresse, customers(strasse, ort)")
+      .select("name, adresse, hidden_categories, customers(strasse, ort)")
       .eq("id", projectId)
       .single();
 
     if (data) {
       setProject(data as unknown as ProjectLike);
+      setHiddenCategories((data as { hidden_categories?: string[] }).hidden_categories ?? []);
     }
   };
 
@@ -267,6 +269,32 @@ const ProjectDetail = () => {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p>Lädt...</p>
+      </div>
+    );
+  }
+
+  // Zugriff sperren: Chefordner nur für Admins; pro Projekt ausgeblendete
+  // Kategorie-Ordner (hidden_categories) nicht anzeigen. (Die Daten selbst sind
+  // zusätzlich per RLS geschützt – das ist die UI-Konsistenz dazu.)
+  const blocked =
+    (type === "chef" && !isAdmin) ||
+    (["photos", "plans", "reports"].includes(type) && hiddenCategories.includes(type));
+  if (blocked) {
+    return (
+      <div className="min-h-screen bg-background">
+        <PageHeader
+          title={project ? `${projectLabel(project)} – ${titleMap[type]}` : titleMap[type]}
+          backPath={`/projects/${projectId}`}
+        />
+        <main className="container mx-auto px-4 py-6 max-w-5xl">
+          <Card>
+            <CardContent className="p-8 text-center text-muted-foreground">
+              {type === "chef"
+                ? "Der Chefordner ist nur für Administratoren zugänglich."
+                : "Dieser Ordner ist für dieses Projekt deaktiviert."}
+            </CardContent>
+          </Card>
+        </main>
       </div>
     );
   }

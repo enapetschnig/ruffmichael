@@ -422,6 +422,31 @@ export default function Admin() {
   };
 
   const handleRoleChange = async (userId: string, newRole: "administrator" | "mitarbeiter") => {
+    // Aussperr-Schutz: Wenn der letzte Administrator herabgestuft würde, blockieren.
+    // Sonst könnte niemand mehr Rollen vergeben (RLS verhindert eine Wiederherstellung).
+    if (userRoles[userId] === "administrator" && newRole !== "administrator") {
+      // Anzahl der aktuellen Administratoren aus der bereits geladenen Rollen-Liste ermitteln
+      let adminCount = Object.values(userRoles).filter((r) => r === "administrator").length;
+
+      // Falls die Liste (noch) nicht geladen ist, direkt aus user_roles zählen
+      if (adminCount === 0) {
+        const { count } = await supabase
+          .from("user_roles")
+          .select("*", { count: "exact", head: true })
+          .eq("role", "administrator");
+        adminCount = count ?? 0;
+      }
+
+      if (adminCount <= 1) {
+        toast({
+          variant: "destructive",
+          title: "Nicht möglich",
+          description: "Der letzte Administrator kann nicht herabgestuft werden.",
+        });
+        return;
+      }
+    }
+
     const { error } = await supabase
       .from("user_roles")
       .update({ role: newRole })

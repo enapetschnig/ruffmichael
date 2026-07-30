@@ -7,10 +7,24 @@ import {
 import { fileTimestamp, type ErstaufnahmePrefill } from "@/components/ErstaufnahmeDialog";
 import { customerDisplayName, customerAddress } from "@/pages/Customers";
 import { supabase } from "@/integrations/supabase/client";
+import { saveUpload } from "@/lib/offlineData";
 import { useToast } from "@/hooks/use-toast";
 
 // WICHTIG: Diese Komponente wird von Mitarbeitern und Kunden gesehen.
 // Es dürfen hier NIEMALS Preise geladen oder angezeigt werden.
+
+// Wandelt einen Dateinamen in einen gültigen Supabase-Storage-Key um
+// (Umlaute transliterieren, restliche Sonderzeichen ersetzen).
+const toStorageKey = (name: string) =>
+  name
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/Ä/g, "Ae")
+    .replace(/Ö/g, "Oe")
+    .replace(/Ü/g, "Ue")
+    .replace(/ß/g, "ss")
+    .replace(/[^a-zA-Z0-9._ ()-]/g, "_");
 
 type AssistantProject = {
   id: string;
@@ -93,14 +107,21 @@ export function DashboardVoiceAssistant({
       .filter((l) => l !== null)
       .join("\n");
 
-    const { error } = await supabase.storage
-      .from("project-files")
-      .upload(
-        `${projectId}/Notizen/Notiz_${fileTimestamp(now)}.txt`,
-        new Blob([content], { type: "text/plain;charset=utf-8" })
-      );
+    // Offline-fähig speichern: bei fehlendem/instabilem Netz landet die Notiz in
+    // der Warteschlange statt verloren zu gehen. Storage-Key ohne Sonderzeichen.
+    const path = `${projectId}/Notizen/${toStorageKey(`Notiz_${fileTimestamp(now)}.txt`)}`;
+    const res = await saveUpload(
+      {
+        bucket: "project-files",
+        path,
+        blob: new Blob([content], { type: "text/plain;charset=utf-8" }),
+        contentType: "text/plain;charset=utf-8",
+        upsert: false,
+      },
+      `Projektnotiz: ${project?.name ?? "Unbekannt"}`
+    );
 
-    if (error) {
+    if (res.error) {
       toast({
         variant: "destructive",
         title: "Fehler",
@@ -108,9 +129,12 @@ export function DashboardVoiceAssistant({
       });
       return;
     }
+    // Warteschlangen-Zustand im Hinweis widerspiegeln.
     toast({
-      title: "Notiz gespeichert",
-      description: `Projekt: ${project?.name ?? "Unbekannt"}`,
+      title: res.queued ? "Notiz offline gespeichert" : "Notiz gespeichert",
+      description: res.queued
+        ? `Wird synchronisiert, sobald wieder Netz da ist — Projekt: ${project?.name ?? "Unbekannt"}`
+        : `Projekt: ${project?.name ?? "Unbekannt"}`,
     });
   };
 

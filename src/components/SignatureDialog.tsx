@@ -58,6 +58,9 @@ export const SignatureDialog = ({
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  // Merkt sich Störungen, die in dieser Session offline unterschrieben + eingereiht wurden,
+  // damit derselbe Bericht nicht erneut gesendet werden kann (Doppel-Mail beim Wieder-Online).
+  const [offlineSignedId, setOfflineSignedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -99,6 +102,16 @@ export const SignatureDialog = ({
         variant: "destructive",
         title: "Unterschrift fehlt",
         description: "Bitte lassen Sie den Kunden unterschreiben",
+      });
+      return;
+    }
+
+    // Doppel-Versand verhindern: wurde diese Störung offline bereits unterschrieben und
+    // eingereiht, darf der Bericht nicht ein zweites Mal in die Warteschlange gelangen.
+    if (offlineSignedId === disturbance.id) {
+      toast({
+        title: "Bereits eingereiht",
+        description: "Der Bericht wird gesendet, sobald wieder Internet da ist.",
       });
       return;
     }
@@ -183,6 +196,10 @@ export const SignatureDialog = ({
         );
         await saveInvoke("send-disturbance-report", sendBody, label, true);
 
+        // Lokal sperren: Offline liefert onSuccess() keine aktualisierten Cache-Daten,
+        // also den Unterschrieben-Status hier merken, damit der Bericht in dieser Session
+        // nicht erneut eingereiht werden kann.
+        setOfflineSignedId(disturbance.id);
         toast({
           title: "Offline gespeichert",
           description: "Bericht wird gesendet, sobald wieder Internet da ist.",
@@ -401,7 +418,7 @@ export const SignatureDialog = ({
           </Button>
           <Button
             onClick={handleSendReport}
-            disabled={!signature || sending}
+            disabled={!signature || sending || offlineSignedId === disturbance.id}
             className="gap-2"
           >
             {sending ? (

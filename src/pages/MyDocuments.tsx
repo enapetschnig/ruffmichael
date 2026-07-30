@@ -9,12 +9,28 @@ import { Label } from "@/components/ui/label";
 import { FileText, Upload, Download, Eye, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { FileViewer } from "@/components/FileViewer";
+import { saveUpload } from "@/lib/offlineData";
+import { getSessionUser } from "@/lib/auth";
 
 interface Document {
   name: string;
   path: string;
   created_at?: string;
 }
+
+// Wandelt einen benutzerfreundlichen Namen in einen gültigen Supabase-Storage-Key um.
+// Supabase Storage lehnt Nicht-ASCII-Object-Keys ab ("Invalid key"), daher werden
+// Umlaute/ß zuerst transliteriert und danach alle übrigen Sonderzeichen entfernt.
+const toStorageKey = (name: string) =>
+  name
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/Ä/g, "Ae")
+    .replace(/Ö/g, "Oe")
+    .replace(/Ü/g, "Ue")
+    .replace(/ß/g, "ss")
+    .replace(/[^a-zA-Z0-9._ ()-]/g, "_");
 
 export default function MyDocuments() {
   const [payslips, setPayslips] = useState<Document[]>([]);
@@ -29,18 +45,24 @@ export default function MyDocuments() {
   }, []);
 
   const fetchUserAndDocuments = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      toast({ variant: "destructive", title: "Fehler", description: "Sie müssen angemeldet sein" });
-      return;
-    }
+    try {
+      // Offline-sicher: Benutzer aus der lokalen Session lesen statt Netz-getUser(),
+      // sonst hängt die Seite ohne Verbindung dauerhaft im Lade-Spinner.
+      const user = await getSessionUser();
+      if (!user) {
+        toast({ variant: "destructive", title: "Fehler", description: "Sie müssen angemeldet sein" });
+        return;
+      }
 
-    setUserId(user.id);
-  await Promise.all([
-      fetchDocuments(user.id, "lohnzettel", setPayslips),
-      fetchDocuments(user.id, "krankmeldung", setSickNotes),
-    ]);
-    setLoading(false);
+      setUserId(user.id);
+      await Promise.all([
+        fetchDocuments(user.id, "lohnzettel", setPayslips),
+        fetchDocuments(user.id, "krankmeldung", setSickNotes),
+      ]);
+    } finally {
+      // Ladezustand IMMER beenden – auch bei fehlendem Netz/Benutzer – kein Endlos-Spinner.
+      setLoading(false);
+    }
   };
 
   const fetchDocuments = async (
@@ -77,14 +99,28 @@ export default function MyDocuments() {
 
     setUploading(true);
 
-    const filePath = `${userId}/${type}/${Date.now()}_${file.name}`;
-    const { error } = await supabase.storage
-      .from("employee-documents")
-      .upload(filePath, file);
+    // Storage-Key ohne Sonderzeichen/Umlaute; Anzeigename bleibt im Original erhalten.
+    const filePath = `${userId}/${type}/${Date.now()}_${toStorageKey(file.name)}`;
 
-    if (error) {
-      console.error("Upload-Fehler:", error);
-      toast({ variant: "destructive", title: "Fehler", description: `Upload fehlgeschlagen: ${error.message}` });
+    // Offline-fähiger Upload über die Warteschlange: ohne Netz geht die Krankmeldung
+    // nicht verloren, sondern wird beim nächsten Verbindungsaufbau automatisch synchronisiert.
+    const res = await saveUpload(
+      {
+        bucket: "employee-documents",
+        path: filePath,
+        blob: file,
+        contentType: file.type || undefined,
+        upsert: false,
+      },
+      `${type === "lohnzettel" ? "Lohnzettel" : "Krankmeldung"}: ${file.name}`
+    );
+
+    if (res.error) {
+      console.error("Upload-Fehler:", res.error);
+      toast({ variant: "destructive", title: "Fehler", description: `Upload fehlgeschlagen: ${res.error}` });
+    } else if (res.queued) {
+      // Offline: freundlicher Hinweis statt hartem Fehler.
+      toast({ title: "Offline gespeichert", description: "Wird bei Verbindung hochgeladen" });
     } else {
       toast({ title: "Erfolg", description: "Dokument hochgeladen" });
       await fetchDocuments(userId, type, type === "lohnzettel" ? setPayslips : setSickNotes);

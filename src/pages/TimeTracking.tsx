@@ -265,7 +265,9 @@ const TimeTracking = () => {
   // Datumswechseln (Sprachsteuerung), damit diktierte Blöcke erhalten bleiben.
   const fetchExistingDayEntries = async (date: string, resetBlocks = true) => {
     setLoadingDayEntries(true);
-    const { data: { user } } = await supabase.auth.getUser();
+    // Offline-sicher: lokalen Benutzer verwenden (getUser() wäre ein Netz-Call
+    // und würde die Tagesübersicht/Duplikat-Prüfung offline ausfallen lassen).
+    const user = await getSessionUser();
     if (!user) {
       setLoadingDayEntries(false);
       return;
@@ -464,10 +466,14 @@ const TimeTracking = () => {
     setLoading(false);
   };
 
-  // Mittagspause automatisch eintragen, wenn der Block das Pausenfenster (12:00-12:30)
-  // ueberdeckt und noch keine Pause gesetzt ist. Pause zaehlt nie als Arbeitszeit.
+  // Mittagspause automatisch eintragen: es wird GENAU die Überlappung des Blocks
+  // mit dem Pausenfenster 12:00-12:30 als Pause abgezogen. Weil sich die Blöcke
+  // eines Tages nicht überlappen, summiert sich das über mehrere Blöcke korrekt
+  // auf – auch wenn der Tag exakt um 12:00 (z.B. 07:00–12:00 + 12:00–16:00) oder
+  // mitten im Fenster (07:00–12:15 + 12:15–16:00) geteilt ist. So wird die
+  // Mittagspause NIE übersprungen und NIE als Arbeitszeit gezählt.
   const withAutoPause = (block: TimeBlock): TimeBlock => {
-    if (block.pauseStart || block.pauseEnd) return block;
+    if (block.pauseStart || block.pauseEnd) return block; // manuelle Pause respektieren
     if (!block.startTime || !block.endTime) return block;
     const toMin = (s: string) => {
       const [h, m] = s.split(':').map(Number);
@@ -475,12 +481,13 @@ const TimeTracking = () => {
     };
     const start = toMin(block.startTime);
     const end = toMin(block.endTime);
-    const pauseStart = 12 * 60;
-    const pauseEnd = 12 * 60 + 30;
-    if (start < pauseStart && end > pauseStart) {
-      const effEnd = Math.min(pauseEnd, end);
+    const windowStart = 12 * 60;      // 12:00
+    const windowEnd = 12 * 60 + 30;   // 12:30
+    const overlapStart = Math.max(start, windowStart);
+    const overlapEnd = Math.min(end, windowEnd);
+    if (overlapEnd > overlapStart) {
       const fmt = (min: number) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
-      return { ...block, pauseStart: fmt(pauseStart), pauseEnd: fmt(effEnd) };
+      return { ...block, pauseStart: fmt(overlapStart), pauseEnd: fmt(overlapEnd) };
     }
     return block;
   };

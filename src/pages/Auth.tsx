@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,71 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
   const [showPasswordReset, setShowPasswordReset] = useState(false);
+  // Recovery-Modus: wird aktiv, wenn der Nutzer über den Passwort-Reset-Link zurückkommt
+  const [isRecovery, setIsRecovery] = useState(false);
+
+  // Supabase feuert beim Öffnen des Reset-Links das Event 'PASSWORD_RECOVERY';
+  // dann schalten wir die UI in den "neues Passwort setzen"-Modus um.
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setIsRecovery(true);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Neues Passwort setzen (nach Klick auf Reset-Link)
+  const handleUpdatePassword = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setLoading(true);
+
+    const formData = new FormData(e.currentTarget);
+    const password = formData.get("new-password") as string;
+    const confirm = formData.get("confirm-password") as string;
+
+    // Mindestlänge prüfen
+    if (password.length < 6) {
+      toast({
+        variant: "destructive",
+        title: "Passwort zu kurz",
+        description: "Das Passwort muss mindestens 6 Zeichen lang sein.",
+      });
+      setLoading(false);
+      return;
+    }
+
+    // Beide Felder müssen übereinstimmen
+    if (password !== confirm) {
+      toast({
+        variant: "destructive",
+        title: "Passwörter stimmen nicht überein",
+        description: "Bitte geben Sie in beiden Feldern dasselbe Passwort ein.",
+      });
+      setLoading(false);
+      return;
+    }
+
+    const { error } = await supabase.auth.updateUser({ password });
+
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: error.message,
+      });
+      setLoading(false);
+      return;
+    }
+
+    toast({
+      title: "Passwort geändert",
+      description: "Ihr neues Passwort wurde gespeichert.",
+    });
+    setIsRecovery(false);
+    navigate("/");
+    setLoading(false);
+  };
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -122,7 +187,45 @@ export default function Auth() {
           <CardDescription>Wärme · Kälte · Regelung</CardDescription>
         </CardHeader>
         <CardContent>
-          {showPasswordReset ? (
+          {isRecovery ? (
+            /* Recovery-Modus: neues Passwort setzen */
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold">Neues Passwort setzen</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Bitte vergeben Sie ein neues Passwort für Ihr Konto.
+                </p>
+              </div>
+
+              <form onSubmit={handleUpdatePassword} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="new-password">Neues Passwort</Label>
+                  <Input
+                    id="new-password"
+                    name="new-password"
+                    type="password"
+                    required
+                    minLength={6}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-password">Passwort bestätigen</Label>
+                  <Input
+                    id="confirm-password"
+                    name="confirm-password"
+                    type="password"
+                    required
+                    minLength={6}
+                  />
+                </div>
+
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? "Lädt..." : "Passwort speichern"}
+                </Button>
+              </form>
+            </div>
+          ) : showPasswordReset ? (
             <div className="space-y-6">
               <div>
                 <h3 className="text-lg font-semibold">Passwort zurücksetzen</h3>

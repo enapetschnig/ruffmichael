@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getSessionUser } from "@/lib/auth";
 
 export type Employee = {
   id: string;
@@ -20,7 +21,9 @@ export const useAvailableEmployees = (excludeCurrentUser = true) => {
   const fetchEmployees = async () => {
     setLoading(true);
     
-    const { data: { user } } = await supabase.auth.getUser();
+    // Offline-sicher: aktuellen Benutzer aus lokaler Session lesen (kein Netz-Call),
+    // damit der eigene Eintrag auch ohne Internet aus der Team-Liste gefiltert wird.
+    const user = await getSessionUser();
     if (user) {
       setCurrentUserId(user.id);
     }

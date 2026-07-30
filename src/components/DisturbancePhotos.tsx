@@ -8,6 +8,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { newId, isOffline, saveUpload } from "@/lib/offlineData";
 import { useToast } from "@/hooks/use-toast";
 
+// Umlaute/ß für Storage-Keys transliterieren (Supabase lehnt Nicht-ASCII-Keys ab).
+const toStorageKey = (name: string): string =>
+  name
+    .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue")
+    .replace(/Ä/g, "Ae").replace(/Ö/g, "Oe").replace(/Ü/g, "Ue")
+    .replace(/ß/g, "ss")
+    .replace(/[^a-zA-Z0-9._ ()-]/g, "_");
+
 interface DisturbancePhoto {
   id: string;
   file_path: string;
@@ -93,7 +101,8 @@ export const DisturbancePhotos = ({ disturbanceId, canEdit }: DisturbancePhotosP
         continue;
       }
 
-      const fileName = `${disturbanceId}/${Date.now()}_${file.name}`;
+      // Storage-Key transliterieren, damit Supabase Nicht-ASCII-Dateinamen nicht ablehnt (Datenverlust).
+      const fileName = `${disturbanceId}/${Date.now()}_${toStorageKey(file.name) || 'foto'}`;
 
       // Offline-fähig: Upload + Folge-DB-Eintrag. Offline wird beides eingereiht und
       // beim nächsten Sync ausgeführt (Foto zuerst, dann der disturbance_photos-Eintrag).

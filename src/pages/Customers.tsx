@@ -287,9 +287,10 @@ const Customers = () => {
     } else {
       // Neuen Kunden anlegen (offline-fähig, mit clientseitiger id).
       const user = await getSessionUser();
+      const newCustomerId = newId();
       const res = await saveInsert(
         "customers",
-        { id: newId(), ...row, created_by: user?.id ?? null },
+        { id: newCustomerId, ...row, created_by: user?.id ?? null },
         `Kunde ${customerDisplayName(row)}`
       );
       if (res.error) {
@@ -301,7 +302,16 @@ const Customers = () => {
             : { title: "Kunde angelegt", description: customerDisplayName(row) }
         );
         setDialogOpen(false);
-        await fetchCustomers();
+        if (res.queued) {
+          // Offline: fetchCustomers() liest nur aus Netz/SW-Cache und sieht die noch
+          // in der Warteschlange liegende Zeile nicht. Deshalb den neuen Kunden mit
+          // seiner Client-id optimistisch ins lokale State einfügen, damit er sofort
+          // in der Liste erscheint (endgültige Sortierung folgt beim nächsten Sync).
+          const newCustomer: Customer = { id: newCustomerId, ...row };
+          setCustomers((prev) => [newCustomer, ...prev]);
+        } else {
+          await fetchCustomers();
+        }
       }
     }
     setSaving(false);

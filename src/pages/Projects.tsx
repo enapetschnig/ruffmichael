@@ -21,6 +21,7 @@ import { enqueue } from "@/lib/offlineQueue";
 import { newId, saveInsert, saveUpload, saveUpdate, isOffline } from "@/lib/offlineData";
 import { getSessionUser } from "@/lib/auth";
 import { projectAddress } from "@/lib/projectLabel";
+import { ProjectEditDialog } from "@/components/ProjectEditDialog";
 
 type ProjectCustomer = Pick<Customer, "id" | "vorname" | "nachname" | "strasse" | "ort">;
 
@@ -131,65 +132,9 @@ const Projects = () => {
   const [statusToDelete, setStatusToDelete] = useState<ProjectStatus | null>(null);
   const [savingStatuses, setSavingStatuses] = useState(false);
 
-  // Projekt bearbeiten
+  // Projekt bearbeiten – einheitlicher Dialog (siehe ProjectEditDialog)
   const [editProject, setEditProject] = useState<Project | null>(null);
-  const [editForm, setEditForm] = useState({
-    name: "", plz: "", adresse: "", beschreibung: "",
-    customerId: "none" as string, statusId: "none" as string,
-  });
-  const [savingEdit, setSavingEdit] = useState(false);
-
-  const openEdit = (project: Project) => {
-    setEditProject(project);
-    setEditForm({
-      name: project.name ?? "",
-      plz: project.plz ?? "",
-      adresse: project.adresse ?? "",
-      beschreibung: project.beschreibung ?? "",
-      customerId: project.customer_id ?? "none",
-      statusId: project.status_id ?? "none",
-    });
-  };
-
-  const handleSaveEdit = async () => {
-    if (!editProject || savingEdit) return;
-    // Bearbeiten bestehender Daten bleibt online-only (klarer Hinweis statt stillem Fehler).
-    if (isOffline()) {
-      toast({ variant: "destructive", title: "Nur mit Internet möglich", description: "Projekt-Änderungen brauchen eine Internetverbindung." });
-      return;
-    }
-    if (!editForm.name.trim()) {
-      toast({ variant: "destructive", title: "Fehler", description: "Projektname ist erforderlich" });
-      return;
-    }
-    if (!/^\d{4,5}$/.test(editForm.plz.trim())) {
-      toast({ variant: "destructive", title: "Fehler", description: "PLZ muss 4-5 Ziffern enthalten" });
-      return;
-    }
-    setSavingEdit(true);
-    // Adresse: leer -> aus gewähltem Kunden ableiten (wie bei der Anlage)
-    let derivedAdresse = editForm.adresse.trim();
-    if (!derivedAdresse && editForm.customerId !== "none") {
-      const c = customers.find((c) => c.id === editForm.customerId);
-      if (c) derivedAdresse = [c.strasse, c.ort].filter(Boolean).join(", ");
-    }
-    const res = await saveUpdate("projects", { id: editProject.id }, {
-      name: editForm.name.trim(),
-      plz: editForm.plz.trim(),
-      adresse: derivedAdresse || null,
-      beschreibung: editForm.beschreibung.trim() || null,
-      customer_id: editForm.customerId !== "none" ? editForm.customerId : null,
-      status_id: editForm.statusId !== "none" ? editForm.statusId : null,
-    }, `Projekt ${editForm.name.trim()}`);
-    setSavingEdit(false);
-    if (res.error) {
-      toast({ variant: "destructive", title: "Fehler", description: "Projekt konnte nicht gespeichert werden" });
-      return;
-    }
-    toast({ title: "Gespeichert", description: "Projekt wurde aktualisiert." });
-    setEditProject(null);
-    fetchProjects();
-  };
+  const openEdit = (project: Project) => setEditProject(project);
 
   useEffect(() => {
     checkAdminStatus();
@@ -1453,67 +1398,15 @@ const Projects = () => {
         )}
       </main>
 
-      {/* Projekt bearbeiten */}
-      <Dialog open={!!editProject} onOpenChange={(open) => !open && setEditProject(null)}>
-        <DialogContent className="max-w-sm sm:max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Projekt bearbeiten</DialogTitle>
-            <DialogDescription>Projektdaten, Kunde und Ampel-Status ändern</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-name">Projektname *</Label>
-              <Input id="edit-name" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
-            </div>
-            <div className="space-y-2">
-              <Label>Kunde</Label>
-              <Select value={editForm.customerId} onValueChange={(v) => setEditForm({ ...editForm, customerId: v })}>
-                <SelectTrigger><SelectValue placeholder="Kunde auswählen" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">— Kein Kunde —</SelectItem>
-                  {customers.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {customerDisplayName(c)}{customerAddress(c) ? ` (${customerAddress(c)})` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-plz">PLZ *</Label>
-              <Input id="edit-plz" value={editForm.plz} maxLength={5} onChange={(e) => setEditForm({ ...editForm, plz: e.target.value })} placeholder="z.B. 9613" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-adresse">Adresse</Label>
-              <Input id="edit-adresse" value={editForm.adresse} onChange={(e) => setEditForm({ ...editForm, adresse: e.target.value })} placeholder="Leer lassen = Adresse des Kunden" />
-            </div>
-            <div className="space-y-2">
-              <Label>Ampel-Status</Label>
-              <Select value={editForm.statusId} onValueChange={(v) => setEditForm({ ...editForm, statusId: v })}>
-                <SelectTrigger><SelectValue placeholder="Status wählen" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Kein Status</SelectItem>
-                  {statuses.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      <span className="inline-flex items-center gap-2">
-                        <span className="h-3 w-3 rounded-full" style={{ backgroundColor: s.color }} />
-                        {s.name}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-beschreibung">Beschreibung</Label>
-              <Textarea id="edit-beschreibung" value={editForm.beschreibung} onChange={(e) => setEditForm({ ...editForm, beschreibung: e.target.value })} className="min-h-20" />
-            </div>
-            <Button onClick={handleSaveEdit} disabled={savingEdit} className="w-full">
-              {savingEdit ? "Speichern..." : "Änderungen speichern"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Projekt bearbeiten – einheitlicher Dialog */}
+      <ProjectEditDialog
+        project={editProject}
+        open={!!editProject}
+        onOpenChange={(open) => !open && setEditProject(null)}
+        customers={customers}
+        statuses={statuses}
+        onSaved={fetchProjects}
+      />
 
       {/* Quick Upload Dialog - Only show when NOT in camera mode */}
       {quickUploadProject && !showCameraDialog && (

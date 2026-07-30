@@ -1,14 +1,29 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, FileText, FileCheck, FolderOpen, Package, Camera, ImagePlus, Lock, FileSignature, Plus, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, FileText, FileCheck, FolderOpen, Package, Camera, ImagePlus, Lock, FileSignature, Plus, CheckCircle2, Pencil, Settings } from "lucide-react";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import { projectLabel } from "@/lib/projectLabel";
+import { saveUpdate } from "@/lib/offlineData";
 import { UebernahmeDialog } from "@/components/UebernahmeDialog";
+import { ProjectEditDialog, type EditableProject, type CustomerOption, type StatusOption } from "@/components/ProjectEditDialog";
+import {
+  CATEGORY_ORDER,
+  CUSTOM_FOLDERS_AFTER,
+  TOGGLEABLE_CATEGORIES,
+  CATEGORY_LABELS,
+  CATEGORY_DESCRIPTIONS,
+  CATEGORY_BUCKETS,
+  isCategoryVisible,
+  type FolderCategory,
+} from "@/lib/projectFolders";
 
 type ProjectNachtrag = {
   id: string;
@@ -18,178 +33,236 @@ type ProjectNachtrag = {
   unterschrieben_am: string | null;
 };
 
-type DocumentCategory = {
-  type: "plans" | "reports" | "photos" | "chef";
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  count: number;
-  adminOnly?: boolean;
+type CustomFolder = { name: string; count: number };
+
+const CATEGORY_ICON: Record<FolderCategory, React.ReactNode> = {
+  photos: <Camera className="h-8 w-8" />,
+  reports: <FileCheck className="h-8 w-8" />,
+  plans: <FileText className="h-8 w-8" />,
+  materials: <Package className="h-8 w-8" />,
+  chef: <Lock className="h-8 w-8" />,
 };
 
 const ProjectOverview = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
+  const { toast } = useToast();
+
   const [projectName, setProjectName] = useState("");
+  const [project, setProject] = useState<EditableProject | null>(null);
+  const [hiddenCategories, setHiddenCategories] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [materialCount, setMaterialCount] = useState(0);
+
+  const [counts, setCounts] = useState<Partial<Record<FolderCategory, number>>>({});
+  const [customFolders, setCustomFolders] = useState<CustomFolder[]>([]);
   const [nachtraege, setNachtraege] = useState<ProjectNachtrag[]>([]);
+
   const [uebernahmeOpen, setUebernahmeOpen] = useState(false);
-  const [categories, setCategories] = useState<DocumentCategory[]>([
-    {
-      type: "photos",
-      title: "Fotos",
-      description: "Baufortschritt und Dokumentationsfotos",
-      icon: <Camera className="h-8 w-8" />,
-      count: 0,
-    },
-    {
-      type: "plans",
-      title: "Pläne",
-      description: "Baupläne und technische Zeichnungen",
-      icon: <FileText className="h-8 w-8" />,
-      count: 0,
-    },
-    {
-      type: "reports",
-      title: "Regieberichte",
-      description: "Bautagebücher und Stundenberichte",
-      icon: <FileCheck className="h-8 w-8" />,
-      count: 0,
-    },
-    {
-      type: "chef",
-      title: "🔒 Chefordner",
-      description: "Vertrauliche Chef-Dokumente",
-      icon: <Lock className="h-8 w-8" />,
-      count: 0,
-      adminOnly: true,
-    },
-  ]);
+  const [editOpen, setEditOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
+  // Entwurf im Einstellungen-Dialog: true = Ordner sichtbar.
+  const [settingsDraft, setSettingsDraft] = useState<Record<string, boolean>>({});
+
+  const [customers, setCustomers] = useState<CustomerOption[]>([]);
+  const [statuses, setStatuses] = useState<StatusOption[]>([]);
 
   useEffect(() => {
     if (projectId) {
       checkAdminStatus();
-      fetchProjectName();
+      fetchProject();
       fetchNachtraege();
+      fetchCustomersAndStatuses();
     }
   }, [projectId]);
 
   useEffect(() => {
     if (projectId) {
-      fetchFileCounts();
-      fetchMaterialCount();
+      fetchCounts();
     }
-  }, [projectId, isAdmin]);
+  }, [projectId, isAdmin, hiddenCategories]);
 
   const checkAdminStatus = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-
     const { data } = await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id)
       .eq("role", "administrator")
       .maybeSingle();
-
     setIsAdmin(!!data);
   };
 
-  const fetchProjectName = async () => {
+  const fetchProject = async () => {
     if (!projectId) return;
-    
     const { data } = await supabase
       .from("projects")
-      .select("name, adresse, customers(strasse, ort)")
+      .select("id, name, plz, adresse, beschreibung, customer_id, status_id, hidden_categories, customers(strasse, ort)")
       .eq("id", projectId)
       .single();
-
     if (data) {
       setProjectName(projectLabel(data));
+      setProject({
+        id: data.id,
+        name: data.name,
+        plz: data.plz,
+        adresse: data.adresse,
+        beschreibung: data.beschreibung,
+        customer_id: data.customer_id,
+        status_id: data.status_id,
+      });
+      setHiddenCategories(data.hidden_categories ?? []);
     }
+  };
+
+  const fetchCustomersAndStatuses = async () => {
+    const [{ data: cust }, { data: stat }] = await Promise.all([
+      supabase.from("customers").select("id, vorname, nachname, strasse, ort").order("nachname"),
+      supabase.from("project_statuses").select("id, name, color").order("sort_order"),
+    ]);
+    setCustomers(cust ?? []);
+    setStatuses(stat ?? []);
   };
 
   const fetchNachtraege = async () => {
     if (!projectId) return;
-
     const { data } = await supabase
       .from("nachtraege")
       .select("id, titel, status, created_at, unterschrieben_am")
       .eq("project_id", projectId)
       .order("created_at", { ascending: false });
-
     setNachtraege(data ?? []);
   };
 
-  const fetchMaterialCount = async () => {
-    if (!projectId) return;
-
-    const { count } = await supabase
-      .from("material_entries")
-      .select("*", { count: "exact", head: true })
-      .eq("project_id", projectId);
-
-    setMaterialCount(count || 0);
+  // Zählt Dateien (ohne .keep) rekursiv unter einem project-files-Prefix.
+  const countFilesUnder = async (prefix: string): Promise<number> => {
+    const { data } = await supabase.storage.from("project-files").list(prefix, { limit: 1000 });
+    if (!data) return 0;
+    let total = 0;
+    for (const item of data) {
+      if (item.id === null) {
+        // Unterordner
+        total += await countFilesUnder(`${prefix}/${item.name}`);
+      } else if (item.name !== ".keep") {
+        total += 1;
+      }
+    }
+    return total;
   };
 
-  const fetchFileCounts = async () => {
+  const fetchCounts = async () => {
     if (!projectId) return;
 
-    const bucketMap: Record<string, string> = {
-      plans: "project-plans",
-      reports: "project-reports",
-      photos: "project-photos",
-      chef: "project-chef",
-    };
-
-    const updatedCategories = await Promise.all(
-      categories.map(async (category) => {
-        // Skip chef bucket for non-admins
-        if (category.type === "chef" && !isAdmin) {
-          return { ...category, count: 0 };
+    // Kategorie-Zähler
+    const next: Partial<Record<FolderCategory, number>> = {};
+    await Promise.all(
+      CATEGORY_ORDER.map(async (cat) => {
+        if (!isCategoryVisible(cat, hiddenCategories, isAdmin)) return;
+        if (cat === "materials") {
+          const { count } = await supabase
+            .from("material_entries")
+            .select("*", { count: "exact", head: true })
+            .eq("project_id", projectId);
+          next.materials = count || 0;
+          return;
         }
-        
-        const bucket = bucketMap[category.type];
-        const { data } = await supabase
-          .storage
-          .from(bucket)
-          .list(projectId);
-
-        return {
-          ...category,
-          count: data?.length || 0,
-        };
+        const bucket = CATEGORY_BUCKETS[cat];
+        if (!bucket) return;
+        const { data } = await supabase.storage.from(bucket).list(projectId);
+        next[cat] = data?.length || 0;
       })
     );
+    setCounts(next);
 
-    setCategories(updatedCategories);
+    // Selbst erstellte Ordner (project-files, oberste Ebene)
+    const { data: top } = await supabase.storage.from("project-files").list(projectId, { limit: 1000 });
+    const folderNames = (top ?? []).filter((i) => i.id === null).map((i) => i.name);
+    const folders: CustomFolder[] = await Promise.all(
+      folderNames.map(async (name) => ({ name, count: await countFilesUnder(`${projectId}/${name}`) }))
+    );
+    folders.sort((a, b) => a.name.localeCompare(b.name, "de"));
+    setCustomFolders(folders);
   };
 
-  const handleQuickPhotoUpload = () => {
-    navigate(`/projects/${projectId}/photos`);
+  const openSettings = () => {
+    const draft: Record<string, boolean> = {};
+    TOGGLEABLE_CATEGORIES.forEach((cat) => {
+      draft[cat] = !hiddenCategories.includes(cat);
+    });
+    setSettingsDraft(draft);
+    setSettingsOpen(true);
   };
 
-  // Filter categories based on admin status
-  const visibleCategories = categories.filter(
-    (category) => !category.adminOnly || isAdmin
-  );
+  const handleSaveSettings = async () => {
+    if (!projectId || savingSettings) return;
+    setSavingSettings(true);
+    // Ausgeblendet = alle abschaltbaren Kategorien, deren Schalter AUS ist.
+    const hidden = TOGGLEABLE_CATEGORIES.filter((cat) => !settingsDraft[cat]);
+    const res = await saveUpdate("projects", { id: projectId }, { hidden_categories: hidden }, "Projektordner");
+    setSavingSettings(false);
+    if (res.error) {
+      toast({ variant: "destructive", title: "Fehler", description: "Einstellungen konnten nicht gespeichert werden" });
+      return;
+    }
+    setHiddenCategories(hidden);
+    setSettingsOpen(false);
+    toast({ title: "Gespeichert", description: "Ordner-Einstellungen aktualisiert." });
+  };
+
+  const handleCategoryClick = (cat: FolderCategory) => {
+    if (cat === "materials") {
+      navigate(`/projects/${projectId}/materials`);
+    } else {
+      navigate(`/projects/${projectId}/${cat}`);
+    }
+  };
+
+  // Kachel-Reihenfolge aufbauen: feste Kategorien in CATEGORY_ORDER, die selbst
+  // erstellten Ordner werden nach "reports" (Regieberichte) eingeschoben.
+  type Tile =
+    | { kind: "category"; category: FolderCategory }
+    | { kind: "custom"; name: string; count: number };
+
+  const tiles: Tile[] = [];
+  for (const cat of CATEGORY_ORDER) {
+    if (isCategoryVisible(cat, hiddenCategories, isAdmin)) {
+      tiles.push({ kind: "category", category: cat });
+    }
+    if (cat === CUSTOM_FOLDERS_AFTER) {
+      for (const f of customFolders) tiles.push({ kind: "custom", name: f.name, count: f.count });
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card sticky top-0 z-50 shadow-sm">
         <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => navigate("/projects")}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Zurück</span>
-            </Button>
-            <img 
-              src="/ruff-logo.png"
-              alt="Ruff Michael Logo"
-              className="h-8 w-8 sm:h-10 sm:w-10 cursor-pointer hover:opacity-80 transition-opacity object-contain" 
-              onClick={() => navigate("/projects")}
-            />
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={() => navigate("/projects")}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Zurück</span>
+              </Button>
+              <img
+                src="/ruff-logo.png"
+                alt="Ruff Michael Logo"
+                className="h-8 w-8 sm:h-10 sm:w-10 cursor-pointer hover:opacity-80 transition-opacity object-contain"
+                onClick={() => navigate("/projects")}
+              />
+            </div>
+            {isAdmin && (
+              <div className="flex items-center gap-1">
+                <Button variant="outline" size="sm" className="gap-1" onClick={() => setEditOpen(true)}>
+                  <Pencil className="h-4 w-4" />
+                  <span className="hidden sm:inline">Bearbeiten</span>
+                </Button>
+                <Button variant="outline" size="sm" className="gap-1" onClick={openSettings}>
+                  <Settings className="h-4 w-4" />
+                  <span className="hidden sm:inline">Ordner</span>
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </header>
@@ -200,11 +273,16 @@ const ProjectOverview = () => {
           <p className="text-muted-foreground">Dokumentation und Dateien</p>
         </div>
 
-        {/* Übernahmebestätigung - prominente Schnellaktion */}
+        {/* Schnellaktionen */}
         <div className="mb-4 flex flex-wrap gap-2">
           <Button className="gap-2" onClick={() => setUebernahmeOpen(true)}>
             <FileCheck className="h-4 w-4" />
             Übernahmebestätigung erstellen
+          </Button>
+          {/* Zugang zur freien Ordnerstruktur (Ordner erstellen/umbenennen/verschieben/löschen) */}
+          <Button variant="outline" className="gap-2" onClick={() => navigate(`/projects/${projectId}/files`)}>
+            <FolderOpen className="h-4 w-4" />
+            Ordner verwalten
           </Button>
         </div>
 
@@ -259,76 +337,53 @@ const ProjectOverview = () => {
           </div>
         )}
 
-        {/* Projektordner - freie Ordnerstruktur mit Dateien */}
-        <Card
-          className="cursor-pointer hover:shadow-lg transition-shadow mb-4 border-primary/40"
-          onClick={() => navigate(`/projects/${projectId}/files`)}
-        >
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="text-primary"><FolderOpen className="h-8 w-8" /></div>
-            </div>
-            <CardTitle className="text-xl">Projektordner</CardTitle>
-            <CardDescription>
-              Eigene Ordner &amp; Dateien — erstellen, verschieben, löschen
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button variant="outline" className="w-full">
-              Öffnen
-            </Button>
-          </CardContent>
-        </Card>
-
         <div className="grid gap-4 md:grid-cols-2">
-          {visibleCategories.map((category) => (
-            <Card 
-              key={category.type}
-              className="cursor-pointer hover:shadow-lg transition-shadow"
-              onClick={() => navigate(`/projects/${projectId}/${category.type}`)}
-            >
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="text-primary">{category.icon}</div>
-                  <div className="text-2xl font-bold">{category.count}</div>
-                </div>
-                <CardTitle className="text-xl">{category.title}</CardTitle>
-                <CardDescription>{category.description}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button variant="outline" className="w-full">
-                  Öffnen
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-
-          {/* Materialliste - separate card with DB count */}
-          <Card 
-            className="cursor-pointer hover:shadow-lg transition-shadow"
-            onClick={() => navigate(`/projects/${projectId}/materials`)}
-          >
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="text-primary"><Package className="h-8 w-8" /></div>
-                <div className="text-2xl font-bold">{materialCount}</div>
-              </div>
-              <CardTitle className="text-xl">Materialliste</CardTitle>
-              <CardDescription>Verwendete Materialien dokumentieren</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="outline" className="w-full">
-                Öffnen
-              </Button>
-            </CardContent>
-          </Card>
+          {tiles.map((tile) =>
+            tile.kind === "category" ? (
+              <Card
+                key={`cat-${tile.category}`}
+                className="cursor-pointer hover:shadow-lg transition-shadow"
+                onClick={() => handleCategoryClick(tile.category)}
+              >
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="text-primary">{CATEGORY_ICON[tile.category]}</div>
+                    <div className="text-2xl font-bold">{counts[tile.category] ?? 0}</div>
+                  </div>
+                  <CardTitle className="text-xl">{CATEGORY_LABELS[tile.category]}</CardTitle>
+                  <CardDescription>{CATEGORY_DESCRIPTIONS[tile.category]}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button variant="outline" className="w-full">Öffnen</Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card
+                key={`custom-${tile.name}`}
+                className="cursor-pointer hover:shadow-lg transition-shadow"
+                onClick={() => navigate(`/projects/${projectId}/files?path=${encodeURIComponent(tile.name)}`)}
+              >
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="text-primary"><FolderOpen className="h-8 w-8" /></div>
+                    <div className="text-2xl font-bold">{tile.count}</div>
+                  </div>
+                  <CardTitle className="text-xl">{tile.name}</CardTitle>
+                  <CardDescription>Projektordner</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button variant="outline" className="w-full">Öffnen</Button>
+                </CardContent>
+              </Card>
+            )
+          )}
         </div>
 
         {/* Floating Action Button für Fotos */}
-        <Button 
+        <Button
           className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-lg"
           size="icon"
-          onClick={handleQuickPhotoUpload}
+          onClick={() => navigate(`/projects/${projectId}/photos`)}
         >
           <ImagePlus className="h-6 w-6" />
         </Button>
@@ -339,6 +394,53 @@ const ProjectOverview = () => {
         onOpenChange={setUebernahmeOpen}
         projectId={projectId}
       />
+
+      <ProjectEditDialog
+        project={project}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        customers={customers}
+        statuses={statuses}
+        onSaved={fetchProject}
+      />
+
+      {/* Ordner-Einstellungen (nur Admin) */}
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent className="max-w-sm sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Projektordner verwalten</DialogTitle>
+            <DialogDescription>
+              Lege fest, welche Ordner dieses Projekt hat. Bereits hochgeladene Dateien
+              bleiben erhalten, auch wenn ein Ordner ausgeblendet wird.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {TOGGLEABLE_CATEGORIES.map((cat) => (
+              <div key={cat} className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                <div className="min-w-0">
+                  <p className="font-medium">{CATEGORY_LABELS[cat]}</p>
+                  <p className="text-xs text-muted-foreground">{CATEGORY_DESCRIPTIONS[cat]}</p>
+                </div>
+                <Switch
+                  checked={!!settingsDraft[cat]}
+                  onCheckedChange={(v) => setSettingsDraft((d) => ({ ...d, [cat]: v }))}
+                />
+              </div>
+            ))}
+            {/* Chef ist nicht abschaltbar */}
+            <div className="flex items-center justify-between gap-3 rounded-lg border p-3 opacity-70">
+              <div className="min-w-0">
+                <p className="font-medium flex items-center gap-1"><Lock className="h-3.5 w-3.5" /> {CATEGORY_LABELS.chef}</p>
+                <p className="text-xs text-muted-foreground">Immer vorhanden – nur für Admins sichtbar</p>
+              </div>
+              <Switch checked disabled />
+            </div>
+            <Button onClick={handleSaveSettings} disabled={savingSettings} className="w-full">
+              {savingSettings ? "Speichern..." : "Speichern"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

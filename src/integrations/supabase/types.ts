@@ -1021,6 +1021,7 @@ export type Database = {
           beschreibung: string | null
           created_at: string
           customer_id: string | null
+          hidden_categories: string[]
           id: string
           name: string
           plz: string
@@ -1033,6 +1034,7 @@ export type Database = {
           beschreibung?: string | null
           created_at?: string
           customer_id?: string | null
+          hidden_categories?: string[]
           id?: string
           name: string
           plz: string
@@ -1045,6 +1047,7 @@ export type Database = {
           beschreibung?: string | null
           created_at?: string
           customer_id?: string | null
+          hidden_categories?: string[]
           id?: string
           name?: string
           plz?: string

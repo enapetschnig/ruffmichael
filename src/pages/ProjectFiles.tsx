@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import {
   ChevronRight,
   File as FileIcon,
@@ -102,11 +102,16 @@ const formatDate = (iso?: string | null) => {
 
 const ProjectFiles = () => {
   const { projectId } = useParams<{ projectId: string }>();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [projectName, setProjectName] = useState("");
-  const [path, setPath] = useState<string[]>([]);
+  // Startordner optional aus ?path=… (Deep-Link aus der Projekt-Übersicht).
+  const [path, setPath] = useState<string[]>(() => {
+    const p = searchParams.get("path");
+    return p ? p.split("/").filter(Boolean) : [];
+  });
   const [folders, setFolders] = useState<StorageEntry[]>([]);
   const [files, setFiles] = useState<StorageEntry[]>([]);
   const [loading, setLoading] = useState(true);

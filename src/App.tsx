@@ -37,6 +37,7 @@ const queryClient = new QueryClient();
 function AppContent() {
   const {
     showInstallDialog,
+    setShowInstallDialog,
     handleInstallDialogClose,
   } = useOnboarding();
 
@@ -87,6 +88,7 @@ function AppContent() {
       <InstallPromptDialog
         open={showInstallDialog}
         onClose={handleInstallDialogClose}
+        onDismiss={() => setShowInstallDialog(false)}
       />
     </>
   );

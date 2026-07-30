@@ -292,7 +292,7 @@ export default function Index() {
                 
                 <DropdownMenuItem onClick={handleRestartInstallGuide}>
                   <Info className="mr-2 h-4 w-4" />
-                  <span>App zum Startbildschirm hinzufügen</span>
+                  <span>App installieren (Handy & PC)</span>
                 </DropdownMenuItem>
                 
                 <DropdownMenuSeparator />

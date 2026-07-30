@@ -20,6 +20,7 @@ export default defineConfig(({ mode }) => ({
         name: 'Ruff Michael Installateur',
         short_name: 'Ruff Michael',
         description: 'Baustellendokumentation und Zeiterfassung',
+        lang: 'de',
         theme_color: '#F07002',
         background_color: '#ffffff',
         display: 'standalone',

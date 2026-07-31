@@ -9,6 +9,17 @@ import { customerDisplayName, customerAddress } from "@/pages/Customers";
 import { supabase } from "@/integrations/supabase/client";
 import { saveUpload } from "@/lib/offlineData";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // WICHTIG: Diese Komponente wird von Mitarbeitern und Kunden gesehen.
 // Es dürfen hier NIEMALS Preise geladen oder angezeigt werden.
@@ -45,6 +56,14 @@ export function DashboardVoiceAssistant({
   const [projects, setProjects] = useState<AssistantProject[]>([]);
   const [customers, setCustomers] = useState<VoiceContext["customers"]>([]);
   const [checklist, setChecklist] = useState<string[]>([]);
+
+  // Bestätigungs-Dialog für Sprachnotizen: Der erkannte Text und die
+  // Projekt-Zuordnung werden VOR dem Speichern angezeigt und sind änderbar –
+  // nichts wird mehr "blind" gespeichert.
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [noteText, setNoteText] = useState("");
+  const [noteProjectId, setNoteProjectId] = useState<string>("");
+  const [savingNote, setSavingNote] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -144,12 +163,17 @@ export function DashboardVoiceAssistant({
       | undefined;
     const erstaufnahme = result.extracted?.erstaufnahme as ErstaufnahmePrefill | undefined;
 
-    if (
-      assistent?.intent === "projektnotiz" &&
-      assistent.projectId &&
-      (assistent.notiz ?? "").trim()
-    ) {
-      await handleProjektnotiz(assistent.projectId, (assistent.notiz ?? "").trim());
+    if (assistent?.intent === "projektnotiz" && (assistent.notiz ?? "").trim()) {
+      // Nicht sofort speichern: Erkannten Text + Projekt-Zuordnung zur Kontrolle
+      // anzeigen (beides änderbar). Auch ohne erkanntes Projekt öffnen – dann
+      // wählt der Nutzer das Projekt selbst.
+      setNoteText((assistent.notiz ?? "").trim());
+      setNoteProjectId(
+        assistent.projectId && projects.some((p) => p.id === assistent.projectId)
+          ? assistent.projectId
+          : ""
+      );
+      setNoteOpen(true);
       return;
     }
 
@@ -171,13 +195,83 @@ export function DashboardVoiceAssistant({
     });
   };
 
+  // Bestätigte Notiz speichern (Text ggf. vom Nutzer korrigiert).
+  const handleSaveNote = async () => {
+    if (!noteProjectId || !noteText.trim() || savingNote) return;
+    setSavingNote(true);
+    try {
+      await handleProjektnotiz(noteProjectId, noteText.trim());
+      setNoteOpen(false);
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
+  const noteProject = projects.find((p) => p.id === noteProjectId);
+
   return (
-    <VoiceInputButton
-      mode="assistent"
-      context={voiceContext}
-      label="Sprachassistent"
-      hint='Sag z. B. „Notiz zum Projekt Fassl: Ventil bestellt" oder diktiere eine komplette Erstaufnahme.'
-      onResult={handleResult}
-    />
+    <>
+      <VoiceInputButton
+        mode="assistent"
+        context={voiceContext}
+        label="Sprachassistent"
+        hint='Sag z. B. „Notiz zum Projekt Fassl: Ventil bestellt" oder diktiere eine komplette Erstaufnahme.'
+        onResult={handleResult}
+      />
+
+      {/* Notiz prüfen & zuordnen, bevor gespeichert wird */}
+      <Dialog open={noteOpen} onOpenChange={(o) => { if (!o && !savingNote) setNoteOpen(false); }}>
+        <DialogContent className="max-w-sm sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Notiz prüfen &amp; speichern</DialogTitle>
+            <DialogDescription>
+              Das wurde erkannt — Text und Projekt-Zuordnung bitte kontrollieren (beides änderbar).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="voice-note-text">Erkannte Notiz</Label>
+              <Textarea
+                id="voice-note-text"
+                value={noteText}
+                onChange={(e) => setNoteText(e.target.value)}
+                rows={5}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Projekt *</Label>
+              <Select value={noteProjectId} onValueChange={setNoteProjectId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Projekt auswählen" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}{p.adresse ? ` – ${p.adresse}` : p.plz ? ` – PLZ ${p.plz}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!noteProjectId && (
+                <p className="text-xs text-muted-foreground">
+                  Kein Projekt eindeutig erkannt — bitte auswählen.
+                </p>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Gespeichert wird im Projektordner „Notizen"{noteProject ? ` von ${noteProject.name}` : ""}.
+            </p>
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2">
+              <Button variant="outline" onClick={() => setNoteOpen(false)} disabled={savingNote}>
+                Abbrechen
+              </Button>
+              <Button onClick={handleSaveNote} disabled={!noteProjectId || !noteText.trim() || savingNote}>
+                {savingNote ? "Speichert…" : "Notiz speichern"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

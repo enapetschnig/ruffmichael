@@ -4,9 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, FolderKanban, Users, BarChart3, LogOut, FileText, ArrowRight, Info, User as UserIcon, Zap, Contact, Package, FilePlus2, ClipboardList, FileCheck } from "lucide-react";
+import { Clock, FolderKanban, Users, BarChart3, LogOut, FileText, ArrowRight, Info, User as UserIcon, Zap, Contact, Package, FilePlus2, ClipboardList, FileCheck, Paintbrush } from "lucide-react";
 import { ErstaufnahmeDialog, type ErstaufnahmePrefill } from "@/components/ErstaufnahmeDialog";
 import { DashboardVoiceAssistant } from "@/components/DashboardVoiceAssistant";
+import { DrawingEditor } from "@/components/DrawingEditor";
 import { useToast } from "@/hooks/use-toast";
 import { useOnboarding } from "@/contexts/OnboardingContext";
 import {
@@ -44,6 +45,7 @@ export default function Index() {
   const { toast } = useToast();
   const [session, setSession] = useState<Session | null>(null);
   const [showErstaufnahme, setShowErstaufnahme] = useState(false);
+  const [showDrawing, setShowDrawing] = useState(false);
   const [erstaufnahmePrefill, setErstaufnahmePrefill] = useState<ErstaufnahmePrefill | undefined>(undefined);
   const [user, setUser] = useState<User | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
@@ -324,16 +326,27 @@ export default function Index() {
           </p>
         </div>
 
-        {/* Schnellaktionen ganz oben: Erstaufnahme + Sprachassistent */}
+        {/* Schnellaktionen ganz oben: Erstaufnahme + Zeichnung + Sprachassistent */}
         <div className="mb-6 sm:mb-8 space-y-3">
-          <Button
-            size="lg"
-            className="w-full sm:w-auto gap-2 text-base h-12 px-6"
-            onClick={() => { setErstaufnahmePrefill(undefined); setShowErstaufnahme(true); }}
-          >
-            <ClipboardList className="h-5 w-5" />
-            Erstaufnahme erstellen
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button
+              size="lg"
+              className="w-full sm:w-auto gap-2 text-base h-12 px-6"
+              onClick={() => { setErstaufnahmePrefill(undefined); setShowErstaufnahme(true); }}
+            >
+              <ClipboardList className="h-5 w-5" />
+              Erstaufnahme erstellen
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="w-full sm:w-auto gap-2 text-base h-12 px-6"
+              onClick={() => setShowDrawing(true)}
+            >
+              <Paintbrush className="h-5 w-5" />
+              Zeichnung erstellen
+            </Button>
+          </div>
           <DashboardVoiceAssistant
             onErstaufnahme={(prefill) => {
               setErstaufnahmePrefill(prefill);
@@ -348,6 +361,9 @@ export default function Index() {
           prefill={erstaufnahmePrefill}
           onFinished={(projectId) => navigate(`/projects/${projectId}`)}
         />
+
+        {/* Zeichnungs-Editor: speichert als PNG im Fotos-Ordner des gewählten Projekts */}
+        <DrawingEditor open={showDrawing} onOpenChange={setShowDrawing} />
 
         {/* Main Actions Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">

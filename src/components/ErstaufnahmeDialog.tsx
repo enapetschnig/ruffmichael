@@ -36,6 +36,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { getSessionUser } from "@/lib/auth";
 import { newId, isOffline, saveInsert, saveUpload } from "@/lib/offlineData";
+import { fetchCustomersCached } from "@/lib/cachedQueries";
+import { cachedSelect } from "@/lib/offlineStore";
 
 // WICHTIG: Diese Komponente wird von Mitarbeitern und Kunden gesehen.
 // Es dürfen hier NIEMALS Preise geladen oder angezeigt werden.
@@ -140,21 +142,21 @@ export function ErstaufnahmeDialog({
     }));
 
   const fetchCustomers = async (): Promise<ErstaufnahmeCustomer[]> => {
-    const { data } = await supabase
-      .from("customers")
-      .select("id, vorname, nachname, strasse, ort, telefon, email")
-      .order("nachname")
-      .order("vorname");
-    const list = data ?? [];
+    // Offline-fähig: letzter bekannter Stand, wenn kein Netz da ist.
+    const { data } = await fetchCustomersCached();
+    const list = (data as unknown as ErstaufnahmeCustomer[]) ?? [];
     setCustomers(list);
     return list;
   };
 
   const fetchChecklistItems = async (): Promise<ChecklistItem[]> => {
-    const { data } = await supabase
-      .from("erstaufnahme_checklist_items")
-      .select("id, text, sort_order, is_active")
-      .order("sort_order", { ascending: true });
+    // Offline-fähig (eigener Schlüssel: hier werden auch inaktive Punkte gebraucht)
+    const { data } = await cachedSelect<ChecklistItem[]>("checklist:editor", () =>
+      supabase
+        .from("erstaufnahme_checklist_items")
+        .select("id, text, sort_order, is_active")
+        .order("sort_order", { ascending: true }) as unknown as PromiseLike<{ data: ChecklistItem[] | null; error: { message: string } | null }>,
+    );
     const list = data ?? [];
     setChecklistItems(list);
     return list;

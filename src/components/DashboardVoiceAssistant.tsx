@@ -8,6 +8,7 @@ import { fileTimestamp, type ErstaufnahmePrefill } from "@/components/Erstaufnah
 import { customerDisplayName, customerAddress } from "@/pages/Customers";
 import { supabase } from "@/integrations/supabase/client";
 import { saveUpload } from "@/lib/offlineData";
+import { fetchActiveProjectsCached, fetchCustomersCached, fetchChecklistCached } from "@/lib/cachedQueries";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -67,22 +68,12 @@ export function DashboardVoiceAssistant({
 
   useEffect(() => {
     (async () => {
+      // Offline-fähig: ohne Netz kommt der letzte bekannte Stand aus der
+      // lokalen Ablage (Projektauswahl + Kundenliste funktionieren im Funkloch).
       const [projectsRes, customersRes, checklistRes] = await Promise.all([
-        supabase
-          .from("projects")
-          .select("id, name, plz, adresse, customers(strasse, ort)")
-          .eq("status", "aktiv")
-          .order("name"),
-        supabase
-          .from("customers")
-          .select("id, vorname, nachname, strasse, ort, telefon, email")
-          .order("nachname")
-          .order("vorname"),
-        supabase
-          .from("erstaufnahme_checklist_items")
-          .select("text")
-          .eq("is_active", true)
-          .order("sort_order", { ascending: true }),
+        fetchActiveProjectsCached(),
+        fetchCustomersCached(),
+        fetchChecklistCached(),
       ]);
 
       setProjects(

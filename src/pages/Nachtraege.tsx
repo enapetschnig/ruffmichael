@@ -46,6 +46,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { isOffline, saveUpdate } from "@/lib/offlineData";
+import { fetchActiveProjectsCached } from "@/lib/cachedQueries";
 
 type NachtragMaterial = {
   id: string;
@@ -185,12 +186,9 @@ const Nachtraege = () => {
   };
 
   const fetchProjects = async () => {
-    const { data } = await supabase
-      .from("projects")
-      .select("id, name, adresse")
-      .eq("status", "aktiv")
-      .order("name");
-    setProjects(data ?? []);
+    // Offline-fähig: Projektfilter aus der lokalen Ablage, wenn kein Netz da ist.
+    const { data } = await fetchActiveProjectsCached();
+    setProjects((data ?? []).map((p) => ({ id: p.id, name: p.name, adresse: p.adresse })));
   };
 
   // Filter options: active projects + projects that already have Nachträge

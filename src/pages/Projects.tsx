@@ -22,6 +22,8 @@ import { newId, saveInsert, saveUpload, saveUpdate, isOffline } from "@/lib/offl
 import { getSessionUser } from "@/lib/auth";
 import { projectAddress } from "@/lib/projectLabel";
 import { ProjectEditDialog } from "@/components/ProjectEditDialog";
+import { readCache, writeCache } from "@/lib/offlineStore";
+import { fetchStatusesCached, fetchCustomersCached } from "@/lib/cachedQueries";
 
 type ProjectCustomer = Pick<Customer, "id" | "vorname" | "nachname" | "strasse" | "ort">;
 
@@ -176,26 +178,43 @@ const Projects = () => {
       .select("id, vorname, nachname, strasse, ort")
       .order("nachname")
       .order("vorname");
-    setCustomers(data ?? []);
+    if (data) {
+      setCustomers(data);
+      return;
+    }
+    // Offline/Fehler: letzter bekannter Stand aus der lokalen Ablage.
+    const cached = await fetchCustomersCached();
+    setCustomers((cached.data as unknown as ProjectCustomer[]) ?? []);
   };
 
   const fetchStatuses = async (): Promise<ProjectStatus[]> => {
-    const { data } = await supabase
-      .from("project_statuses")
-      .select("id, name, color, sort_order")
-      .order("sort_order", { ascending: true });
-    const list = data ?? [];
+    // Offline-fähig: letzter bekannter Stand ohne Netz.
+    const { data } = await fetchStatusesCached();
+    const list = (data as ProjectStatus[]) ?? [];
     setStatuses(list);
     return list;
   };
 
   const fetchProjects = async () => {
+    // Ohne Netz: sofort den letzten bekannten Stand (inkl. Datei-Zählern) zeigen.
+    if (isOffline()) {
+      const cached = await readCache<Project[]>("projects:seite");
+      if (cached) {
+        setProjects(cached.data);
+        setLoading(false);
+        return;
+      }
+    }
+
     const { data, error } = await supabase
       .from("projects")
       .select("*, customers(id, vorname, nachname, strasse, ort), project_statuses(id, name, color)")
       .order("created_at", { ascending: false });
 
     if (error) {
+      // Netzfehler trotz navigator.onLine (Funkloch): letzter bekannter Stand.
+      const cached = await readCache<Project[]>("projects:seite");
+      if (cached) setProjects(cached.data);
       setLoading(false);
       return;
     }
@@ -221,6 +240,8 @@ const Projects = () => {
 
     setProjects(projectsWithCounts);
     setLoading(false);
+    // Fertiges Ergebnis (inkl. Zähler) für die Offline-Anzeige ablegen.
+    void writeCache("projects:seite", projectsWithCounts);
   };
 
   const handleCreateProject = async () => {

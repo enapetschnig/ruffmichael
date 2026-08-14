@@ -23,6 +23,7 @@ import {
 import { getNormalWorkingHours } from "@/lib/workingHours";
 import { projectLabel } from "@/lib/projectLabel";
 import { getSessionUser } from "@/lib/auth";
+import { fetchAllProjectsCached } from "@/lib/cachedQueries";
 
 interface TimeEntry {
   id: string;
@@ -122,7 +123,8 @@ export default function HoursReport() {
   };
 
   const fetchProjects = async () => {
-    const { data } = await supabase.from("projects").select("id, name, adresse, plz, customers(strasse, ort)");
+    // Offline-fähig: Projektnamen aus der lokalen Ablage, wenn kein Netz da ist.
+    const { data } = await fetchAllProjectsCached();
     if (data) {
       const projectMap: Record<string, Project> = {};
       data.forEach((p) => {

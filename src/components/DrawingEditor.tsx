@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { saveUpload } from "@/lib/offlineData";
+import { fetchActiveProjectsCached } from "@/lib/cachedQueries";
 import { projectLabel } from "@/lib/projectLabel";
 import { fileTimestamp } from "@/components/ErstaufnahmeDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -190,12 +191,9 @@ export function DrawingEditor({ open, onOpenChange, defaultProjectId, onSaved }:
     setTool("pen");
     setProjectId(defaultProjectId ?? "");
     (async () => {
-      const { data } = await supabase
-        .from("projects")
-        .select("id, name, adresse, customers(strasse, ort)")
-        .eq("status", "aktiv")
-        .order("name");
-      setProjects((data as DrawingProject[]) ?? []);
+      // Offline-fähig: Projektauswahl funktioniert auch ohne Netz.
+      const { data } = await fetchActiveProjectsCached();
+      setProjects((data as unknown as DrawingProject[]) ?? []);
     })();
   }, [open, defaultProjectId]);
 

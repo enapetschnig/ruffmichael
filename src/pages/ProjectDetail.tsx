@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { FileViewer } from "@/components/FileViewer";
 import { saveUpload } from "@/lib/offlineData";
 import { projectLabel, type ProjectLike } from "@/lib/projectLabel";
+import { cachedSelect } from "@/lib/offlineStore";
 
 type DocumentType = "plans" | "reports" | "photos" | "chef";
 
@@ -128,15 +129,19 @@ const ProjectDetail = () => {
   const fetchProject = async () => {
     if (!projectId) return;
 
-    const { data } = await supabase
-      .from("projects")
-      .select("name, adresse, hidden_categories, customers(strasse, ort)")
-      .eq("id", projectId)
-      .single();
+    // Offline-fähig: Projektdaten aus der lokalen Ablage, wenn kein Netz da ist.
+    type Row = { name: string; adresse: string | null; hidden_categories?: string[]; customers: { strasse: string | null; ort: string | null } | null };
+    const { data } = await cachedSelect<Row>(`project:${projectId}:detail`, () =>
+      supabase
+        .from("projects")
+        .select("name, adresse, hidden_categories, customers(strasse, ort)")
+        .eq("id", projectId)
+        .single() as unknown as PromiseLike<{ data: Row | null; error: { message: string } | null }>,
+    );
 
     if (data) {
       setProject(data as unknown as ProjectLike);
-      setHiddenCategories((data as { hidden_categories?: string[] }).hidden_categories ?? []);
+      setHiddenCategories(data.hidden_categories ?? []);
     }
   };
 

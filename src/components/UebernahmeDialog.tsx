@@ -26,6 +26,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { projectLabel } from "@/lib/projectLabel";
 import { getSessionUser } from "@/lib/auth";
+import { fetchActiveProjectsCached } from "@/lib/cachedQueries";
 import { newId, saveInsert, saveInvoke } from "@/lib/offlineData";
 
 // WICHTIG: Diese Komponente wird von Mitarbeitern und Kunden gesehen.
@@ -116,12 +117,9 @@ export function UebernahmeDialog({
         setProjects(data ? [data as UebernahmeProject] : []);
         return;
       }
-      const { data } = await supabase
-        .from("projects")
-        .select(PROJECT_SELECT)
-        .eq("status", "aktiv")
-        .order("name");
-      setProjects((data as UebernahmeProject[]) ?? []);
+      // Offline-fähig: Projektauswahl aus der lokalen Ablage, wenn kein Netz da ist.
+      const { data } = await fetchActiveProjectsCached();
+      setProjects((data as unknown as UebernahmeProject[]) ?? []);
     })();
   }, [open, projectId]);
 

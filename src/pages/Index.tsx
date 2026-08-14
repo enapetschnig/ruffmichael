@@ -8,6 +8,8 @@ import { Clock, FolderKanban, Users, BarChart3, LogOut, FileText, ArrowRight, In
 import { ErstaufnahmeDialog, type ErstaufnahmePrefill } from "@/components/ErstaufnahmeDialog";
 import { DashboardVoiceAssistant } from "@/components/DashboardVoiceAssistant";
 import { DrawingEditor } from "@/components/DrawingEditor";
+import { cachedSelect } from "@/lib/offlineStore";
+import { warmOfflineCache } from "@/lib/cachedQueries";
 import { useToast } from "@/hooks/use-toast";
 import { useOnboarding } from "@/contexts/OnboardingContext";
 import {
@@ -57,12 +59,20 @@ export default function Index() {
   const { handleRestartInstallGuide } = useOnboarding();
 
   const fetchProjects = async () => {
-    const { data } = await supabase
-      .from("projects")
-      .select("id, name, status, updated_at")
-      .eq("status", "aktiv")
-      .order("updated_at", { ascending: false })
-      .limit(5);
+    // Offline-fähig (letzter bekannter Stand) — und gleichzeitig der zentrale
+    // Moment, um die lokale Ablage für ALLE Seiten vorzuwärmen: Projekte,
+    // Kunden, Status, Checkliste. So funktioniert z.B. die Projektauswahl in
+    // der Zeiterfassung auch offline, selbst wenn sie auf diesem Gerät noch
+    // nie geöffnet war.
+    warmOfflineCache();
+    const { data } = await cachedSelect<Project[]>("projects:index", () =>
+      supabase
+        .from("projects")
+        .select("id, name, status, updated_at")
+        .eq("status", "aktiv")
+        .order("updated_at", { ascending: false })
+        .limit(5) as unknown as PromiseLike<{ data: Project[] | null; error: { message: string } | null }>,
+    );
 
     if (data) {
       setProjects(data);

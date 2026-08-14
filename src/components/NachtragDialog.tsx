@@ -25,6 +25,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { projectLabel } from "@/lib/projectLabel";
 import { getSessionUser } from "@/lib/auth";
+import { fetchActiveProjectsCached } from "@/lib/cachedQueries";
 import { newId, saveInsert } from "@/lib/offlineData";
 
 // WICHTIG: Diese Komponente wird von Mitarbeitern und Kunden gesehen.
@@ -192,12 +193,9 @@ export function NachtragDialog({
   useEffect(() => {
     if (!open) return;
     (async () => {
-      const { data } = await supabase
-        .from("projects")
-        .select("id, name, adresse, customers(strasse, ort)")
-        .eq("status", "aktiv")
-        .order("name");
-      let list: ProjectOption[] = data ?? [];
+      // Offline-fähig: Projektauswahl aus der lokalen Ablage, wenn kein Netz da ist.
+      const { data } = await fetchActiveProjectsCached();
+      let list: ProjectOption[] = (data as unknown as ProjectOption[]) ?? [];
       // Falls das vorgegebene Projekt nicht (mehr) aktiv ist, trotzdem nachladen
       if (projectId && !list.some((p) => p.id === projectId)) {
         const { data: single } = await supabase

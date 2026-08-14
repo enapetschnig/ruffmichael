@@ -11,6 +11,7 @@ import * as XLSX from "xlsx-js-style";
 import { format, parseISO } from "date-fns";
 import { de } from "date-fns/locale";
 import { projectAddress, projectLabel } from "@/lib/projectLabel";
+import { fetchAllProjectsCached } from "@/lib/cachedQueries";
 
 interface DetailedProjectEntry {
   id: string;
@@ -95,10 +96,8 @@ export default function ProjectHoursReport() {
   }, [selectedProjectId]);
 
   const fetchProjects = async () => {
-    const { data, error } = await supabase
-      .from("projects")
-      .select("id, name, plz, adresse, customers(strasse, ort)")
-      .order("name");
+    // Offline-fähig: Projektliste aus der lokalen Ablage, wenn kein Netz da ist.
+    const { data, error } = await fetchAllProjectsCached();
 
     if (data && !error) {
       setProjects(data);

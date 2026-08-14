@@ -34,6 +34,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { isOffline, newId, saveInsert } from "@/lib/offlineData";
+import { cachedSelect } from "@/lib/offlineStore";
 
 interface Material {
   id: string;
@@ -127,12 +128,16 @@ const MaterialCatalog = () => {
 
   const fetchMaterials = async (admin: boolean) => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("materials")
-      .select("id, name, einheit, kategorie")
-      .eq("is_active", true)
-      .order("kategorie")
-      .order("name");
+    // Offline-fähig (gleicher Schlüssel wie der MaterialPicker). Preise werden
+    // BEWUSST NICHT lokal abgelegt (nur Admin darf sie sehen).
+    const { data, error } = await cachedSelect<Material[]>("materials:aktiv", () =>
+      supabase
+        .from("materials")
+        .select("id, name, einheit, kategorie")
+        .eq("is_active", true)
+        .order("kategorie")
+        .order("name") as unknown as PromiseLike<{ data: Material[] | null; error: { message: string } | null }>,
+    );
     if (error) {
       toast({
         variant: "destructive",

@@ -54,6 +54,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { projectLabel } from "@/lib/projectLabel";
+import { cachedSelect } from "@/lib/offlineStore";
 
 const BUCKET = "project-files";
 const PLACEHOLDER_NAMES = [".keep", ".emptyFolderPlaceholder"];
@@ -134,11 +135,15 @@ const ProjectFiles = () => {
   useEffect(() => {
     if (!projectId) return;
     const fetchProjectName = async () => {
-      const { data, error } = await supabase
-        .from("projects")
-        .select("name, adresse, customers(strasse, ort)")
-        .eq("id", projectId)
-        .single();
+      // Offline-fähig: Projektname aus der lokalen Ablage, wenn kein Netz da ist.
+      type Row = { name: string; adresse: string | null; customers: { strasse: string | null; ort: string | null } | null };
+      const { data, error } = await cachedSelect<Row>(`project:${projectId}:label`, () =>
+        supabase
+          .from("projects")
+          .select("name, adresse, customers(strasse, ort)")
+          .eq("id", projectId)
+          .single() as unknown as PromiseLike<{ data: Row | null; error: { message: string } | null }>,
+      );
 
       if (error) {
         toast({

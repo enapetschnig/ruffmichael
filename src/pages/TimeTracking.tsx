@@ -11,6 +11,7 @@ import { resolveTimeBlocks } from "@/lib/timeBlockResolver";
 import { enqueue } from "@/lib/offlineQueue";
 import { isOffline, newId, saveInsert, saveUpload } from "@/lib/offlineData";
 import { getSessionUser } from "@/lib/auth";
+import { fetchActiveProjectsCached } from "@/lib/cachedQueries";
 import { projectLabel, projectAddress } from "@/lib/projectLabel";
 import { customerDisplayName, customerAddress, type Customer } from "@/pages/Customers";
 import { format, startOfWeek } from "date-fns";
@@ -456,13 +457,10 @@ const TimeTracking = () => {
   };
 
   const fetchProjects = async () => {
-    const { data } = await supabase
-      .from("projects")
-      .select("id, name, status, plz, adresse, customers(strasse, ort)")
-      .eq("status", "aktiv")
-      .order("name");
-
-    if (data) setProjects(data);
+    // Offline-fähig: liefert ohne Netz sofort den letzten bekannten Stand,
+    // damit die Projektauswahl auch im Funkloch funktioniert.
+    const { data } = await fetchActiveProjectsCached();
+    if (data) setProjects(data as unknown as Project[]);
     setLoading(false);
   };
 

@@ -1,4 +1,5 @@
 import { getSessionUser } from "@/lib/auth";
+import { fetchCustomersCached } from "@/lib/cachedQueries";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Search, Pencil, Trash2, Phone, Smartphone, Mail, MapPin, Truck, Users } from "lucide-react";
@@ -211,15 +212,12 @@ const Customers = () => {
 
   const fetchCustomers = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("customers")
-      .select("*")
-      .order("nachname")
-      .order("vorname");
+    // Offline-fähig: ohne Netz kommt sofort der letzte bekannte Stand.
+    const { data, error } = await fetchCustomersCached();
     if (error) {
       toast({ variant: "destructive", title: "Fehler", description: "Kunden konnten nicht geladen werden" });
     } else {
-      setCustomers(data ?? []);
+      setCustomers((data as unknown as Customer[]) ?? []);
     }
     setLoading(false);
   };

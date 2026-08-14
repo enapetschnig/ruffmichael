@@ -11,6 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
+import { cachedSelect } from "@/lib/offlineStore";
 
 // WICHTIG: Diese Komponente wird von Mitarbeitern verwendet.
 // Es dürfen hier NIEMALS Preise geladen oder angezeigt werden.
@@ -38,12 +39,15 @@ export function MaterialPicker({ onSelect, triggerLabel }: MaterialPickerProps):
     if (!open || loaded) return;
     (async () => {
       setLoading(true);
-      const { data } = await supabase
-        .from("materials")
-        .select("id, name, einheit, kategorie")
-        .eq("is_active", true)
-        .order("kategorie")
-        .order("name");
+      // Offline-fähig: Katalog aus der lokalen Ablage, wenn kein Netz da ist.
+      const { data } = await cachedSelect<CatalogMaterial[]>("materials:aktiv", () =>
+        supabase
+          .from("materials")
+          .select("id, name, einheit, kategorie")
+          .eq("is_active", true)
+          .order("kategorie")
+          .order("name") as unknown as PromiseLike<{ data: CatalogMaterial[] | null; error: { message: string } | null }>,
+      );
       setMaterials(data ?? []);
       setLoaded(true);
       setLoading(false);

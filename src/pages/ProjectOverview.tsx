@@ -13,6 +13,8 @@ import { useToast } from "@/hooks/use-toast";
 import { projectLabel } from "@/lib/projectLabel";
 import { saveUpdate } from "@/lib/offlineData";
 import { UebernahmeDialog } from "@/components/UebernahmeDialog";
+import { cachedSelect } from "@/lib/offlineStore";
+import { fetchCustomersCached, fetchStatusesCached } from "@/lib/cachedQueries";
 import { ProjectEditDialog, type EditableProject, type CustomerOption, type StatusOption } from "@/components/ProjectEditDialog";
 import {
   CATEGORY_ORDER,
@@ -96,11 +98,15 @@ const ProjectOverview = () => {
 
   const fetchProject = async () => {
     if (!projectId) return;
-    const { data } = await supabase
-      .from("projects")
-      .select("id, name, plz, adresse, beschreibung, customer_id, status_id, hidden_categories, customers(strasse, ort)")
-      .eq("id", projectId)
-      .single();
+    // Offline-fähig: Projektdaten aus der lokalen Ablage, wenn kein Netz da ist.
+    type Row = EditableProject & { hidden_categories: string[] | null; customers: { strasse: string | null; ort: string | null } | null };
+    const { data } = await cachedSelect<Row>(`project:${projectId}:overview`, () =>
+      supabase
+        .from("projects")
+        .select("id, name, plz, adresse, beschreibung, customer_id, status_id, hidden_categories, customers(strasse, ort)")
+        .eq("id", projectId)
+        .single() as unknown as PromiseLike<{ data: Row | null; error: { message: string } | null }>,
+    );
     if (data) {
       setProjectName(projectLabel(data));
       setProject({
@@ -117,12 +123,10 @@ const ProjectOverview = () => {
   };
 
   const fetchCustomersAndStatuses = async () => {
-    const [{ data: cust }, { data: stat }] = await Promise.all([
-      supabase.from("customers").select("id, vorname, nachname, strasse, ort").order("nachname"),
-      supabase.from("project_statuses").select("id, name, color").order("sort_order"),
-    ]);
-    setCustomers(cust ?? []);
-    setStatuses(stat ?? []);
+    // Offline-fähig: gemeinsame lokale Ablage (gleiche Schlüssel wie überall).
+    const [cust, stat] = await Promise.all([fetchCustomersCached(), fetchStatusesCached()]);
+    setCustomers((cust.data as unknown as CustomerOption[]) ?? []);
+    setStatuses((stat.data as StatusOption[]) ?? []);
   };
 
   const fetchNachtraege = async () => {

@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { projectLabel } from "@/lib/projectLabel";
 import { getSessionUser } from "@/lib/auth";
+import { cachedSelect } from "@/lib/offlineStore";
 
 type TimeEntry = {
   id: string;
@@ -81,13 +82,16 @@ const MyHours = () => {
     const lastDay = new Date(year, month, 0).getDate();
     const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
-    const { data } = await supabase
-      .from("time_entries")
-      .select("*, projects(name, plz, adresse, customers(strasse, ort))")
-      .eq("user_id", user.id)
-      .gte("datum", startDate)
-      .lte("datum", endDate)
-      .order("datum", { ascending: false });
+    // Offline-fähig: eigene Stunden des Monats aus der lokalen Ablage, wenn kein Netz.
+    const { data } = await cachedSelect<TimeEntry[]>(`myhours:${user.id}:${selectedMonth}`, () =>
+      supabase
+        .from("time_entries")
+        .select("*, projects(name, plz, adresse, customers(strasse, ort))")
+        .eq("user_id", user.id)
+        .gte("datum", startDate)
+        .lte("datum", endDate)
+        .order("datum", { ascending: false }) as unknown as PromiseLike<{ data: TimeEntry[] | null; error: { message: string } | null }>,
+    );
 
     if (data) {
       setEntries(data as any);

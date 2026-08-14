@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { getSessionUser } from "@/lib/auth";
 import { isOffline, newId, saveInsert } from "@/lib/offlineData";
+import { cachedSelect } from "@/lib/offlineStore";
 import { PageHeader } from "@/components/PageHeader";
 import { projectLabel } from "@/lib/projectLabel";
 
@@ -76,11 +77,16 @@ const MaterialList = () => {
   const fetchProjectName = async () => {
     if (!projectId) return;
 
-    const { data } = await supabase
-      .from("projects")
-      .select("name, adresse, customers(strasse, ort)")
-      .eq("id", projectId)
-      .single();
+    // Offline-fähig: Projektname aus der lokalen Ablage, wenn kein Netz da ist.
+    const { data } = await cachedSelect<{ name: string; adresse: string | null; customers: { strasse: string | null; ort: string | null } | null }>(
+      `project:${projectId}:label`,
+      () =>
+        supabase
+          .from("projects")
+          .select("name, adresse, customers(strasse, ort)")
+          .eq("id", projectId)
+          .single() as unknown as PromiseLike<{ data: { name: string; adresse: string | null; customers: { strasse: string | null; ort: string | null } | null } | null; error: { message: string } | null }>,
+    );
 
     if (data) {
       setProjectName(projectLabel(data));

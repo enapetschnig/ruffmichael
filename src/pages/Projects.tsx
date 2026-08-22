@@ -18,7 +18,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CustomerFormFields, customerFormToRow, customerAddress, customerDisplayName, type Customer } from "./Customers";
 import { enqueue } from "@/lib/offlineQueue";
-import { newId, saveInsert, saveUpload, saveUpdate, isOffline } from "@/lib/offlineData";
+import { newId, saveInsert, saveUpload, saveUpdate, saveInvoke, isOffline } from "@/lib/offlineData";
 import { getSessionUser } from "@/lib/auth";
 import { projectAddress } from "@/lib/projectLabel";
 import { ProjectEditDialog } from "@/components/ProjectEditDialog";
@@ -341,6 +341,11 @@ const Projects = () => {
         );
         anyQueued = anyQueued || fr.queued;
       }
+
+      // OneDrive-Ordner SOFORT anlegen: online direkt (Sekunden), offline in der
+      // Warteschlange NACH den Inserts (Kette). Fehler stören die Anlage nicht —
+      // der 10-Minuten-Sync ist das Sicherheitsnetz.
+      void saveInvoke("onedrive-sync", { projectId }, `OneDrive-Ordner: ${newProject.name.trim()}`, anyQueued);
 
       toast({
         title: anyQueued ? "Offline gespeichert" : "Erfolg",

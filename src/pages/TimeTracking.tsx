@@ -9,7 +9,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { VoiceInputButton, type VoiceContext } from "@/components/VoiceInputButton";
 import { resolveTimeBlocks } from "@/lib/timeBlockResolver";
 import { enqueue } from "@/lib/offlineQueue";
-import { isOffline, newId, saveInsert, saveUpload } from "@/lib/offlineData";
+import { isOffline, newId, saveInsert, saveUpload, saveInvoke } from "@/lib/offlineData";
 import { getSessionUser } from "@/lib/auth";
 import { fetchActiveProjectsCached } from "@/lib/cachedQueries";
 import { projectLabel, projectAddress } from "@/lib/projectLabel";
@@ -437,6 +437,10 @@ const TimeTracking = () => {
       );
       anyQueued = anyQueued || fr.queued;
     }
+
+    // OneDrive-Ordner SOFORT anlegen (online direkt, offline über die Warteschlange
+    // nach den Inserts). Fehler stören nicht — der 10-Min-Sync ist das Sicherheitsnetz.
+    void saveInvoke("onedrive-sync", { projectId }, `OneDrive-Ordner: ${newProjectName.trim()}`, anyQueued);
 
     sonnerToast.success(anyQueued ? "Projekt offline gespeichert – wird gesendet, sobald wieder Internet da ist" : "Projekt erfolgreich erstellt");
 

@@ -304,15 +304,31 @@ Deno.serve(async (req: Request) => {
 
   const supa = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
+  // Optional: nur EIN Projekt synchronisieren (Sofort-Ordner nach Projekt-Anlage).
+  let onlyProjectId = url.searchParams.get("projectId");
+  if (!onlyProjectId && req.method === "POST") {
+    try {
+      const b = await req.json();
+      if (b && typeof b.projectId === "string") onlyProjectId = b.projectId;
+    } catch { /* leerer/kein JSON-Body (z.B. Cron) */ }
+  }
+
   try {
     const token = await getToken(tenant, clientId, secret);
     const g = new Graph(token);
     const { driveId, owner } = await resolveDrive(g, target);
+    // Root darf ein VERSCHACHTELTER Pfad sein (z.B. "1 Installateur Ruff/1 Kunde
+    // in Arbeit/1 Arbeit 2026") – Segmente einzeln encodieren; fehlende Teile
+    // werden segmentweise angelegt.
+    const encPath = (p: string) => p.split("/").filter(Boolean).map(encodeURIComponent).join("/");
     const rootItem = await (async () => {
-      const res = await g.req(`/drives/${driveId}/root:/${encodeURIComponent(ROOT_NAME)}`);
+      const res = await g.req(`/drives/${driveId}/root:/${encPath(ROOT_NAME)}`);
       if (res.ok) return (await res.json()) as GraphItem;
-      const root = await g.json<GraphItem>(`/drives/${driveId}/root`);
-      return await g.ensureFolder(driveId, root.id, ROOT_NAME);
+      let cur = await g.json<GraphItem>(`/drives/${driveId}/root`);
+      for (const seg of ROOT_NAME.split("/").filter(Boolean)) {
+        cur = await g.ensureFolder(driveId, cur.id, seg);
+      }
+      return cur;
     })();
 
     if (action === "test") {
@@ -325,10 +341,12 @@ Deno.serve(async (req: Request) => {
     let partial = false;
     const outOfBudget = () => Date.now() - started > TIME_BUDGET_MS || transfers >= MAX_TRANSFERS;
 
-    const { data: projects, error: projErr } = await supa
+    let projQuery = supa
       .from("projects")
       .select("id, name, onedrive_folder_id")
       .order("created_at");
+    if (onlyProjectId) projQuery = projQuery.eq("id", onlyProjectId);
+    const { data: projects, error: projErr } = await projQuery;
     if (projErr) throw new Error(projErr.message);
 
     for (const project of projects ?? []) {

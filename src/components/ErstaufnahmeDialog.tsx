@@ -35,7 +35,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { getSessionUser } from "@/lib/auth";
-import { newId, isOffline, saveInsert, saveUpload } from "@/lib/offlineData";
+import { newId, isOffline, saveInsert, saveUpload, saveInvoke } from "@/lib/offlineData";
 import { fetchCustomersCached } from "@/lib/cachedQueries";
 import { cachedSelect } from "@/lib/offlineStore";
 
@@ -518,6 +518,10 @@ export function ErstaufnahmeDialog({
         );
         if (folderRes.queued) queued = true;
       }
+
+      // OneDrive-Ordner SOFORT anlegen (online direkt, offline über die Warteschlange
+      // nach den Inserts). Fehler stören nicht — der 10-Min-Sync ist das Sicherheitsnetz.
+      void saveInvoke("onedrive-sync", { projectId }, `OneDrive-Ordner: ${projektName.trim() || "Projekt"}`, queued);
 
       // (d) Erstaufnahme-Datensatz speichern (Client-ID)
       const checklistJson = activeItems.map((item) => {

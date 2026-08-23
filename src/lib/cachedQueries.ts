@@ -20,6 +20,7 @@ export type CachedProject = {
 
 export type CachedCustomer = {
   id: string;
+  kundennr: string | null;
   vorname: string | null;
   nachname: string;
   strasse: string | null;

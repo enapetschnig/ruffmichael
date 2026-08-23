@@ -32,6 +32,8 @@ import { isOffline, newId, saveInsert } from "@/lib/offlineData";
 
 export interface Customer {
   id: string;
+  // Kundennummer aus der Faktura-Software (z.B. "0253"); nur bei importierten Kunden gesetzt
+  kundennr?: string | null;
   vorname: string;
   nachname: string;
   strasse: string | null;
@@ -226,7 +228,7 @@ const Customers = () => {
     const q = search.trim().toLowerCase();
     if (!q) return customers;
     return customers.filter((c) =>
-      [c.vorname, c.nachname, c.strasse, c.ort, c.telefon, c.mobil, c.email, c.liefer_strasse, c.liefer_ort]
+      [c.kundennr, c.vorname, c.nachname, c.strasse, c.ort, c.telefon, c.mobil, c.email, c.liefer_strasse, c.liefer_ort]
         .filter(Boolean)
         .some((v) => (v as string).toLowerCase().includes(q))
     );
@@ -396,7 +398,15 @@ const Customers = () => {
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 space-y-1">
-                      <div className="font-semibold text-base">{customerDisplayName(c) || "(ohne Name)"}</div>
+                      <div className="font-semibold text-base flex items-center gap-2 flex-wrap">
+                        <span>{customerDisplayName(c) || "(ohne Name)"}</span>
+                        {/* Kundennummer aus der Faktura-Software (nur wenn vorhanden) */}
+                        {c.kundennr && (
+                          <span className="text-xs font-normal text-muted-foreground bg-muted rounded px-1.5 py-0.5">
+                            Nr. {c.kundennr}
+                          </span>
+                        )}
+                      </div>
                       {customerAddress(c) && (
                         <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                           <MapPin className="h-3.5 w-3.5 shrink-0" />

@@ -180,6 +180,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           email: string | null
+          kundennr: string | null
           id: string
           liefer_ort: string | null
           liefer_strasse: string | null
@@ -195,6 +196,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           email?: string | null
+          kundennr?: string | null
           id?: string
           liefer_ort?: string | null
           liefer_strasse?: string | null
@@ -210,6 +212,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           email?: string | null
+          kundennr?: string | null
           id?: string
           liefer_ort?: string | null
           liefer_strasse?: string | null

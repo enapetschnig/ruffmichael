@@ -195,8 +195,8 @@ export default function TimeAccountManagement({ profiles }: TimeAccountManagemen
                     key={profile.id}
                     className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-lg border"
                   >
-                    <div>
-                      <p className="font-medium">
+                    <div className="min-w-0">
+                      <p className="font-medium break-words">
                         {profile.vorname} {profile.nachname}
                       </p>
                       {account ? (
@@ -219,12 +219,14 @@ export default function TimeAccountManagement({ profiles }: TimeAccountManagemen
                         </p>
                       )}
                     </div>
-                    <div className="flex gap-2">
+                    {/* flex-wrap + größere Tippziele am Handy */}
+                    <div className="flex flex-wrap gap-2 sm:shrink-0">
                       {account ? (
                         <>
                           <Button
                             variant="outline"
                             size="sm"
+                            className="h-10 sm:h-9"
                             onClick={() => {
                               setSelectedUserId(profile.id);
                               setShowAdjustDialog(true);
@@ -235,6 +237,7 @@ export default function TimeAccountManagement({ profiles }: TimeAccountManagemen
                           <Button
                             variant="ghost"
                             size="sm"
+                            className="h-10 sm:h-9"
                             onClick={() => {
                               setSelectedUserId(profile.id);
                               setShowHistoryDialog(true);
@@ -247,6 +250,7 @@ export default function TimeAccountManagement({ profiles }: TimeAccountManagemen
                         <Button
                           variant="outline"
                           size="sm"
+                          className="h-10 sm:h-9"
                           onClick={() => ensureAccount(profile.id)}
                         >
                           Zeitkonto anlegen
@@ -262,10 +266,10 @@ export default function TimeAccountManagement({ profiles }: TimeAccountManagemen
 
       {/* Adjust Dialog */}
       <Dialog open={showAdjustDialog} onOpenChange={setShowAdjustDialog}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Zeitkonto buchen</DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="break-words">
               {selectedUserId && getProfileName(selectedUserId)}
             </DialogDescription>
           </DialogHeader>
@@ -305,7 +309,7 @@ export default function TimeAccountManagement({ profiles }: TimeAccountManagemen
                 rows={2}
               />
             </div>
-            <div className="flex gap-2 justify-end">
+            <div className="flex flex-wrap gap-2 justify-end">
               <Button variant="outline" onClick={() => setShowAdjustDialog(false)}>
                 Abbrechen
               </Button>
@@ -319,9 +323,9 @@ export default function TimeAccountManagement({ profiles }: TimeAccountManagemen
 
       {/* History Dialog */}
       <Dialog open={showHistoryDialog} onOpenChange={setShowHistoryDialog}>
-        <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-auto">
+        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="break-words pr-6">
               Verlauf – {selectedUserId && getProfileName(selectedUserId)}
             </DialogTitle>
             <DialogDescription>
@@ -339,23 +343,25 @@ export default function TimeAccountManagement({ profiles }: TimeAccountManagemen
                   key={tx.id}
                   className="p-3 rounded-lg border text-sm space-y-1"
                 >
-                  <div className="flex items-center justify-between">
+                  {/* Am Handy umbrechen: Badge + Zeitstempel passten nicht nebeneinander */}
+                  <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
                     <Badge
                       variant={tx.hours >= 0 ? "default" : "destructive"}
+                      className="whitespace-normal break-words text-left"
                     >
                       {tx.hours >= 0 ? "+" : ""}
                       {Number(tx.hours).toFixed(2)} h · {tx.change_type}
                     </Badge>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
                       {format(new Date(tx.created_at), "dd.MM.yyyy HH:mm", {
                         locale: de,
                       })}
                     </span>
                   </div>
-                  <p className="text-muted-foreground">
+                  <p className="text-muted-foreground break-words">
                     {tx.reason || "Kein Grund angegeben"}
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground break-words">
                     Saldo: {Number(tx.balance_before).toFixed(2)} → {Number(tx.balance_after).toFixed(2)} h · geändert von{" "}
                     {getProfileName(tx.changed_by)}
                   </p>

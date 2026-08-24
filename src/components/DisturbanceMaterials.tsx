@@ -183,9 +183,10 @@ export const DisturbanceMaterials = ({ disturbanceId, canEdit }: DisturbanceMate
   return (
     <>
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5" />
+        {/* flex-wrap statt starrer Zeile: am Handy rutscht der Button unter den Titel */}
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 px-4 sm:px-6">
+          <CardTitle className="text-base sm:text-lg flex items-center gap-2 min-w-0">
+            <Package className="h-5 w-5 flex-shrink-0" />
             Verwendete Materialien
           </CardTitle>
           {canEdit && (
@@ -195,7 +196,7 @@ export const DisturbanceMaterials = ({ disturbanceId, canEdit }: DisturbanceMate
             </Button>
           )}
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 sm:px-6">
           {loading ? (
             <div className="text-center py-4">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
@@ -212,23 +213,34 @@ export const DisturbanceMaterials = ({ disturbanceId, canEdit }: DisturbanceMate
               )}
             </div>
           ) : (
+            // Der Table-Wrapper scrollt bei Bedarf für sich; am Handy wandern die
+            // Notizen unter das Material, damit die Spalte entfallen kann
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Material</TableHead>
-                  <TableHead>Menge</TableHead>
-                  <TableHead>Notizen</TableHead>
-                  {canEdit && <TableHead className="w-[100px]">Aktionen</TableHead>}
+                  <TableHead className="h-10 px-2 sm:h-12 sm:px-4">Material</TableHead>
+                  <TableHead className="h-10 px-2 sm:h-12 sm:px-4">Menge</TableHead>
+                  <TableHead className="hidden sm:table-cell">Notizen</TableHead>
+                  {canEdit && <TableHead className="h-10 px-2 sm:h-12 sm:px-4 w-[100px]">Aktionen</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {materials.map((material) => (
                   <TableRow key={material.id}>
-                    <TableCell className="font-medium">{material.material}</TableCell>
-                    <TableCell>{material.menge || "-"}</TableCell>
-                    <TableCell className="max-w-[200px] truncate">{material.notizen || "-"}</TableCell>
+                    <TableCell className="p-2 sm:p-4 align-top font-medium break-words">
+                      {material.material}
+                      {material.notizen && (
+                        <span className="mt-1 block text-xs font-normal text-muted-foreground break-words sm:hidden">
+                          {material.notizen}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="p-2 sm:p-4 align-top break-words">{material.menge || "-"}</TableCell>
+                    <TableCell className="hidden sm:table-cell align-top">
+                      <div className="max-w-[200px] truncate">{material.notizen || "-"}</div>
+                    </TableCell>
                     {canEdit && (
-                      <TableCell>
+                      <TableCell className="p-2 sm:p-4 align-top">
                         <div className="flex gap-1">
                           <Button
                             variant="ghost"
@@ -247,10 +259,10 @@ export const DisturbanceMaterials = ({ disturbanceId, canEdit }: DisturbanceMate
                                 <Trash2 className="h-4 w-4 text-destructive" />
                               </Button>
                             </AlertDialogTrigger>
-                            <AlertDialogContent>
+                            <AlertDialogContent className="max-w-[calc(100vw-1.5rem)] sm:max-w-lg max-h-[90vh] overflow-y-auto">
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Material löschen?</AlertDialogTitle>
-                                <AlertDialogDescription>
+                                <AlertDialogDescription className="break-words">
                                   Möchten Sie "{material.material}" wirklich löschen?
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
@@ -278,19 +290,19 @@ export const DisturbanceMaterials = ({ disturbanceId, canEdit }: DisturbanceMate
 
       {/* Add/Edit Material Dialog */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
+        <DialogContent className="max-w-[calc(100vw-1.5rem)] sm:max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+          <DialogHeader className="pr-8">
+            <DialogTitle className="text-base sm:text-lg">
               {editingMaterial ? "Material bearbeiten" : "Material hinzufügen"}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-xs sm:text-sm">
               Erfassen Sie das verwendete Material für diesen Einsatz.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <Label htmlFor="material">Material *</Label>
                 <MaterialPicker
                   triggerLabel="Aus Katalog"
@@ -330,11 +342,11 @@ export const DisturbanceMaterials = ({ disturbanceId, canEdit }: DisturbanceMate
               />
             </div>
 
-            <div className="flex gap-3 justify-end pt-2">
-              <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
+            <div className="flex flex-wrap gap-2 sm:gap-3 justify-end pt-2">
+              <Button type="button" variant="outline" onClick={() => setShowForm(false)} className="flex-1 sm:flex-none">
                 Abbrechen
               </Button>
-              <Button type="submit" disabled={saving}>
+              <Button type="submit" disabled={saving} className="flex-1 sm:flex-none">
                 {saving ? "Speichern..." : editingMaterial ? "Aktualisieren" : "Hinzufügen"}
               </Button>
             </div>

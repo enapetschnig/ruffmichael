@@ -10,6 +10,24 @@
 
 export type FolderCategory = "photos" | "reports" | "plans" | "materials" | "chef";
 
+// Standardordner, die beim Anlegen eines Projekts erzeugt werden.
+//
+// Diese Liste entspricht der TATSÄCHLICH GELEBTEN Ordnerstruktur von Michael
+// Ruff in OneDrive (ausgezählt über 44 echte Projektordner aus 2025/2026):
+// Abnahme Protokoll 42x, Programmierung 38x, Anbote/Anleitungen/Doko/Mail je 36x.
+// "Fotos" und "Plan" fehlen hier bewusst — die kommen als Kategorie-Kacheln
+// (project-photos / project-plans) und würden sonst doppelt entstehen.
+// Frühere App-Ordner "Beschreibung"/"Hydraulik" wurden entfernt: in nur 2 von
+// 44 Projekten benutzt. "Foto" (Einzahl) war ein Namensfehler — er schreibt "Fotos".
+export const STANDARD_PROJECT_FOLDERS = [
+  "Abnahme Protokoll",
+  "Anbote",
+  "Anleitungen",
+  "Doko",
+  "Mail",
+  "Programmierung",
+];
+
 // Reihenfolge der festen Kacheln. Die selbst erstellten Ordner werden im
 // Overview NACH "reports" (Regieberichte) und VOR "plans" eingefügt.
 export const CATEGORY_ORDER: FolderCategory[] = [

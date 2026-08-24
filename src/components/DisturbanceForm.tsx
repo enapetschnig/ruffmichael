@@ -651,13 +651,13 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
-        <DialogHeader className="flex-shrink-0">
-          <DialogTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
+      <DialogContent className="max-w-[calc(100vw-1.5rem)] sm:max-w-lg max-h-[90vh] flex flex-col overflow-hidden p-4 sm:p-6">
+        <DialogHeader className="flex-shrink-0 pr-8">
+          <DialogTitle className="text-base sm:text-lg flex items-center gap-2">
+            <FileText className="h-5 w-5 flex-shrink-0" />
             {editData ? "Regiebericht bearbeiten" : "Neuen Regiebericht erfassen"}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-xs sm:text-sm">
             Erfassen Sie einen Service-Einsatz beim Kunden. Die Arbeitszeit wird automatisch für alle beteiligten Mitarbeiter gebucht.
           </DialogDescription>
         </DialogHeader>
@@ -683,8 +683,10 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
               <Calendar className="h-4 w-4" />
               Datum & Uhrzeit
             </h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
+            {/* min-w-0 in jeder Spalte: date/time-Felder haben eine breite Mindestgröße
+                und würden das Raster am Handy sonst auseinanderdrücken */}
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+              <div className="col-span-2 min-w-0">
                 <Label htmlFor="datum">Datum</Label>
                 <Input
                   id="datum"
@@ -692,9 +694,10 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
                   value={formData.datum}
                   onChange={(e) => setFormData({ ...formData, datum: e.target.value })}
                   required
+                  className="w-full min-w-0"
                 />
               </div>
-              <div>
+              <div className="min-w-0">
                 <Label htmlFor="startTime">Startzeit</Label>
                 <Input
                   id="startTime"
@@ -702,9 +705,10 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
                   value={formData.startTime}
                   onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
                   required
+                  className="w-full min-w-0"
                 />
               </div>
-              <div>
+              <div className="min-w-0">
                 <Label htmlFor="endTime">Endzeit</Label>
                 <Input
                   id="endTime"
@@ -712,9 +716,10 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
                   value={formData.endTime}
                   onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
                   required
+                  className="w-full min-w-0"
                 />
               </div>
-              <div>
+              <div className="min-w-0">
                 <Label htmlFor="pauseMinutes">Pause (Minuten)</Label>
                 <Input
                   id="pauseMinutes"
@@ -722,11 +727,12 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
                   min="0"
                   value={formData.pauseMinutes}
                   onChange={(e) => setFormData({ ...formData, pauseMinutes: parseInt(e.target.value) || 0 })}
+                  className="w-full min-w-0"
                 />
               </div>
-              <div className="flex items-end">
-                <div className="bg-muted rounded-md px-3 py-2 w-full text-center">
-                  <span className="text-sm text-muted-foreground">Stunden: </span>
+              <div className="flex items-end min-w-0">
+                <div className="bg-muted rounded-md px-2 sm:px-3 py-2 w-full text-center h-10 flex items-center justify-center gap-1">
+                  <span className="text-xs sm:text-sm text-muted-foreground">Stunden: </span>
                   <span className="font-bold text-primary">{calculateHours().toFixed(2)}</span>
                 </div>
               </div>
@@ -761,13 +767,13 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
                       <button
                         key={c.name}
                         type="button"
-                        className="w-full px-3 py-2 text-left text-sm hover:bg-accent"
+                        className="w-full px-3 py-2.5 text-left text-sm hover:bg-accent"
                         onMouseDown={(e) => {
                           e.preventDefault();
                           pickCustomerSuggestion(c);
                         }}
                       >
-                        <span className="font-medium">{c.name}</span>
+                        <span className="block font-medium truncate">{c.name}</span>
                         {c.adresse && (
                           <span className="block text-xs text-muted-foreground truncate">{c.adresse}</span>
                         )}
@@ -857,11 +863,11 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
           {/* Materials Section */}
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <h3 className="font-medium flex items-center gap-2">
-                <Package className="h-4 w-4" />
+              <h3 className="font-medium flex items-center gap-2 min-w-0">
+                <Package className="h-4 w-4 flex-shrink-0" />
                 Verwendetes Material (optional)
               </h3>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <MaterialPicker
                   triggerLabel="Aus Katalog"
                   onSelect={(m) =>
@@ -891,20 +897,20 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
                       placeholder="Material"
                       value={mat.material}
                       onChange={(e) => updateMaterial(mat.id, "material", e.target.value)}
-                      className="flex-1"
+                      className="flex-1 min-w-0"
                     />
                     <Input
                       placeholder="Menge"
                       value={mat.menge}
                       onChange={(e) => updateMaterial(mat.id, "menge", e.target.value)}
-                      className="w-24"
+                      className="w-20 sm:w-24 flex-shrink-0"
                     />
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon"
                       onClick={() => removeMaterial(mat.id)}
-                      className="text-destructive hover:text-destructive"
+                      className="text-destructive hover:text-destructive flex-shrink-0"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -917,11 +923,11 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
         </div>
 
         {/* Sticky Actions */}
-        <div className="flex gap-3 justify-end pt-4 border-t bg-background flex-shrink-0">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+        <div className="flex flex-wrap gap-2 sm:gap-3 justify-end pt-4 border-t bg-background flex-shrink-0">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1 sm:flex-none">
             Abbrechen
           </Button>
-          <Button onClick={(e) => { 
+          <Button className="flex-1 sm:flex-none" onClick={(e) => {
             e.preventDefault();
             const form = document.querySelector('form');
             if (form) form.requestSubmit();

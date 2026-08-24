@@ -268,13 +268,13 @@ const MaterialList = () => {
     <div className="min-h-screen bg-background">
       <PageHeader title={`${projectName} – Materialliste`} backPath={`/projects/${projectId}`} />
 
-      <main className="container mx-auto px-4 py-6 max-w-3xl">
+      <main className="container mx-auto px-3 sm:px-4 lg:px-6 py-6 max-w-3xl">
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
                 <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5" />
+                  <Package className="h-5 w-5 shrink-0" />
                   Materialliste
                 </CardTitle>
                 <CardDescription>
@@ -282,7 +282,8 @@ const MaterialList = () => {
                 </CardDescription>
               </div>
               {!showForm && (
-                <Button onClick={() => setShowForm(true)} size="sm">
+                // am Handy höher (besseres Tippziel), ab sm wieder kompakt
+                <Button onClick={() => setShowForm(true)} size="sm" className="shrink-0 h-10 sm:h-9">
                   <Plus className="h-4 w-4 mr-2" />
                   Hinzufügen
                 </Button>
@@ -320,7 +321,7 @@ const MaterialList = () => {
                     rows={2}
                   />
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button type="submit" disabled={submitting || !newMaterial.trim()}>
                     {submitting ? "Speichert..." : "Speichern"}
                   </Button>
@@ -366,7 +367,7 @@ const MaterialList = () => {
                           placeholder="Notizen"
                           rows={2}
                         />
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                           <Button
                             size="sm"
                             onClick={() => saveEdit(entry.id)}
@@ -385,18 +386,19 @@ const MaterialList = () => {
                       // View mode
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium">{entry.material}</p>
+                          {/* break-words: lange Materialbezeichnungen ohne Leerzeichen umbrechen lassen */}
+                          <p className="font-medium break-words">{entry.material}</p>
                           {entry.menge && (
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-sm text-muted-foreground break-words">
                               Menge: {entry.menge}
                             </p>
                           )}
                           {entry.notizen && (
-                            <p className="text-sm text-muted-foreground mt-1">
+                            <p className="text-sm text-muted-foreground mt-1 break-words">
                               {entry.notizen}
                             </p>
                           )}
-                          <p className="text-xs text-muted-foreground mt-2">
+                          <p className="text-xs text-muted-foreground mt-2 break-words">
                             {entry.profiles
                               ? `${entry.profiles.vorname} ${entry.profiles.nachname}`
                               : "Unbekannt"}{" "}
@@ -404,17 +406,18 @@ const MaterialList = () => {
                           </p>
                         </div>
                         {canEditOrDelete(entry) && (
-                          <div className="flex gap-1">
+                          // size="icon" (h-10 w-10) statt "sm": besseres Tippziel am Handy
+                          <div className="flex gap-1 shrink-0">
                             <Button
                               variant="ghost"
-                              size="sm"
+                              size="icon"
                               onClick={() => startEdit(entry)}
                             >
                               <Edit2 className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="ghost"
-                              size="sm"
+                              size="icon"
                               onClick={() => handleDelete(entry.id)}
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />

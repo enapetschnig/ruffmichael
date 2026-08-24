@@ -10,6 +10,7 @@ import { VoiceInputButton, type VoiceContext } from "@/components/VoiceInputButt
 import { resolveTimeBlocks } from "@/lib/timeBlockResolver";
 import { enqueue } from "@/lib/offlineQueue";
 import { isOffline, newId, saveInsert, saveUpload, saveInvoke } from "@/lib/offlineData";
+import { STANDARD_PROJECT_FOLDERS } from "@/lib/projectFolders";
 import { getSessionUser } from "@/lib/auth";
 import { fetchActiveProjectsCached } from "@/lib/cachedQueries";
 import { projectLabel, projectAddress } from "@/lib/projectLabel";
@@ -34,15 +35,6 @@ import {
   getWeeklyTargetHours,
   getTotalWorkingHours
 } from "@/lib/workingHours";
-
-// Standardordner für neue Projekte (identisch zu Projects.tsx / ErstaufnahmeDialog)
-const STANDARD_PROJECT_FOLDERS = [
-  "Abnahme Protokoll",
-  "Beschreibung",
-  "Foto",
-  "Hydraulik",
-  "Programmierung",
-];
 
 type Project = {
   id: string;
@@ -981,25 +973,25 @@ const TimeTracking = () => {
     <div className="min-h-screen bg-background">
       <PageHeader title="Zeiterfassung" />
       
-      <div className="p-4">
+      <div className="px-3 sm:px-4 lg:px-6 py-4 sm:py-6">
         <Card className="max-w-2xl mx-auto">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                <CardTitle>Zeiterfassung</CardTitle>
+          <CardHeader className="p-4 sm:p-6">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <Clock className="h-5 w-5 shrink-0" />
+                <CardTitle className="text-xl sm:text-2xl truncate">Zeiterfassung</CardTitle>
               </div>
-              <Button 
-                variant="outline" 
-                onClick={() => setShowAbsenceDialog(true)} 
-                className="gap-2"
+              <Button
+                variant="outline"
+                onClick={() => setShowAbsenceDialog(true)}
+                className="gap-2 shrink-0"
               >
                 <Calendar className="h-4 w-4" />
                 Abwesenheit
               </Button>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
             <form onSubmit={handleSubmit} className="space-y-6">
               <VoiceInputButton
                 mode="time"
@@ -1008,7 +1000,7 @@ const TimeTracking = () => {
                 label="Zeit per Sprache erfassen"
               />
               {voiceTranscription && (
-                <div className="rounded-md border bg-muted/50 p-2 text-xs italic text-muted-foreground">
+                <div className="rounded-md border bg-muted/50 p-2 text-xs italic text-muted-foreground break-words">
                   „{voiceTranscription}"
                 </div>
               )}
@@ -1018,14 +1010,14 @@ const TimeTracking = () => {
                 <CollapsibleTrigger asChild>
                   <button
                     type="button"
-                    className="flex w-full items-center justify-between rounded-md border bg-card px-3 py-2 text-sm hover:bg-muted/50 transition-colors"
+                    className="flex min-h-10 w-full items-center justify-between gap-2 rounded-md border bg-card px-3 py-2 text-sm hover:bg-muted/50 transition-colors"
                   >
-                    <span className="flex items-center gap-2 font-medium">
-                      <FolderOpen className="h-4 w-4 text-primary" />
-                      Offene Projekte
-                      <Badge variant="secondary" className="ml-1">{openProjects.length}</Badge>
+                    <span className="flex min-w-0 items-center gap-2 font-medium">
+                      <FolderOpen className="h-4 w-4 shrink-0 text-primary" />
+                      <span className="truncate">Offene Projekte</span>
+                      <Badge variant="secondary" className="ml-1 shrink-0">{openProjects.length}</Badge>
                     </span>
-                    <ChevronDown className={`h-4 w-4 transition-transform ${projectListOpen ? "rotate-180" : ""}`} />
+                    <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${projectListOpen ? "rotate-180" : ""}`} />
                   </button>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
@@ -1035,9 +1027,10 @@ const TimeTracking = () => {
                         <div className="p-3 text-sm text-muted-foreground">Keine offenen Projekte.</div>
                       ) : (
                         openProjects.map((p) => (
-                          <div key={p.id} className="flex items-center justify-between px-3 py-1.5 text-sm">
+                          <div key={p.id} className="flex items-center justify-between gap-2 px-3 py-1.5 text-sm">
                             <span className="truncate">{p.name}</span>
-                            <span className="text-xs text-muted-foreground ml-2 shrink-0">
+                            {/* Adresse darf am Handy nie die Zeile sprengen: begrenzt + abgeschnitten */}
+                            <span className="text-xs text-muted-foreground shrink-0 truncate max-w-[45%]">
                               {projectAddress(p)}
                             </span>
                           </div>
@@ -1072,9 +1065,9 @@ const TimeTracking = () => {
               </div>
 
               {/* Weekly target info */}
-              <div className="rounded-lg border bg-card p-4">
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-xs">
+              <div className="rounded-lg border bg-card p-3 sm:p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="secondary" className="text-xs shrink-0">
                     {getWeeklyTargetHours()}h Wochensoll
                   </Badge>
                   <span className="text-xs text-muted-foreground">
@@ -1090,20 +1083,20 @@ const TimeTracking = () => {
                   Lade Tageseinträge...
                 </div>
               ) : existingDayEntries.length > 0 ? (
-                <div className={`rounded-lg p-4 space-y-3 ${
+                <div className={`rounded-lg p-3 sm:p-4 space-y-3 ${
                   isDayBlocked
                     ? "bg-destructive/10 border border-destructive/30"
                     : "bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800"
                 }`}>
-                  <div className="flex items-center gap-2 font-medium text-sm">
+                  <div className="flex items-center gap-2 font-medium text-sm min-w-0">
                     {isDayBlocked ? (
                       <>
-                        <AlertTriangle className="w-4 h-4 text-destructive" />
-                        <span className="text-destructive">Tag blockiert ({existingDayEntries[0].taetigkeit})</span>
+                        <AlertTriangle className="w-4 h-4 shrink-0 text-destructive" />
+                        <span className="text-destructive break-words">Tag blockiert ({existingDayEntries[0].taetigkeit})</span>
                       </>
                     ) : (
                       <>
-                        <Calendar className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                        <Calendar className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
                         <span className="text-amber-700 dark:text-amber-300">Bereits gebuchte Zeiten</span>
                       </>
                     )}
@@ -1112,24 +1105,25 @@ const TimeTracking = () => {
                   {!isDayBlocked && (
                     <div className="space-y-1.5">
                       {existingDayEntries.map((entry) => (
-                        <div key={entry.id} className="flex items-center justify-between text-sm bg-background/60 rounded px-2 py-1.5">
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="font-mono text-xs">
+                        <div key={entry.id} className="flex items-center justify-between gap-2 text-sm bg-background/60 rounded px-2 py-1.5">
+                          {/* min-w-0 damit der Projektname am Handy abgeschnitten wird statt die Zeile zu sprengen */}
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Badge variant="outline" className="font-mono text-xs shrink-0 whitespace-nowrap">
                               {entry.start_time.substring(0, 5)} - {entry.end_time.substring(0, 5)}
                             </Badge>
-                            <span className="truncate max-w-[150px]">
+                            <span className="truncate">
                               {entry.project_name ? `${entry.project_name}` : entry.taetigkeit}
                             </span>
                           </div>
-                          <span className="font-medium">{Number(entry.stunden).toFixed(2)}h</span>
+                          <span className="font-medium shrink-0">{Number(entry.stunden).toFixed(2)}h</span>
                         </div>
                       ))}
                     </div>
                   )}
                   
-                  <div className="flex items-center justify-between pt-2 border-t border-amber-200 dark:border-amber-700">
+                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-amber-200 dark:border-amber-700">
                     <span className="text-sm font-medium">Tagessumme</span>
-                    <span className="font-bold">
+                    <span className="font-bold shrink-0">
                       {existingDayEntries.reduce((sum, e) => sum + Number(e.stunden), 0).toFixed(2)} Stunden
                     </span>
                   </div>
@@ -1152,13 +1146,13 @@ const TimeTracking = () => {
                     {timeBlocks.map((block, index) => (
                       <div 
                         key={block.id} 
-                        className="border rounded-lg p-4 space-y-4 bg-card"
+                        className="border rounded-lg p-3 sm:p-4 space-y-4 bg-card"
                       >
                         {/* Block header */}
-                        <div className="flex items-center justify-between">
-                          <h3 className="font-semibold text-sm flex items-center gap-2">
-                            <Clock className="w-4 h-4" />
-                            {timeBlocks.length > 1 ? `Zeitblock ${index + 1}` : "Arbeitszeit"}
+                        <div className="flex items-center justify-between gap-2">
+                          <h3 className="font-semibold text-sm flex items-center gap-2 min-w-0">
+                            <Clock className="w-4 h-4 shrink-0" />
+                            <span className="truncate">{timeBlocks.length > 1 ? `Zeitblock ${index + 1}` : "Arbeitszeit"}</span>
                           </h3>
                           {timeBlocks.length > 1 && (
                             <Button
@@ -1166,7 +1160,7 @@ const TimeTracking = () => {
                               variant="ghost"
                               size="sm"
                               onClick={() => removeBlock(block.id)}
-                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              className="h-10 w-10 shrink-0 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>
@@ -1179,17 +1173,17 @@ const TimeTracking = () => {
                           <RadioGroup 
                             value={block.locationType} 
                             onValueChange={(value: 'baustelle' | 'werkstatt') => updateBlock(block.id, { locationType: value })} 
-                            className="grid grid-cols-2 gap-4"
+                            className="grid grid-cols-2 gap-2 sm:gap-4"
                           >
                             <div>
                               <RadioGroupItem value="baustelle" id={`baustelle-${block.id}`} className="peer sr-only" />
-                              <Label htmlFor={`baustelle-${block.id}`} className="flex h-12 cursor-pointer items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent peer-data-[state=checked]:border-primary text-sm">
+                              <Label htmlFor={`baustelle-${block.id}`} className="flex h-12 cursor-pointer items-center justify-center rounded-md border-2 border-muted bg-popover p-2 sm:p-4 text-center hover:bg-accent peer-data-[state=checked]:border-primary text-sm">
                                 🏗️ Baustelle
                               </Label>
                             </div>
                             <div>
                               <RadioGroupItem value="werkstatt" id={`werkstatt-${block.id}`} className="peer sr-only" />
-                              <Label htmlFor={`werkstatt-${block.id}`} className="flex h-12 cursor-pointer items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent peer-data-[state=checked]:border-primary text-sm">
+                              <Label htmlFor={`werkstatt-${block.id}`} className="flex h-12 cursor-pointer items-center justify-center rounded-md border-2 border-muted bg-popover p-2 sm:p-4 text-center hover:bg-accent peer-data-[state=checked]:border-primary text-sm">
                                 🔧 Werkstatt
                               </Label>
                             </div>
@@ -1211,10 +1205,11 @@ const TimeTracking = () => {
                                 }
                               }}
                             >
-                              <SelectTrigger><SelectValue placeholder="Projekt auswählen" /></SelectTrigger>
-                              <SelectContent>
+                              <SelectTrigger className="w-full min-w-0"><SelectValue placeholder="Projekt auswählen" /></SelectTrigger>
+                              {/* Popup nie breiter als der Bildschirm (lange Projektnamen am Handy) */}
+                              <SelectContent className="max-w-[calc(100vw-2rem)]">
                                 {projects.map((p) => (
-                                  <SelectItem key={p.id} value={p.id}>{projectLabel(p)}</SelectItem>
+                                  <SelectItem key={p.id} value={p.id} className="break-words">{projectLabel(p)}</SelectItem>
                                 ))}
                                 <SelectItem value="new" className="text-primary font-semibold">
                                   <div className="flex items-center gap-2"><Plus className="w-4 h-4" />Neues Projekt erstellen</div>
@@ -1245,13 +1240,13 @@ const TimeTracking = () => {
                           />
                         </div>
 
-                        {/* Nachtrag zum Projekt */}
+                        {/* Nachtrag zum Projekt — h-auto + whitespace-normal, damit der lange Text am Handy umbricht statt überzulaufen */}
                         {block.projectId && (
                           <Button
                             type="button"
                             variant="outline"
                             size="sm"
-                            className="w-full gap-2"
+                            className="w-full gap-2 h-auto min-h-10 py-2 whitespace-normal text-xs sm:text-sm leading-tight"
                             onClick={() => {
                               setNachtragProjectId(block.projectId);
                               setShowNachtragDialog(true);
@@ -1318,7 +1313,7 @@ const TimeTracking = () => {
                               });
                             }
                           }}
-                          className="w-full text-xs"
+                          className="w-full text-xs h-10 sm:h-9"
                         >
                           <Sun className="w-3 h-3 mr-1" />
                           Regelarbeitszeit einfüllen
@@ -1337,9 +1332,9 @@ const TimeTracking = () => {
                         </div>
 
                         {/* Block hours */}
-                        <div className="bg-muted/50 rounded px-3 py-2 flex items-center justify-between text-sm">
+                        <div className="bg-muted/50 rounded px-3 py-2 flex items-center justify-between gap-2 text-sm">
                           <span>Stunden</span>
-                          <span className="font-bold">{calculateBlockHours(block).toFixed(2)} h</span>
+                          <span className="font-bold shrink-0">{calculateBlockHours(block).toFixed(2)} h</span>
                         </div>
                       </div>
                     ))}
@@ -1350,16 +1345,16 @@ const TimeTracking = () => {
                     type="button" 
                     variant="outline" 
                     onClick={addTimeBlock}
-                    className="w-full gap-2 border-dashed"
+                    className="w-full gap-2 border-dashed h-auto min-h-10 py-2 whitespace-normal leading-tight"
                   >
                     <Plus className="w-4 h-4" />
                     Weitere Stunden hinzufügen
                   </Button>
 
                   {/* Total hours */}
-                  <div className="bg-primary/10 border border-primary/30 rounded-lg p-4 flex items-center justify-between">
+                  <div className="bg-primary/10 border border-primary/30 rounded-lg p-3 sm:p-4 flex items-center justify-between gap-2">
                     <span className="font-medium">Gesamt zu buchen</span>
-                    <span className="text-2xl font-bold">{calculateTotalHours()} h</span>
+                    <span className="text-xl sm:text-2xl font-bold shrink-0">{calculateTotalHours()} h</span>
                   </div>
 
                   <Button type="submit" className="w-full" disabled={saving}>
@@ -1373,7 +1368,7 @@ const TimeTracking = () => {
 
         {/* New Project Dialog */}
         <Dialog open={showNewProjectDialog} onOpenChange={setShowNewProjectDialog}>
-          <DialogContent>
+          <DialogContent className="max-w-sm sm:max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Neues Projekt erstellen</DialogTitle>
               <DialogDescription>Geben Sie die Details ein.</DialogDescription>
@@ -1383,11 +1378,12 @@ const TimeTracking = () => {
               <div>
                 <Label>Kunde</Label>
                 <Select value={selectedNewProjectCustomerId} onValueChange={setSelectedNewProjectCustomerId}>
-                  <SelectTrigger><SelectValue placeholder="Kunde auswählen" /></SelectTrigger>
-                  <SelectContent>
+                  <SelectTrigger className="w-full min-w-0"><SelectValue placeholder="Kunde auswählen" /></SelectTrigger>
+                  {/* Popup nie breiter als der Bildschirm (lange Kunden-/Adresstexte am Handy) */}
+                  <SelectContent className="max-w-[calc(100vw-2rem)]">
                     <SelectItem value="none">— Kein Kunde —</SelectItem>
                     {newProjectCustomers.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
+                      <SelectItem key={c.id} value={c.id} className="break-words">
                         {customerDisplayName(c)}{customerAddress(c) ? ` (${customerAddress(c)})` : ""}
                       </SelectItem>
                     ))}
@@ -1406,8 +1402,8 @@ const TimeTracking = () => {
               <div>
                 <Label htmlFor="new-project-status">Ampel-Status</Label>
                 <Select value={newProjectStatusId} onValueChange={setNewProjectStatusId}>
-                  <SelectTrigger id="new-project-status"><SelectValue placeholder="Status wählen" /></SelectTrigger>
-                  <SelectContent>
+                  <SelectTrigger id="new-project-status" className="w-full min-w-0"><SelectValue placeholder="Status wählen" /></SelectTrigger>
+                  <SelectContent className="max-w-[calc(100vw-2rem)]">
                     <SelectItem value="none">
                       <span className="flex items-center gap-2">
                         <span className="h-3 w-3 rounded-full border-2 border-muted-foreground/50 shrink-0" />
@@ -1425,7 +1421,7 @@ const TimeTracking = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex gap-2 justify-end">
+              <div className="flex flex-wrap gap-2 justify-end">
                 <Button
                   variant="outline"
                   onClick={() => {
@@ -1452,7 +1448,7 @@ const TimeTracking = () => {
 
         {/* Absence Dialog */}
         <Dialog open={showAbsenceDialog} onOpenChange={setShowAbsenceDialog}>
-          <DialogContent>
+          <DialogContent className="max-w-sm sm:max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Abwesenheit erfassen</DialogTitle>
               <DialogDescription>Erfassen Sie Urlaub, Krankenstand, ZA, Weiterbildung oder Feiertag</DialogDescription>
@@ -1473,13 +1469,13 @@ const TimeTracking = () => {
                 <RadioGroup 
                   value={absenceData.type} 
                   onValueChange={(value: "urlaub" | "krankenstand" | "weiterbildung" | "feiertag" | "za") => setAbsenceData({ ...absenceData, type: value })}
-                  className="grid grid-cols-3 gap-2 mt-2"
+                  className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2"
                 >
                   <div>
                     <RadioGroupItem value="urlaub" id="urlaub" className="peer sr-only" />
                     <Label 
                       htmlFor="urlaub" 
-                      className="flex h-14 cursor-pointer items-center justify-center rounded-md border-2 border-muted bg-popover p-2 hover:bg-accent peer-data-[state=checked]:border-primary text-sm"
+                      className="flex h-14 cursor-pointer items-center justify-center rounded-md border-2 border-muted bg-popover p-2 text-center leading-tight hover:bg-accent peer-data-[state=checked]:border-primary text-xs sm:text-sm"
                     >
                       🏖️ Urlaub
                     </Label>
@@ -1488,7 +1484,7 @@ const TimeTracking = () => {
                     <RadioGroupItem value="krankenstand" id="krankenstand" className="peer sr-only" />
                     <Label 
                       htmlFor="krankenstand" 
-                      className="flex h-14 cursor-pointer items-center justify-center rounded-md border-2 border-muted bg-popover p-2 hover:bg-accent peer-data-[state=checked]:border-primary text-sm"
+                      className="flex h-14 cursor-pointer items-center justify-center rounded-md border-2 border-muted bg-popover p-2 text-center leading-tight hover:bg-accent peer-data-[state=checked]:border-primary text-xs sm:text-sm"
                     >
                       🏥 Kranken.
                     </Label>
@@ -1497,7 +1493,7 @@ const TimeTracking = () => {
                     <RadioGroupItem value="za" id="za" className="peer sr-only" />
                     <Label 
                       htmlFor="za" 
-                      className="flex h-14 cursor-pointer items-center justify-center rounded-md border-2 border-muted bg-popover p-2 hover:bg-accent peer-data-[state=checked]:border-primary text-sm"
+                      className="flex h-14 cursor-pointer items-center justify-center rounded-md border-2 border-muted bg-popover p-2 text-center leading-tight hover:bg-accent peer-data-[state=checked]:border-primary text-xs sm:text-sm"
                     >
                       ⏰ ZA
                     </Label>
@@ -1506,7 +1502,7 @@ const TimeTracking = () => {
                     <RadioGroupItem value="weiterbildung" id="weiterbildung" className="peer sr-only" />
                     <Label 
                       htmlFor="weiterbildung" 
-                      className="flex h-14 cursor-pointer items-center justify-center rounded-md border-2 border-muted bg-popover p-2 hover:bg-accent peer-data-[state=checked]:border-primary text-sm"
+                      className="flex h-14 cursor-pointer items-center justify-center rounded-md border-2 border-muted bg-popover p-2 text-center leading-tight hover:bg-accent peer-data-[state=checked]:border-primary text-xs sm:text-sm"
                     >
                       📚 Weiterbild.
                     </Label>
@@ -1515,7 +1511,7 @@ const TimeTracking = () => {
                     <RadioGroupItem value="feiertag" id="feiertag" className="peer sr-only" />
                     <Label 
                       htmlFor="feiertag" 
-                      className="flex h-14 cursor-pointer items-center justify-center rounded-md border-2 border-muted bg-popover p-2 hover:bg-accent peer-data-[state=checked]:border-primary text-sm"
+                      className="flex h-14 cursor-pointer items-center justify-center rounded-md border-2 border-muted bg-popover p-2 text-center leading-tight hover:bg-accent peer-data-[state=checked]:border-primary text-xs sm:text-sm"
                     >
                       🎉 Feiertag
                     </Label>
@@ -1545,10 +1541,10 @@ const TimeTracking = () => {
 
               {absenceData.isFullDay ? (
                 /* Full day: show calculated hours with optional override */
-                <div className="bg-muted/50 rounded-lg p-4 space-y-3">
-                  <div className="flex items-center justify-between">
+                <div className="bg-muted/50 rounded-lg p-3 sm:p-4 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-sm text-muted-foreground">Berechnete Stunden für diesen Tag:</span>
-                    <Badge variant="secondary" className="text-lg font-bold px-3 py-1">
+                    <Badge variant="secondary" className="text-base sm:text-lg font-bold px-3 py-1 shrink-0">
                       {absenceData.customHours || getNormalWorkingHours(new Date(absenceData.date))} h
                     </Badge>
                   </div>
@@ -1563,7 +1559,7 @@ const TimeTracking = () => {
                   </div>
                   <div className="pt-2 border-t">
                     <Label className="text-sm">Stunden anpassen (optional)</Label>
-                    <div className="flex items-center gap-2 mt-1">
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
                       <Input
                         type="number"
                         step="0.5"
@@ -1581,6 +1577,7 @@ const TimeTracking = () => {
                           variant="ghost" 
                           size="sm"
                           onClick={() => setAbsenceData({ ...absenceData, customHours: "" })}
+                          className="h-10 sm:h-9"
                         >
                           Zurücksetzen
                         </Button>
@@ -1590,7 +1587,7 @@ const TimeTracking = () => {
                 </div>
               ) : (
                 /* Partial day: Von/Bis time inputs */
-                <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                <div className="bg-muted/50 rounded-lg p-3 sm:p-4 space-y-3">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <Label>Von</Label>
@@ -1634,9 +1631,9 @@ const TimeTracking = () => {
                       className="w-24"
                     />
                   </div>
-                  <div className="flex items-center justify-between pt-2 border-t">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t">
                     <span className="text-sm text-muted-foreground">Berechnete Stunden:</span>
-                    <Badge variant="secondary" className="text-lg font-bold px-3 py-1">
+                    <Badge variant="secondary" className="text-base sm:text-lg font-bold px-3 py-1 shrink-0">
                       {(() => {
                         const [sH, sM] = absenceData.absenceStartTime.split(':').map(Number);
                         const [eH, eM] = absenceData.absenceEndTime.split(':').map(Number);
@@ -1662,9 +1659,9 @@ const TimeTracking = () => {
                 </div>
               )}
 
-              <div className="flex gap-2 justify-end">
-                <Button 
-                  variant="outline" 
+              <div className="flex flex-wrap gap-2 justify-end">
+                <Button
+                  variant="outline"
                   onClick={() => {
                     setShowAbsenceDialog(false);
                     setAbsenceData({ date: new Date().toISOString().split('T')[0], type: "urlaub", document: null, customHours: "", isFullDay: true, absenceStartTime: "07:00", absenceEndTime: "16:00", absencePauseMinutes: "30" });

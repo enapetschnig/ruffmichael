@@ -344,9 +344,9 @@ const Customers = () => {
 
       <main className="container mx-auto px-3 sm:px-4 lg:px-6 py-6 max-w-4xl space-y-4">
         <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-2xl font-bold flex items-center gap-2">
-              <Users className="h-6 w-6 text-primary" />
+          <div className="min-w-0">
+            <h2 className="text-xl sm:text-2xl font-bold flex items-center gap-2 flex-wrap">
+              <Users className="h-5 w-5 sm:h-6 sm:w-6 text-primary shrink-0" />
               Kunden
               <Badge variant="secondary">{customers.length}</Badge>
             </h2>
@@ -354,7 +354,7 @@ const Customers = () => {
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={openCreate} className="gap-2">
+              <Button onClick={openCreate} className="gap-2 shrink-0">
                 <Plus className="h-4 w-4" />
                 <span className="hidden sm:inline">Neuer Kunde</span>
               </Button>
@@ -397,9 +397,10 @@ const Customers = () => {
               <Card key={c.id}>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 space-y-1">
+                    <div className="min-w-0 flex-1 space-y-1">
                       <div className="font-semibold text-base flex items-center gap-2 flex-wrap">
-                        <span>{customerDisplayName(c) || "(ohne Name)"}</span>
+                        {/* min-w-0 + break-words: lange Firmennamen brechen um, statt die Seite breiter zu machen */}
+                        <span className="min-w-0 break-words">{customerDisplayName(c) || "(ohne Name)"}</span>
                         {/* Kundennummer aus der Faktura-Software (nur wenn vorhanden) */}
                         {c.kundennr && (
                           <span className="text-xs font-normal text-muted-foreground bg-muted rounded px-1.5 py-0.5">
@@ -410,29 +411,35 @@ const Customers = () => {
                       {customerAddress(c) && (
                         <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                           <MapPin className="h-3.5 w-3.5 shrink-0" />
-                          {customerAddress(c)}
+                          <span className="min-w-0 break-words">{customerAddress(c)}</span>
                         </div>
                       )}
                       {(c.liefer_strasse || c.liefer_ort) && (
                         <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                           <Truck className="h-3.5 w-3.5 shrink-0" />
-                          Lieferadresse: {[c.liefer_strasse, c.liefer_ort].filter(Boolean).join(", ")}
+                          <span className="min-w-0 break-words">
+                            Lieferadresse: {[c.liefer_strasse, c.liefer_ort].filter(Boolean).join(", ")}
+                          </span>
                         </div>
                       )}
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground pt-1">
                         {c.telefon && (
-                          <a href={`tel:${c.telefon}`} className="flex items-center gap-1.5 hover:text-primary">
-                            <Phone className="h-3.5 w-3.5" /> {c.telefon}
+                          <a href={`tel:${c.telefon}`} className="flex items-center gap-1.5 hover:text-primary min-w-0 max-w-full py-0.5">
+                            <Phone className="h-3.5 w-3.5 shrink-0" />
+                            <span className="break-all">{c.telefon}</span>
                           </a>
                         )}
                         {c.mobil && (
-                          <a href={`tel:${c.mobil}`} className="flex items-center gap-1.5 hover:text-primary">
-                            <Smartphone className="h-3.5 w-3.5" /> {c.mobil}
+                          <a href={`tel:${c.mobil}`} className="flex items-center gap-1.5 hover:text-primary min-w-0 max-w-full py-0.5">
+                            <Smartphone className="h-3.5 w-3.5 shrink-0" />
+                            <span className="break-all">{c.mobil}</span>
                           </a>
                         )}
                         {c.email && (
-                          <a href={`mailto:${c.email}`} className="flex items-center gap-1.5 hover:text-primary">
-                            <Mail className="h-3.5 w-3.5" /> {c.email}
+                          // break-all: lange Mail-Adressen brechen mitten im Wort um (sonst Seiten-Überlauf)
+                          <a href={`mailto:${c.email}`} className="flex items-center gap-1.5 hover:text-primary min-w-0 max-w-full py-0.5">
+                            <Mail className="h-3.5 w-3.5 shrink-0" />
+                            <span className="break-all">{c.email}</span>
                           </a>
                         )}
                       </div>

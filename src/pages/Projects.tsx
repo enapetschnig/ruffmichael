@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CustomerFormFields, customerFormToRow, customerAddress, customerDisplayName, type Customer } from "./Customers";
 import { enqueue } from "@/lib/offlineQueue";
 import { newId, saveInsert, saveUpload, saveUpdate, saveInvoke, isOffline } from "@/lib/offlineData";
+import { STANDARD_PROJECT_FOLDERS } from "@/lib/projectFolders";
 import { getSessionUser } from "@/lib/auth";
 import { projectAddress } from "@/lib/projectLabel";
 import { ProjectEditDialog } from "@/components/ProjectEditDialog";
@@ -70,15 +71,6 @@ const toStorageKey = (name: string): string =>
     .replace(/Ä/g, "Ae").replace(/Ö/g, "Oe").replace(/Ü/g, "Ue")
     .replace(/ß/g, "ss")
     .replace(/[^a-zA-Z0-9._ ()-]/g, "_");
-
-// Standardordner für neue Projekte (lt. Vorlage der Firma, ohne Vorlagen-Ordner)
-const STANDARD_PROJECT_FOLDERS = [
-  "Abnahme Protokoll",
-  "Beschreibung",
-  "Foto",
-  "Hydraulik",
-  "Programmierung",
-];
 
 const emptyCustomerForm = {
   vorname: "",
@@ -538,9 +530,13 @@ const Projects = () => {
   // Echte Ampel vor dem Projektnamen: alle Farben nebeneinander,
   // ein Klick auf eine Farbe setzt den Status direkt.
   // Klick auf die aktive Farbe entfernt den Status wieder.
+  // Darstellung am Handy: Die Ampel bekommt eine eigene Zeile (basis-full), damit der
+  // Projektname daneben nicht auf ein paar Pixel zusammengedrückt wird. Bei vielen
+  // Status umbrechen die Punkte innerhalb der Ampel, statt die Karte breiter als den
+  // Bildschirm zu machen.
   const renderAmpel = (project: Project) => (
     <span
-      className="flex items-center gap-1 shrink-0 rounded-full border bg-background/90 px-1.5 py-1"
+      className="flex flex-wrap items-center gap-1 shrink-0 basis-full sm:basis-auto max-w-full rounded-full border bg-background/90 px-1.5 py-1"
       onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
       onPointerDown={(e) => e.stopPropagation()}
     >
@@ -559,7 +555,7 @@ const Projects = () => {
               e.preventDefault();
               handleSetProjectAmpel(project.id, active ? null : s.id);
             }}
-            className="flex items-center justify-center h-9 w-9 rounded-full transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-muted"
+            className="flex shrink-0 items-center justify-center h-9 w-9 rounded-full transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-muted"
           >
             <span
               className={
@@ -899,7 +895,8 @@ const Projects = () => {
                           <SelectTrigger>
                             <SelectValue placeholder="Kunde auswählen" />
                           </SelectTrigger>
-                          <SelectContent>
+                          {/* Kundenname + Adresse werden schnell lang: Liste nie breiter als der Bildschirm */}
+                          <SelectContent className="max-w-[calc(100vw-2rem)]">
                             <SelectItem value="none">— Kein Kunde —</SelectItem>
                             {customers.map((c) => (
                               <SelectItem key={c.id} value={c.id}>
@@ -972,7 +969,7 @@ const Projects = () => {
                       <SelectTrigger id="projekt-status">
                         <SelectValue placeholder="Status wählen" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="max-w-[calc(100vw-2rem)]">
                         <SelectItem value="none">
                           <span className="flex items-center gap-2">
                             <span className="h-3 w-3 rounded-full border-2 border-muted-foreground/50 shrink-0" />
@@ -1039,7 +1036,7 @@ const Projects = () => {
                     type="button"
                     variant="outline"
                     size="sm"
-                    className={`h-8 rounded-full gap-2 ${selected ? 'hover:opacity-90' : ''}`}
+                    className={`h-8 max-w-full rounded-full gap-2 ${selected ? 'hover:opacity-90' : ''}`}
                     style={selected ? { backgroundColor: s.color, borderColor: s.color, color: '#ffffff' } : undefined}
                     onClick={() => setStatusFilter(selected ? null : s.id)}
                     title={s.name}
@@ -1048,8 +1045,9 @@ const Projects = () => {
                       className="h-3 w-3 rounded-full shrink-0"
                       style={{ backgroundColor: selected ? '#ffffff' : s.color }}
                     />
-                    {s.name}
-                    <span className={selected ? 'text-white/80' : 'text-muted-foreground'}>({count})</span>
+                    {/* Buttons brechen Text nie um: langer Statusname wird abgekürzt statt die Seite zu verbreitern */}
+                    <span className="truncate">{s.name}</span>
+                    <span className={`shrink-0 ${selected ? 'text-white/80' : 'text-muted-foreground'}`}>({count})</span>
                   </Button>
                 );
               })}
@@ -1069,7 +1067,7 @@ const Projects = () => {
             </div>
           </div>
 
-          <div className="grid gap-3 sm:gap-4 lg:gap-6">
+          <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:gap-6">
             {projects
               .filter((project) => {
                 if (project.status !== 'aktiv') return false;
@@ -1091,9 +1089,9 @@ const Projects = () => {
               onClick={() => navigate(`/projects/${project.id}`)}
 
             >
-              <CardHeader className="bg-primary/5 pb-3 sm:pb-4" style={ampelHeaderStyle(project)}>
+              <CardHeader className="bg-primary/5 p-4 pb-3 sm:p-6 sm:pb-4" style={ampelHeaderStyle(project)}>
                 <div className="flex flex-col sm:flex-row sm:justify-between gap-3">
-                  <div className="flex gap-2 sm:gap-3">
+                  <div className="flex gap-2 sm:gap-3 min-w-0">
                     <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
                       {project.status === "geschlossen" ? (
                         <Lock className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -1102,7 +1100,7 @@ const Projects = () => {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <CardTitle className="text-base sm:text-xl flex items-center gap-2 min-w-0">
+                      <CardTitle className="text-base sm:text-xl flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
                         {renderAmpel(project)}
                         <span className="truncate">
                           {project.name}
@@ -1126,14 +1124,14 @@ const Projects = () => {
                   </Badge>
                 </div>
               </CardHeader>
-              <CardContent className="pt-4 sm:pt-6">
+              <CardContent className="p-4 sm:p-6">
                 {project.beschreibung && (
                   <p className="text-xs sm:text-sm text-muted-foreground mb-4 line-clamp-2">
                     {project.beschreibung}
                   </p>
                 )}
                 
-                <div className={`grid ${isAdmin ? 'grid-cols-3 sm:grid-cols-6' : 'grid-cols-2 sm:grid-cols-5'} gap-2 sm:gap-3 mb-4`}>
+                <div className={`grid ${isAdmin ? 'grid-cols-3 sm:grid-cols-6' : 'grid-cols-3 sm:grid-cols-5'} gap-2 sm:gap-3 mb-4`}>
                   <div className="flex flex-col items-center gap-1 p-2">
                     <FileText className="w-5 h-5 text-primary" />
                     <span className="text-xs font-medium">Pläne</span>
@@ -1185,7 +1183,7 @@ const Projects = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="w-full gap-2 mt-3"
+                      className="w-full gap-2 mt-3 h-10 sm:h-9"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <Upload className="w-4 h-4" />
@@ -1239,7 +1237,7 @@ const Projects = () => {
                   <p className="text-xs text-muted-foreground">
                     Aktualisiert: {formatDate(project.updated_at)}
                   </p>
-                  <div className="flex items-center gap-2 self-end sm:self-auto">
+                  <div className="flex flex-wrap items-center justify-end gap-2 self-end sm:self-auto">
                     <Button
                       variant="outline"
                       size="sm"
@@ -1301,7 +1299,7 @@ const Projects = () => {
             </div>
 
             <CollapsibleContent>
-              <div className="grid gap-3 sm:gap-4 lg:gap-6">
+              <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:gap-6">
                 {projects
                   .filter((project) => project.status === 'geschlossen')
                   .map((project) => (
@@ -1311,14 +1309,14 @@ const Projects = () => {
                     style={ampelCardStyle(project)}
                     onClick={() => navigate(`/projects/${project.id}`)}
                   >
-                    <CardHeader className="bg-primary/5 pb-3 sm:pb-4" style={ampelHeaderStyle(project)}>
+                    <CardHeader className="bg-primary/5 p-4 pb-3 sm:p-6 sm:pb-4" style={ampelHeaderStyle(project)}>
                       <div className="flex flex-col sm:flex-row sm:justify-between gap-3">
-                        <div className="flex gap-2 sm:gap-3">
+                        <div className="flex gap-2 sm:gap-3 min-w-0">
                           <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
                             <Lock className="w-5 h-5 sm:w-6 sm:h-6" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <CardTitle className="text-base sm:text-xl flex items-center gap-2 min-w-0">
+                            <CardTitle className="text-base sm:text-xl flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
                               {renderAmpel(project)}
                               <span className="truncate">
                                 {project.name}
@@ -1339,14 +1337,14 @@ const Projects = () => {
                         </Badge>
                       </div>
                     </CardHeader>
-                    <CardContent className="pt-4 sm:pt-6">
+                    <CardContent className="p-4 sm:p-6">
                       {project.beschreibung && (
                         <p className="text-xs sm:text-sm text-muted-foreground mb-4 line-clamp-2">
                           {project.beschreibung}
                         </p>
                       )}
                       
-                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3 mb-4">
+                      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3 mb-4">
                         <div className="flex flex-col items-center gap-1 p-2">
                           <FileText className="w-5 h-5 text-primary" />
                           <span className="text-xs font-medium">Pläne</span>
@@ -1392,7 +1390,7 @@ const Projects = () => {
                           Aktualisiert: {formatDate(project.updated_at)}
                         </p>
                         {isAdmin && (
-                          <div className="flex gap-2 self-end sm:self-auto">
+                          <div className="flex flex-wrap justify-end gap-2 self-end sm:self-auto">
                             <Button
                               variant="default"
                               size="sm"
@@ -1463,7 +1461,7 @@ const Projects = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Projekt schließen?</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogDescription className="break-words">
               Bist du sicher, dass du das Projekt <strong>{projectToClose?.name}</strong> schließen möchtest?
               <br /><br />
               Das Projekt wird als "Geschlossen" markiert und kann später wieder geöffnet werden.
@@ -1483,10 +1481,10 @@ const Projects = () => {
 
       {/* AlertDialog für Projekt löschen */}
       <AlertDialog open={!!projectToDelete} onOpenChange={(open) => !open && setProjectToDelete(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-h-[90vh] overflow-y-auto">
           <AlertDialogHeader>
             <AlertDialogTitle>Projekt endgültig löschen?</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogDescription className="break-words">
               Bist du sicher, dass du das Projekt <strong>{projectToDelete?.name}</strong> unwiderruflich löschen möchtest?
               <br /><br />
               <span className="text-destructive font-semibold">Alle zugehörigen Dateien, Dokumente und Ordner des Projekts werden ebenfalls gelöscht.</span>
@@ -1545,7 +1543,7 @@ const Projects = () => {
                       )
                     }
                     placeholder="Statusname"
-                    className="flex-1"
+                    className="flex-1 min-w-0"
                   />
                   <Button
                     type="button"
@@ -1604,7 +1602,7 @@ const Projects = () => {
                   value={newStatusForm.name}
                   onChange={(e) => setNewStatusForm({ ...newStatusForm, name: e.target.value })}
                   placeholder="z.B. In Bearbeitung"
-                  className="flex-1"
+                  className="flex-1 min-w-0"
                 />
               </div>
               <Button
@@ -1626,7 +1624,7 @@ const Projects = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Status löschen?</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogDescription className="break-words">
               Bist du sicher, dass du den Status <strong>{statusToDelete?.name}</strong> löschen möchtest?
               <br /><br />
               Projekte mit diesem Status bleiben erhalten – ihr Status wird lediglich auf "Kein Status" zurückgesetzt.

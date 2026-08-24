@@ -36,20 +36,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { getSessionUser } from "@/lib/auth";
 import { newId, isOffline, saveInsert, saveUpload, saveInvoke } from "@/lib/offlineData";
+import { STANDARD_PROJECT_FOLDERS } from "@/lib/projectFolders";
 import { fetchCustomersCached } from "@/lib/cachedQueries";
 import { cachedSelect } from "@/lib/offlineStore";
 
 // WICHTIG: Diese Komponente wird von Mitarbeitern und Kunden gesehen.
 // Es dürfen hier NIEMALS Preise geladen oder angezeigt werden.
-
-// Standardordner für neue Projekte (identisch zu Projects.tsx)
-const STANDARD_PROJECT_FOLDERS = [
-  "Abnahme Protokoll",
-  "Beschreibung",
-  "Foto",
-  "Hydraulik",
-  "Programmierung",
-];
 
 const emptyCustomerForm = {
   vorname: "",
@@ -602,10 +594,10 @@ export function ErstaufnahmeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-[calc(100vw-1.5rem)] sm:max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+        <DialogHeader className="pr-8">
           <DialogTitle className="flex items-center gap-2">
-            <ClipboardList className="h-5 w-5" />
+            <ClipboardList className="h-5 w-5 shrink-0" />
             Erstaufnahme
           </DialogTitle>
           <DialogDescription>
@@ -627,7 +619,8 @@ export function ErstaufnahmeDialog({
             <Label>Kunde *</Label>
             {newCustomerMode ? (
               <div className="rounded-lg border p-3 space-y-3">
-                <div className="flex items-center justify-between gap-2">
+                {/* flex-wrap: am Handy rutscht der lange Button-Text in die nächste Zeile */}
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-sm font-medium">Neuer Kunde</span>
                   <Button
                     type="button"
@@ -646,9 +639,10 @@ export function ErstaufnahmeDialog({
                   <SelectTrigger>
                     <SelectValue placeholder="Kunde auswählen" />
                   </SelectTrigger>
-                  <SelectContent>
+                  {/* Lange Namen/Adressen dürfen die Liste nicht über den Bildschirmrand ziehen */}
+                  <SelectContent className="max-w-[calc(100vw-2rem)]">
                     {customers.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
+                      <SelectItem key={c.id} value={c.id} className="break-words">
                         {customerDisplayName(c)}
                         {customerAddress(c) ? ` (${customerAddress(c)})` : ""}
                       </SelectItem>
@@ -707,11 +701,11 @@ export function ErstaufnahmeDialog({
                       id={`erstaufnahme-check-${item.id}`}
                       checked={st.erledigt}
                       onCheckedChange={(v) => setEntry(item.id, { erledigt: v === true })}
-                      className="mt-0.5"
+                      className="mt-0.5 shrink-0"
                     />
                     <Label
                       htmlFor={`erstaufnahme-check-${item.id}`}
-                      className="text-sm font-normal leading-snug cursor-pointer"
+                      className="text-sm font-normal leading-snug cursor-pointer min-w-0 break-words"
                     >
                       {item.text}
                     </Label>
@@ -720,7 +714,7 @@ export function ErstaufnahmeDialog({
                     value={st.bemerkung}
                     onChange={(e) => setEntry(item.id, { bemerkung: e.target.value })}
                     placeholder="Bemerkung"
-                    className="h-8 text-sm"
+                    className="h-9 sm:h-8 text-sm"
                   />
                 </div>
               );
@@ -749,12 +743,13 @@ export function ErstaufnahmeDialog({
                       value={item.text}
                       onChange={(e) => updateItemLocal(item.id, { text: e.target.value })}
                       onBlur={() => persistItemText(checklistItems.find((i) => i.id === item.id) ?? item)}
-                      className="h-8 text-sm flex-1 min-w-0"
+                      className="h-9 sm:h-8 text-sm flex-1 min-w-0"
                     />
                     <Switch
                       checked={item.is_active}
                       onCheckedChange={(v) => toggleItemActive(item, v)}
                       title={item.is_active ? "Aktiv" : "Inaktiv"}
+                      className="shrink-0"
                     />
                   </div>
                 ))}
@@ -769,7 +764,7 @@ export function ErstaufnahmeDialog({
                       }
                     }}
                     placeholder="Neuer Checklisten-Punkt"
-                    className="h-8 text-sm flex-1 min-w-0"
+                    className="h-9 sm:h-8 text-sm flex-1 min-w-0"
                   />
                   <Button
                     type="button"

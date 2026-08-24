@@ -349,9 +349,9 @@ const MaterialCatalog = () => {
 
       <main className="container mx-auto px-3 sm:px-4 lg:px-6 py-6 max-w-4xl space-y-4">
         <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-2xl font-bold flex items-center gap-2">
-              <Package className="h-6 w-6 text-primary" />
+          <div className="min-w-0">
+            <h2 className="text-xl sm:text-2xl font-bold flex items-center gap-2 flex-wrap">
+              <Package className="h-5 w-5 sm:h-6 sm:w-6 text-primary shrink-0" />
               Materialien
               <Badge variant="secondary">{materials.length}</Badge>
             </h2>
@@ -364,7 +364,7 @@ const MaterialCatalog = () => {
           {isAdmin && (
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
-                <Button onClick={openCreate} className="gap-2">
+                <Button onClick={openCreate} className="gap-2 shrink-0">
                   <Plus className="h-4 w-4" />
                   <span className="hidden sm:inline">Neues Material</span>
                 </Button>
@@ -485,8 +485,9 @@ const MaterialCatalog = () => {
             {grouped.map(([kategorie, items]) => (
               <section key={kategorie}>
                 <div className="sticky top-[60px] sm:top-[72px] z-10 bg-background/95 backdrop-blur py-2">
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-                    {kategorie}
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2 flex-wrap">
+                    {/* Lange Kategorienamen dürfen umbrechen, statt die Seite zu verbreitern */}
+                    <span className="min-w-0 break-words">{kategorie}</span>
                     <Badge variant="outline">{items.length}</Badge>
                   </h3>
                 </div>

@@ -108,7 +108,9 @@ export const SignaturePad = ({
           ref={canvasRef}
           width={width}
           height={height}
-          className="w-full touch-none cursor-crosshair"
+          // block + max-w-full: Canvas skaliert am Handy mit dem Container mit
+          // und kann nie breiter werden als der Dialog (kein Querscrollen).
+          className="block w-full max-w-full touch-none cursor-crosshair"
           style={{ maxHeight: `${height}px` }}
           onMouseDown={startDrawing}
           onMouseMove={draw}
@@ -119,7 +121,7 @@ export const SignaturePad = ({
           onTouchEnd={stopDrawing}
         />
       </div>
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap justify-between items-center gap-2">
         <p className="text-xs text-muted-foreground">
           Bitte hier unterschreiben
         </p>
@@ -128,7 +130,7 @@ export const SignaturePad = ({
           variant="outline"
           size="sm"
           onClick={clearSignature}
-          className="gap-1"
+          className="gap-1 h-10 sm:h-9"
         >
           <Eraser className="h-4 w-4" />
           Löschen

@@ -277,8 +277,8 @@ export const SignatureDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
+          <DialogTitle className="flex items-center gap-2 pr-6">
+            <FileText className="h-5 w-5 shrink-0" />
             Regiebericht zur Unterschrift
           </DialogTitle>
           <DialogDescription>
@@ -314,7 +314,8 @@ export const SignatureDialog = ({
                   Kundendaten
                 </CardTitle>
               </CardHeader>
-              <CardContent className="text-sm space-y-1">
+              {/* break-words: lange E-Mails/Adressen dürfen den Dialog nicht breiter machen */}
+              <CardContent className="text-sm space-y-1 break-words">
                 <p><strong>Name:</strong> {disturbance.kunde_name}</p>
                 {disturbance.kunde_adresse && (
                   <p><strong>Adresse:</strong> {disturbance.kunde_adresse}</p>
@@ -390,8 +391,8 @@ export const SignatureDialog = ({
                   <ul className="text-sm space-y-1">
                     {materials.map((material) => (
                       <li key={material.id} className="flex gap-2">
-                        <span>•</span>
-                        <span>
+                        <span className="shrink-0">•</span>
+                        <span className="min-w-0 break-words">
                           {material.menge && `${material.menge} `}
                           {material.material}
                           {material.notizen && (
@@ -408,7 +409,7 @@ export const SignatureDialog = ({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex justify-end gap-3 pt-4 border-t">
+        <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3 pt-4 border-t">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}

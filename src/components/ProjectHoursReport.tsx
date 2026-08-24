@@ -297,17 +297,19 @@ export default function ProjectHoursReport() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex justify-between items-start">
-          <div>
-            <CardTitle>Projektzeiterfassung</CardTitle>
+        {/* Am Handy untereinander: Titel + Export-Button nebeneinander sprengten
+            sonst die Kartenbreite und die Seite scrollte horizontal. */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start">
+          <div className="min-w-0">
+            <CardTitle className="text-xl sm:text-2xl break-words">Projektzeiterfassung</CardTitle>
             <CardDescription>
               Detaillierte Stunden nach Projekt mit Arbeitszeiten
             </CardDescription>
           </div>
-          <Button 
-            onClick={exportToExcel} 
+          <Button
+            onClick={exportToExcel}
             disabled={!selectedProjectId || projectData.length === 0}
-            className="gap-2"
+            className="gap-2 w-full sm:w-auto shrink-0"
           >
             <Download className="w-4 h-4" />
             Excel exportieren
@@ -359,6 +361,7 @@ export default function ProjectHoursReport() {
               <Button
                 variant="outline"
                 size="sm"
+                className="h-10 sm:h-9"
                 onClick={() => {
                   const now = new Date();
                   setStartDate(new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]);
@@ -370,6 +373,7 @@ export default function ProjectHoursReport() {
               <Button
                 variant="outline"
                 size="sm"
+                className="h-10 sm:h-9"
                 onClick={() => {
                   const now = new Date();
                   const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -382,6 +386,7 @@ export default function ProjectHoursReport() {
               <Button
                 variant="outline"
                 size="sm"
+                className="h-10 sm:h-9"
                 onClick={() => {
                   const now = new Date();
                   const quarterStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3 - 3, 1);
@@ -397,24 +402,24 @@ export default function ProjectHoursReport() {
         </Card>
 
         {selectedProject && (
-          <div className="grid grid-cols-2 gap-4">
-            <Card>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Card className="min-w-0">
               <CardHeader>
-                <CardTitle className="text-lg">Projekt</CardTitle>
+                <CardTitle className="text-base sm:text-lg">Projekt</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-xl font-bold">{selectedProject.name}</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-lg sm:text-xl font-bold break-words">{selectedProject.name}</p>
+                <p className="text-sm text-muted-foreground break-words">
                   {projectAddress(selectedProject) || "Keine Adresse hinterlegt"}
                 </p>
               </CardContent>
             </Card>
-            <Card>
+            <Card className="min-w-0">
               <CardHeader>
-                <CardTitle className="text-lg">Gesamt-Stunden</CardTitle>
+                <CardTitle className="text-base sm:text-lg">Gesamt-Stunden</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-bold">{totalHours.toFixed(2)}</p>
+                <p className="text-2xl sm:text-3xl font-bold">{totalHours.toFixed(2)}</p>
               </CardContent>
             </Card>
           </div>
@@ -426,44 +431,45 @@ export default function ProjectHoursReport() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Datum</TableHead>
-                    <TableHead>Start</TableHead>
-                    <TableHead>Ende</TableHead>
-                    <TableHead>Pause</TableHead>
-                    <TableHead className="text-right">Stunden</TableHead>
-                    <TableHead>Mitarbeiter</TableHead>
-                    <TableHead>Tätigkeit</TableHead>
-                    <TableHead>Ort</TableHead>
+                    <TableHead className="whitespace-nowrap">Datum</TableHead>
+                    <TableHead className="whitespace-nowrap">Start</TableHead>
+                    <TableHead className="whitespace-nowrap">Ende</TableHead>
+                    <TableHead className="whitespace-nowrap">Pause</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">Stunden</TableHead>
+                    <TableHead className="whitespace-nowrap">Mitarbeiter</TableHead>
+                    <TableHead className="whitespace-nowrap">Tätigkeit</TableHead>
+                    <TableHead className="whitespace-nowrap">Ort</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {projectData.map((entry) => (
                     <TableRow key={entry.id}>
-                      <TableCell className="font-medium">
+                      <TableCell className="font-medium whitespace-nowrap">
                         {format(parseISO(entry.datum), "dd.MM.yyyy", { locale: de })}
                       </TableCell>
-                      <TableCell>{formatTime(entry.startTime)}</TableCell>
-                      <TableCell>{formatTime(entry.endTime)}</TableCell>
-                      <TableCell>{formatPause(entry)}</TableCell>
-                      <TableCell className="text-right font-medium">
+                      <TableCell className="whitespace-nowrap">{formatTime(entry.startTime)}</TableCell>
+                      <TableCell className="whitespace-nowrap">{formatTime(entry.endTime)}</TableCell>
+                      <TableCell className="whitespace-nowrap">{formatPause(entry)}</TableCell>
+                      <TableCell className="text-right font-medium whitespace-nowrap">
                         {entry.hours.toFixed(2)}
                       </TableCell>
-                      <TableCell>{entry.employeeName}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="gap-1">
-                          <Briefcase className="w-3 h-3" />
+                      <TableCell className="max-w-[160px] break-words">{entry.employeeName}</TableCell>
+                      {/* Tätigkeit begrenzen: lange Texte machten die Tabelle sonst extrem breit */}
+                      <TableCell className="max-w-[200px]">
+                        <Badge variant="outline" className="gap-1 whitespace-normal break-words text-left">
+                          <Briefcase className="w-3 h-3 shrink-0" />
                           {entry.taetigkeit}
                         </Badge>
                       </TableCell>
                       <TableCell>
                         {entry.locationType === "werkstatt" ? (
-                          <Badge variant="secondary" className="gap-1">
-                            <Wrench className="w-3 h-3" />
+                          <Badge variant="secondary" className="gap-1 whitespace-nowrap">
+                            <Wrench className="w-3 h-3 shrink-0" />
                             Werkstatt
                           </Badge>
                         ) : (
-                          <Badge variant="outline" className="gap-1">
-                            <MapPin className="w-3 h-3" />
+                          <Badge variant="outline" className="gap-1 whitespace-nowrap">
+                            <MapPin className="w-3 h-3 shrink-0" />
                             Baustelle
                           </Badge>
                         )}

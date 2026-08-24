@@ -365,7 +365,7 @@ const MyHours = () => {
               </div>
               <div className="text-sm sm:text-base">
                 <span className="text-muted-foreground">Gesamt: </span>
-                <span className="font-bold text-lg text-primary">{totalHours.toFixed(2)} Std.</span>
+                <span className="font-bold text-base sm:text-lg text-primary">{totalHours.toFixed(2)} Std.</span>
               </div>
             </div>
 
@@ -393,11 +393,14 @@ const MyHours = () => {
                       <TableHead></TableHead>
                       <TableHead></TableHead>
                       <TableHead></TableHead>
-                      <TableHead className="text-center">Beginn</TableHead>
-                      <TableHead className="text-center">Ende</TableHead>
-                      <TableHead className="text-center">von - bis</TableHead>
-                      <TableHead className="text-center">Beginn</TableHead>
-                      <TableHead className="text-center">Ende</TableHead>
+                      <TableHead className="text-center whitespace-nowrap">Beginn</TableHead>
+                      <TableHead className="text-center whitespace-nowrap">Ende</TableHead>
+                      <TableHead className="text-center whitespace-nowrap">von - bis</TableHead>
+                      <TableHead className="text-center whitespace-nowrap">Beginn</TableHead>
+                      <TableHead className="text-center whitespace-nowrap">Ende</TableHead>
+                      {/* Die zweite Kopfzeile hatte eine Spalte zu wenig (10 statt 11),
+                          dadurch verrutschten die Spalten gegenüber der ersten Zeile. */}
+                      <TableHead></TableHead>
                       <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -422,31 +425,35 @@ const MyHours = () => {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell>{entry.projects ? projectLabel(entry.projects) : '-'}</TableCell>
-                        <TableCell>
-                          <div>{entry.taetigkeit}</div>
+                        {/* Projekt/Tätigkeit/Notiz begrenzen, damit lange Texte die
+                            Tabelle am Handy nicht ins Endlose ziehen. */}
+                        <TableCell className="max-w-[200px] break-words">
+                          {entry.projects ? projectLabel(entry.projects) : '-'}
+                        </TableCell>
+                        <TableCell className="max-w-[220px]">
+                          <div className="break-words">{entry.taetigkeit}</div>
                           {entry.notizen && (
-                            <div className="text-xs text-muted-foreground">{entry.notizen}</div>
+                            <div className="text-xs text-muted-foreground break-words">{entry.notizen}</div>
                           )}
                         </TableCell>
-                        <TableCell className="text-center">
+                        <TableCell className="text-center whitespace-nowrap">
                           {entry.start_time?.substring(0, 5) || '-'}
                         </TableCell>
-                        <TableCell className="text-center">
+                        <TableCell className="text-center whitespace-nowrap">
                           {calculateMorningEnd(entry)}
                         </TableCell>
-                        <TableCell className="text-center">
+                        <TableCell className="text-center whitespace-nowrap">
                           {formatPauseTime(entry)}
                         </TableCell>
-                        <TableCell className="text-center">
+                        <TableCell className="text-center whitespace-nowrap">
                           {calculateAfternoonStart(entry)}
                         </TableCell>
-                        <TableCell className="text-center">
-                          {entry.pause_minutes && entry.pause_minutes > 0 
+                        <TableCell className="text-center whitespace-nowrap">
+                          {entry.pause_minutes && entry.pause_minutes > 0
                             ? entry.end_time?.substring(0, 5) || '-'
                             : '-'}
                         </TableCell>
-                        <TableCell className="text-right font-semibold">
+                        <TableCell className="text-right font-semibold whitespace-nowrap">
                           {entry.stunden.toFixed(2)} h
                         </TableCell>
                         <TableCell className="text-right">
@@ -458,7 +465,7 @@ const MyHours = () => {
                               setShowEditDialog(true);
                             }}
                             disabled={!isCurrentMonth(entry.datum)}
-                            className="h-8"
+                            className="h-10 w-10 p-0 sm:h-8 sm:w-8"
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
@@ -468,10 +475,10 @@ const MyHours = () => {
                   </TableBody>
                   <TableFooter>
                     <TableRow>
-                      <TableCell colSpan={10} className="text-right font-semibold">
+                      <TableCell colSpan={10} className="text-right font-semibold whitespace-nowrap">
                         Gesamtstunden:
                       </TableCell>
-                      <TableCell className="text-right font-bold text-lg">
+                      <TableCell className="text-right font-bold text-base sm:text-lg whitespace-nowrap">
                         {totalHours.toFixed(2)} h
                       </TableCell>
                     </TableRow>
@@ -519,7 +526,7 @@ const MyHours = () => {
               {/* Arbeitszeit */}
               <div className="space-y-3 p-4 rounded-lg border bg-muted/30">
                 <h3 className="font-semibold text-sm">Arbeitszeit</h3>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4">
                   <div>
                     <Label htmlFor="edit-start">Beginn</Label>
                     <Input
@@ -539,7 +546,7 @@ const MyHours = () => {
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div>
                     <Label htmlFor="edit-pause">Pause (Minuten)</Label>
                     <Input

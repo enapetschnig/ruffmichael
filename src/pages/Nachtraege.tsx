@@ -420,9 +420,9 @@ const Nachtraege = () => {
 
       <main className="container mx-auto px-3 sm:px-4 lg:px-6 py-6 max-w-4xl space-y-4">
         <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-2xl font-bold flex items-center gap-2">
-              <FileSignature className="h-6 w-6 text-primary" />
+          <div className="min-w-0">
+            <h2 className="text-xl sm:text-2xl font-bold flex flex-wrap items-center gap-2">
+              <FileSignature className="h-5 w-5 sm:h-6 sm:w-6 text-primary shrink-0" />
               Nachträge
               <Badge variant="secondary">{nachtraege.length}</Badge>
             </h2>
@@ -430,7 +430,7 @@ const Nachtraege = () => {
               Zusatzaufträge erfassen und vom Kunden unterschreiben lassen
             </p>
           </div>
-          <Button onClick={openCreate} className="gap-2">
+          <Button onClick={openCreate} className="gap-2 shrink-0">
             <Plus className="h-4 w-4" />
             <span className="hidden sm:inline">Neuer Nachtrag</span>
           </Button>
@@ -480,31 +480,35 @@ const Nachtraege = () => {
                 onClick={() => openDetail(n)}
               >
                 <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 space-y-1">
-                      <div className="font-semibold text-base">{n.titel}</div>
-                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                        <MapPin className="h-3.5 w-3.5 shrink-0" />
-                        <span className="truncate">{projectLabel(n)}</span>
+                  <div className="min-w-0 space-y-1">
+                    {/* Am Handy steht der Status unter dem Titel, ab sm rechts daneben —
+                        sonst bleibt für den Titel neben dem langen Badge kaum Platz. */}
+                    <div className="flex flex-col sm:flex-row items-start sm:justify-between gap-1 sm:gap-3">
+                      <div className="font-semibold text-base break-words min-w-0 w-full sm:w-auto sm:flex-1">
+                        {n.titel}
                       </div>
-                      {n.beschreibung && (
-                        <p className="text-sm text-muted-foreground line-clamp-2 whitespace-pre-wrap">
-                          {n.beschreibung}
-                        </p>
-                      )}
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground pt-1">
-                        <span className="flex items-center gap-1">
-                          <Package className="h-3.5 w-3.5" />
-                          {n.nachtrag_materials.length}{" "}
-                          {n.nachtrag_materials.length === 1 ? "Material" : "Materialien"}
-                        </span>
-                        <span>
-                          Erstellt: {format(new Date(n.created_at), "dd.MM.yyyy", { locale: de })}
-                        </span>
+                      <div className="sm:shrink-0">
+                        <StatusBadge nachtrag={n} />
                       </div>
                     </div>
-                    <div className="shrink-0">
-                      <StatusBadge nachtrag={n} />
+                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <MapPin className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">{projectLabel(n)}</span>
+                    </div>
+                    {n.beschreibung && (
+                      <p className="text-sm text-muted-foreground line-clamp-2 whitespace-pre-wrap break-words">
+                        {n.beschreibung}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground pt-1">
+                      <span className="flex items-center gap-1">
+                        <Package className="h-3.5 w-3.5 shrink-0" />
+                        {n.nachtrag_materials.length}{" "}
+                        {n.nachtrag_materials.length === 1 ? "Material" : "Materialien"}
+                      </span>
+                      <span>
+                        Erstellt: {format(new Date(n.created_at), "dd.MM.yyyy", { locale: de })}
+                      </span>
                     </div>
                   </div>
                 </CardContent>
@@ -528,11 +532,11 @@ const Nachtraege = () => {
           {detail && (
             <>
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <FileSignature className="h-5 w-5" />
+                <DialogTitle className="flex items-center gap-2 pr-6 break-words">
+                  <FileSignature className="h-5 w-5 shrink-0" />
                   {signMode ? "Nachtrag unterschreiben" : detail.titel}
                 </DialogTitle>
-                <DialogDescription>{projectLabel(detail)}</DialogDescription>
+                <DialogDescription className="break-words">{projectLabel(detail)}</DialogDescription>
               </DialogHeader>
 
               {isSigned ? (
@@ -544,7 +548,7 @@ const Nachtraege = () => {
                   {detail.beschreibung && (
                     <div className="space-y-1">
                       <Label>Beschreibung</Label>
-                      <p className="text-sm whitespace-pre-wrap">{detail.beschreibung}</p>
+                      <p className="text-sm whitespace-pre-wrap break-words">{detail.beschreibung}</p>
                     </div>
                   )}
                   {detail.nachtrag_materials.length > 0 && (
@@ -582,7 +586,8 @@ const Nachtraege = () => {
                 /* Signature flow: customer-facing summary + SignaturePad */
                 <div className="space-y-4">
                   <Card>
-                    <CardContent className="p-4 space-y-3 text-sm">
+                    {/* break-words: frei eingegebene Titel/Texte dürfen den Dialog nicht sprengen */}
+                    <CardContent className="p-4 space-y-3 text-sm break-words">
                       <div>
                         <p className="text-xs text-muted-foreground mb-0.5">Nachtrag</p>
                         <p className="font-semibold">{editTitel}</p>
@@ -627,7 +632,7 @@ const Nachtraege = () => {
               ) : (
                 /* Edit view while status = offen */
                 <div className="space-y-4">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <StatusBadge nachtrag={detail} />
                     <span className="text-xs text-muted-foreground">
                       Erstellt: {format(new Date(detail.created_at), "dd.MM.yyyy", { locale: de })}

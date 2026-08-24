@@ -309,16 +309,16 @@ const DisturbanceDetail = () => {
     return (
       <div className="min-h-screen bg-background">
         <header className="border-b bg-card sticky top-0 z-50 shadow-sm">
-          <div className="container mx-auto px-4 py-3">
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" onClick={() => navigate("/disturbances")}>
+          <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-3">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <Button variant="ghost" size="icon" onClick={() => navigate("/disturbances")} className="flex-shrink-0">
                 <ArrowLeft className="h-5 w-5" />
               </Button>
-              <h1 className="text-lg font-semibold">Regiebericht nicht gefunden</h1>
+              <h1 className="text-base sm:text-lg font-semibold truncate">Regiebericht nicht gefunden</h1>
             </div>
           </div>
         </header>
-        <main className="container mx-auto px-4 py-6 text-center">
+        <main className="container mx-auto px-3 sm:px-4 lg:px-6 py-6 text-center">
           <p>Der angeforderte Regiebericht konnte nicht gefunden werden.</p>
           <Button onClick={() => navigate("/disturbances")} className="mt-4">
             Zurück zur Übersicht
@@ -331,24 +331,24 @@ const DisturbanceDetail = () => {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card sticky top-0 z-50 shadow-sm">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/disturbances")}>
+        <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/disturbances")} className="flex-shrink-0">
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h1 className="text-lg font-semibold">Regiebericht Details</h1>
+            <h1 className="text-base sm:text-lg font-semibold truncate">Regiebericht Details</h1>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6 max-w-4xl space-y-6">
+      <main className="container mx-auto px-3 sm:px-4 lg:px-6 py-6 max-w-4xl space-y-6">
         {/* Header with status and actions */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-between items-start">
-          <div className="flex items-center gap-4">
-            <Zap className="h-8 w-8 text-primary" />
-            <div>
-              <h1 className="text-2xl font-bold">{disturbance.kunde_name}</h1>
-              <p className="text-muted-foreground">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-between items-start">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0 w-full sm:w-auto">
+            <Zap className="h-7 w-7 sm:h-8 sm:w-8 text-primary flex-shrink-0" />
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold break-words">{disturbance.kunde_name}</h1>
+              <p className="text-sm sm:text-base text-muted-foreground break-words">
                 {format(new Date(disturbance.datum), "EEEE, dd. MMMM yyyy", { locale: de })}
               </p>
             </div>
@@ -383,7 +383,7 @@ const DisturbanceDetail = () => {
                       Löschen
                     </Button>
                   </AlertDialogTrigger>
-                  <AlertDialogContent>
+                  <AlertDialogContent className="max-w-[calc(100vw-1.5rem)] sm:max-w-lg max-h-[90vh] overflow-y-auto">
                     <AlertDialogHeader>
                       <AlertDialogTitle>Regiebericht löschen?</AlertDialogTitle>
                       <AlertDialogDescription>
@@ -401,8 +401,8 @@ const DisturbanceDetail = () => {
               </>
             )}
             {canEdit && isLocked && (
-              <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Lock className="h-3 w-3" />
+              <span className="flex items-center gap-1 text-xs text-muted-foreground min-w-0 break-words">
+                <Lock className="h-3 w-3 flex-shrink-0" />
                 Unterschrieben – nicht mehr änderbar
               </span>
             )}
@@ -411,43 +411,44 @@ const DisturbanceDetail = () => {
 
         {/* Customer Information */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
+          <CardHeader className="px-4 sm:px-6">
+            <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+              <User className="h-5 w-5 flex-shrink-0" />
               Kundendaten
             </CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1">
+          <CardContent className="px-4 sm:px-6 grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1 min-w-0">
               <p className="text-sm text-muted-foreground">Name</p>
-              <p className="font-medium">{disturbance.kunde_name}</p>
+              <p className="font-medium break-words">{disturbance.kunde_name}</p>
             </div>
             {disturbance.kunde_email && (
-              <div className="space-y-1">
+              <div className="space-y-1 min-w-0">
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
-                  <Mail className="h-4 w-4" /> E-Mail
+                  <Mail className="h-4 w-4 flex-shrink-0" /> E-Mail
                 </p>
-                <a href={`mailto:${disturbance.kunde_email}`} className="font-medium text-primary hover:underline">
+                {/* break-all: lange E-Mail-Adressen dürfen die Seite nicht breiter machen */}
+                <a href={`mailto:${disturbance.kunde_email}`} className="block font-medium text-primary hover:underline break-all">
                   {disturbance.kunde_email}
                 </a>
               </div>
             )}
             {disturbance.kunde_telefon && (
-              <div className="space-y-1">
+              <div className="space-y-1 min-w-0">
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
-                  <Phone className="h-4 w-4" /> Telefon
+                  <Phone className="h-4 w-4 flex-shrink-0" /> Telefon
                 </p>
-                <a href={`tel:${disturbance.kunde_telefon}`} className="font-medium text-primary hover:underline">
+                <a href={`tel:${disturbance.kunde_telefon}`} className="block font-medium text-primary hover:underline break-words">
                   {disturbance.kunde_telefon}
                 </a>
               </div>
             )}
             {disturbance.kunde_adresse && (
-              <div className="space-y-1">
+              <div className="space-y-1 min-w-0">
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
-                  <MapPin className="h-4 w-4" /> Adresse
+                  <MapPin className="h-4 w-4 flex-shrink-0" /> Adresse
                 </p>
-                <p className="font-medium">{disturbance.kunde_adresse}</p>
+                <p className="font-medium break-words">{disturbance.kunde_adresse}</p>
               </div>
             )}
           </CardContent>
@@ -455,31 +456,31 @@ const DisturbanceDetail = () => {
 
         {/* Time Information */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
+          <CardHeader className="px-4 sm:px-6">
+            <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+              <Clock className="h-5 w-5 flex-shrink-0" />
               Arbeitszeit
             </CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-1">
+          <CardContent className="px-4 sm:px-6 grid gap-4 grid-cols-2 sm:grid-cols-3">
+            <div className="space-y-1 min-w-0">
               <p className="text-sm text-muted-foreground">Datum</p>
               <p className="font-medium">
                 {format(new Date(disturbance.datum), "dd.MM.yyyy", { locale: de })}
               </p>
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1 min-w-0">
               <p className="text-sm text-muted-foreground">Arbeitszeit</p>
-              <p className="font-medium">
+              <p className="font-medium whitespace-nowrap">
                 {disturbance.start_time.slice(0, 5)} - {disturbance.end_time.slice(0, 5)}
               </p>
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1 min-w-0">
               <p className="text-sm text-muted-foreground">Gesamtstunden</p>
-              <p className="font-medium text-lg text-primary">{disturbance.stunden.toFixed(2)} h</p>
+              <p className="font-medium text-base sm:text-lg text-primary">{disturbance.stunden.toFixed(2)} h</p>
             </div>
             {disturbance.pause_minutes > 0 && (
-              <div className="space-y-1">
+              <div className="space-y-1 min-w-0">
                 <p className="text-sm text-muted-foreground">Pause</p>
                 <p className="font-medium">{disturbance.pause_minutes} Minuten</p>
               </div>
@@ -489,19 +490,20 @@ const DisturbanceDetail = () => {
 
         {/* Work Description */}
         <Card>
-          <CardHeader>
-            <CardTitle>Durchgeführte Arbeiten</CardTitle>
+          <CardHeader className="px-4 sm:px-6">
+            <CardTitle className="text-base sm:text-lg">Durchgeführte Arbeiten</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="px-4 sm:px-6 space-y-4">
             <div>
-              <p className="whitespace-pre-wrap">{disturbance.beschreibung}</p>
+              {/* break-words: freier Text darf keine Querscroll-Leiste erzeugen */}
+              <p className="whitespace-pre-wrap break-words">{disturbance.beschreibung}</p>
             </div>
             {disturbance.notizen && (
               <>
                 <Separator />
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">Notizen</p>
-                  <p className="whitespace-pre-wrap text-sm">{disturbance.notizen}</p>
+                  <p className="whitespace-pre-wrap break-words text-sm">{disturbance.notizen}</p>
                 </div>
               </>
             )}
@@ -511,19 +513,19 @@ const DisturbanceDetail = () => {
         {/* Workers Section */}
         {workers.length > 0 && (
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
+            <CardHeader className="px-4 sm:px-6">
+              <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                <Users className="h-5 w-5 flex-shrink-0" />
                 Beteiligte Mitarbeiter
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-4 sm:px-6">
               <div className="flex flex-wrap gap-2">
                 {workers.map((worker) => (
-                  <Badge 
-                    key={worker.user_id} 
+                  <Badge
+                    key={worker.user_id}
                     variant={worker.is_main ? "default" : "secondary"}
-                    className="text-sm py-1 px-3"
+                    className="text-sm py-1 px-3 max-w-full whitespace-normal break-words text-center"
                   >
                     {worker.vorname} {worker.nachname}
                     {worker.is_main && " (Ersteller)"}
@@ -552,8 +554,8 @@ const DisturbanceDetail = () => {
         {/* Metadata */}
         {isAdmin && (disturbance.profile_vorname || disturbance.profile_nachname) && (
           <Card>
-            <CardContent className="pt-4">
-              <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+            <CardContent className="pt-4 px-4 sm:px-6">
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground break-words">
                 <span>Erfasst von: {disturbance.profile_vorname} {disturbance.profile_nachname}</span>
                 <span>Erstellt: {format(new Date(disturbance.created_at), "dd.MM.yyyy HH:mm", { locale: de })}</span>
                 <span>Zuletzt aktualisiert: {format(new Date(disturbance.updated_at), "dd.MM.yyyy HH:mm", { locale: de })}</span>

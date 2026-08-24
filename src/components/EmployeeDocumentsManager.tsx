@@ -201,13 +201,14 @@ export default function EmployeeDocumentsManager({ employeeId, userId }: Props) 
         {documentTypes.map((type) => (
           <TabsContent key={type.id} value={type.id}>
             <Card>
-              <CardHeader>
-                <CardTitle>{type.label}</CardTitle>
+              {/* Innerhalb von Dialogen: am Handy weniger Innenabstand, sonst bleibt kaum Platz */}
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="text-lg sm:text-2xl break-words">{type.label}</CardTitle>
                 <CardDescription>
                   {documents[type.id].length} Dokument(e) hochgeladen
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0 space-y-4">
                 {isAdmin && (
                   <div className="space-y-2">
                     <Label htmlFor={`upload-${type.id}`} className="text-sm sm:text-base">
@@ -220,7 +221,7 @@ export default function EmployeeDocumentsManager({ employeeId, userId }: Props) 
                       accept="*/*"
                       onChange={(e) => handleUpload(type.id, e.target.files)}
                       disabled={uploading === type.id}
-                      className="h-11 cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold hover:file:bg-accent"
+                      className="h-11 w-full min-w-0 cursor-pointer file:mr-2 sm:file:mr-4 file:py-2 file:px-3 sm:file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold hover:file:bg-accent"
                     />
                     {uploading === type.id && (
                       <p className="text-xs text-muted-foreground">Wird hochgeladen...</p>
@@ -251,7 +252,7 @@ export default function EmployeeDocumentsManager({ employeeId, userId }: Props) 
                             size="sm"
                             variant="outline"
                             onClick={() => handleDownload(type.id, doc.name)}
-                            className="h-9 min-w-[44px]"
+                            className="h-10 sm:h-9 min-w-[44px]"
                           >
                             <Download className="w-4 h-4" />
                           </Button>
@@ -260,7 +261,7 @@ export default function EmployeeDocumentsManager({ employeeId, userId }: Props) 
                               size="sm"
                               variant="destructive"
                               onClick={() => handleDelete(type.id, doc.name)}
-                              className="h-9 min-w-[44px]"
+                              className="h-10 sm:h-9 min-w-[44px]"
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>

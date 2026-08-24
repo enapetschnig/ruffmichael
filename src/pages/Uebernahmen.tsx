@@ -149,9 +149,9 @@ const Uebernahmen = () => {
 
       <main className="container mx-auto px-3 sm:px-4 lg:px-6 py-6 max-w-4xl space-y-4">
         <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-2xl font-bold flex items-center gap-2">
-              <FileCheck className="h-6 w-6 text-primary" />
+          <div className="min-w-0">
+            <h2 className="text-xl sm:text-2xl font-bold flex flex-wrap items-center gap-2">
+              <FileCheck className="h-5 w-5 sm:h-6 sm:w-6 text-primary shrink-0" />
               Übernahmen
               <Badge variant="secondary">{uebernahmen.length}</Badge>
             </h2>
@@ -159,7 +159,7 @@ const Uebernahmen = () => {
               Unterschriebene Übernahmebestätigungen mit PDF im Projektordner
             </p>
           </div>
-          <Button onClick={() => setDialogOpen(true)} className="gap-2">
+          <Button onClick={() => setDialogOpen(true)} className="gap-2 shrink-0">
             <Plus className="h-4 w-4" />
             <span className="hidden sm:inline">Neue Übernahmebestätigung</span>
           </Button>
@@ -190,10 +190,12 @@ const Uebernahmen = () => {
             {filtered.map((u) => (
               <Card key={u.id}>
                 <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-3">
+                  {/* Am Handy steht der PDF-Button unter den Daten (volle Breite),
+                      ab sm wie bisher rechts daneben. */}
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                     <div className="min-w-0 space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-base">{u.kunde_name}</span>
+                        <span className="font-semibold text-base break-words min-w-0">{u.kunde_name}</span>
                         {u.pdf_path ? (
                           <Badge className="bg-green-600 text-white hover:bg-green-600 gap-1">
                             <CheckCircle2 className="h-3 w-3" />
@@ -214,12 +216,12 @@ const Uebernahmen = () => {
                         <span>{format(new Date(u.datum), "dd.MM.yyyy")}</span>
                       </div>
                     </div>
-                    <div className="shrink-0">
+                    <div className="sm:shrink-0">
                       {u.pdf_path ? (
                         <Button
                           variant="outline"
                           size="sm"
-                          className="gap-1.5"
+                          className="gap-1.5 w-full sm:w-auto h-10 sm:h-9"
                           disabled={pdfBusyId === u.id}
                           onClick={() => openPdf(u)}
                         >
@@ -233,7 +235,7 @@ const Uebernahmen = () => {
                       ) : (
                         <Button
                           size="sm"
-                          className="gap-1.5"
+                          className="gap-1.5 w-full sm:w-auto h-10 sm:h-9"
                           disabled={pdfBusyId === u.id}
                           onClick={() => createPdf(u)}
                         >

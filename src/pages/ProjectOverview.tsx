@@ -243,9 +243,10 @@ const ProjectOverview = () => {
       <header className="border-b bg-card sticky top-0 z-50 shadow-sm">
         <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               <Button variant="ghost" size="sm" onClick={() => navigate("/projects")}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
+                {/* Am Handy nur das Pfeil-Symbol, daher Abstand erst ab sm */}
+                <ArrowLeft className="h-4 w-4 sm:mr-2" />
                 <span className="hidden sm:inline">Zurück</span>
               </Button>
               <img
@@ -255,7 +256,7 @@ const ProjectOverview = () => {
                 onClick={() => navigate("/projects")}
               />
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 shrink-0">
               {/* Projekt bearbeiten: wie in der Projektliste für alle sichtbar. */}
               <Button variant="outline" size="sm" className="gap-1" onClick={() => setEditOpen(true)}>
                 <Pencil className="h-4 w-4" />
@@ -273,9 +274,11 @@ const ProjectOverview = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 max-w-4xl">
+      {/* pb-24: Platz, damit der runde Foto-Knopf unten die letzte Kachel nicht verdeckt */}
+      <main className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 pb-24 max-w-4xl">
         <div className="mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold mb-2">{projectName}</h1>
+          {/* break-words: lange Projekt-/Adressnamen dürfen die Seite nicht breiter machen */}
+          <h1 className="text-2xl sm:text-3xl font-bold mb-2 break-words">{projectName}</h1>
           <p className="text-muted-foreground">Dokumentation und Dateien</p>
         </div>
 
@@ -295,9 +298,9 @@ const ProjectOverview = () => {
         {/* Nachträge - nur anzeigen, wenn das Projekt Nachträge hat */}
         {nachtraege.length > 0 && (
           <div className="mb-4 space-y-2">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-lg font-semibold flex items-center gap-2">
-                <FileSignature className="h-5 w-5 text-primary" />
+                <FileSignature className="h-5 w-5 text-primary shrink-0" />
                 Nachträge
               </h2>
               <Button
@@ -318,7 +321,7 @@ const ProjectOverview = () => {
                   onClick={() => navigate(`/nachtraege?project=${projectId}`)}
                 >
                   <CardContent className="p-3 flex items-center justify-between gap-3">
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="font-medium truncate">{n.titel}</p>
                       <p className="text-xs text-muted-foreground">
                         {format(new Date(n.created_at), "dd.MM.yyyy", { locale: de })}
@@ -351,15 +354,15 @@ const ProjectOverview = () => {
                 className="cursor-pointer hover:shadow-lg transition-shadow"
                 onClick={() => handleCategoryClick(tile.category)}
               >
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="text-primary">{CATEGORY_ICON[tile.category]}</div>
-                    <div className="text-2xl font-bold">{counts[tile.category] ?? 0}</div>
+                <CardHeader className="p-4 sm:p-6">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-primary shrink-0">{CATEGORY_ICON[tile.category]}</div>
+                    <div className="text-xl sm:text-2xl font-bold shrink-0">{counts[tile.category] ?? 0}</div>
                   </div>
-                  <CardTitle className="text-xl">{CATEGORY_LABELS[tile.category]}</CardTitle>
-                  <CardDescription>{CATEGORY_DESCRIPTIONS[tile.category]}</CardDescription>
+                  <CardTitle className="text-lg sm:text-xl break-words">{CATEGORY_LABELS[tile.category]}</CardTitle>
+                  <CardDescription className="break-words">{CATEGORY_DESCRIPTIONS[tile.category]}</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
                   <Button variant="outline" className="w-full">Öffnen</Button>
                 </CardContent>
               </Card>
@@ -369,15 +372,16 @@ const ProjectOverview = () => {
                 className="cursor-pointer hover:shadow-lg transition-shadow"
                 onClick={() => navigate(`/projects/${projectId}/files?path=${encodeURIComponent(tile.name)}`)}
               >
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="text-primary"><FolderOpen className="h-8 w-8" /></div>
-                    <div className="text-2xl font-bold">{tile.count}</div>
+                <CardHeader className="p-4 sm:p-6">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-primary shrink-0"><FolderOpen className="h-8 w-8" /></div>
+                    <div className="text-xl sm:text-2xl font-bold shrink-0">{tile.count}</div>
                   </div>
-                  <CardTitle className="text-xl">{tile.name}</CardTitle>
+                  {/* break-words: selbst vergebene Ordnernamen können sehr lang sein */}
+                  <CardTitle className="text-lg sm:text-xl break-words">{tile.name}</CardTitle>
                   <CardDescription>Projektordner</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
                   <Button variant="outline" className="w-full">Öffnen</Button>
                 </CardContent>
               </Card>
@@ -412,7 +416,7 @@ const ProjectOverview = () => {
 
       {/* Ordner-Einstellungen (nur Admin) */}
       <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-        <DialogContent className="max-w-sm sm:max-w-md">
+        <DialogContent className="max-w-[calc(100vw-1.5rem)] sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Projektordner verwalten</DialogTitle>
             <DialogDescription>
@@ -424,10 +428,11 @@ const ProjectOverview = () => {
             {TOGGLEABLE_CATEGORIES.map((cat) => (
               <div key={cat} className="flex items-center justify-between gap-3 rounded-lg border p-3">
                 <div className="min-w-0">
-                  <p className="font-medium">{CATEGORY_LABELS[cat]}</p>
-                  <p className="text-xs text-muted-foreground">{CATEGORY_DESCRIPTIONS[cat]}</p>
+                  <p className="font-medium break-words">{CATEGORY_LABELS[cat]}</p>
+                  <p className="text-xs text-muted-foreground break-words">{CATEGORY_DESCRIPTIONS[cat]}</p>
                 </div>
                 <Switch
+                  className="shrink-0"
                   checked={!!settingsDraft[cat]}
                   onCheckedChange={(v) => setSettingsDraft((d) => ({ ...d, [cat]: v }))}
                 />
@@ -436,10 +441,10 @@ const ProjectOverview = () => {
             {/* Chef ist nicht abschaltbar */}
             <div className="flex items-center justify-between gap-3 rounded-lg border p-3 opacity-70">
               <div className="min-w-0">
-                <p className="font-medium flex items-center gap-1"><Lock className="h-3.5 w-3.5" /> {CATEGORY_LABELS.chef}</p>
-                <p className="text-xs text-muted-foreground">Immer vorhanden – nur für Admins sichtbar</p>
+                <p className="font-medium flex items-center gap-1"><Lock className="h-3.5 w-3.5 shrink-0" /> {CATEGORY_LABELS.chef}</p>
+                <p className="text-xs text-muted-foreground break-words">Immer vorhanden – nur für Admins sichtbar</p>
               </div>
-              <Switch checked disabled />
+              <Switch className="shrink-0" checked disabled />
             </div>
             <Button onClick={handleSaveSettings} disabled={savingSettings} className="w-full">
               {savingSettings ? "Speichern..." : "Speichern"}

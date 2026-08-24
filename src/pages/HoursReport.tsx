@@ -6,7 +6,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/hooks/use-toast";
 import { ArrowLeft, Download, FileSpreadsheet, Building2, Hammer, ChevronDown } from "lucide-react";
 import { format, isSameDay, parseISO } from "date-fns";
@@ -551,40 +550,42 @@ export default function HoursReport() {
   };
 
   return (
-    <div className="container mx-auto p-4 space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+    <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
+      <div className="flex items-center gap-2 sm:gap-4">
+        <Button variant="ghost" size="icon" className="shrink-0 h-10 w-10" onClick={() => navigate(-1)}>
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <h1 className="text-3xl font-bold">Stundenauswertung</h1>
+        <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold min-w-0 truncate">Stundenauswertung</h1>
       </div>
 
       <Tabs defaultValue="mitarbeiter" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="mitarbeiter">
-            <FileSpreadsheet className="w-4 h-4 mr-2" />
-            Arbeitszeiterfassung
+        {/* Tab-Beschriftungen sind lang: am Handy kleinere Schrift + min-w-0/truncate,
+            sonst schiebt der nowrap-Text die Leiste über den Bildschirmrand hinaus. */}
+        <TabsList className="grid w-full grid-cols-2 h-auto">
+          <TabsTrigger value="mitarbeiter" className="min-w-0 h-10 px-1.5 sm:px-3 text-xs sm:text-sm">
+            <FileSpreadsheet className="w-4 h-4 mr-1 sm:mr-2 shrink-0" />
+            <span className="truncate">Arbeitszeiterfassung</span>
           </TabsTrigger>
-          <TabsTrigger value="projekte">
-            <Building2 className="w-4 h-4 mr-2" />
-            Projektzeiterfassung
+          <TabsTrigger value="projekte" className="min-w-0 h-10 px-1.5 sm:px-3 text-xs sm:text-sm">
+            <Building2 className="w-4 h-4 mr-1 sm:mr-2 shrink-0" />
+            <span className="truncate">Projektzeiterfassung</span>
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="mitarbeiter" className="space-y-6">
+        <TabsContent value="mitarbeiter" className="space-y-4 sm:space-y-6">
           <Card>
-            <CardHeader>
+            <CardHeader className="p-4 sm:p-6">
               <div className="flex items-center justify-between flex-wrap gap-3">
-                <div>
-                  <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-                    <FileSpreadsheet className="w-5 h-5 sm:w-6 sm:h-6" />
-                    Arbeitszeiterfassung nach Mitarbeitern
+                <div className="min-w-0">
+                  <CardTitle className="flex items-start sm:items-center gap-2 text-base sm:text-xl">
+                    <FileSpreadsheet className="w-5 h-5 sm:w-6 sm:h-6 shrink-0 mt-0.5 sm:mt-0" />
+                    <span className="min-w-0 break-words">Arbeitszeiterfassung nach Mitarbeitern</span>
                   </CardTitle>
                   <CardDescription className="text-xs sm:text-sm">Monatsberichte mit Überstunden exportieren</CardDescription>
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button disabled={!selectedUserId} className="h-11">
+                    <Button disabled={!selectedUserId} className="h-11 shrink-0">
                       <Download className="mr-2 h-4 w-4" />
                       <span className="hidden sm:inline">Excel exportieren</span>
                       <span className="sm:hidden">Export</span>
@@ -602,12 +603,12 @@ export default function HoursReport() {
                 </DropdownMenu>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              
+            <CardContent className="space-y-4 p-4 sm:p-6 pt-0 sm:pt-0">
+
               <div className="flex flex-col sm:flex-row gap-3">
                 {isAdmin && (
                   <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                    <SelectTrigger className="h-11">
+                    <SelectTrigger className="h-11 min-w-0">
                       <SelectValue placeholder="Mitarbeiter auswählen" />
                     </SelectTrigger>
                     <SelectContent position="popper">
@@ -620,7 +621,7 @@ export default function HoursReport() {
                   </Select>
                 )}
                 <Select value={month.toString()} onValueChange={(v) => setMonth(parseInt(v))}>
-                  <SelectTrigger className="h-11">
+                  <SelectTrigger className="h-11 min-w-0">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent position="popper">
@@ -632,7 +633,7 @@ export default function HoursReport() {
                   </SelectContent>
                 </Select>
                 <Select value={year.toString()} onValueChange={(v) => setYear(parseInt(v))}>
-                  <SelectTrigger className="h-11">
+                  <SelectTrigger className="h-11 min-w-0">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent position="popper">
@@ -647,32 +648,36 @@ export default function HoursReport() {
 
               {selectedUserId && (
                 <>
-                  <div className="bg-muted/50 p-4 rounded-lg">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Gesamtstunden</p>
-                        <p className="text-2xl font-bold">{totalHours.toFixed(2)} h</p>
+                  <div className="bg-muted/50 p-3 sm:p-4 rounded-lg">
+                    <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                      <div className="min-w-0">
+                        <p className="text-xs sm:text-sm text-muted-foreground truncate">Gesamtstunden</p>
+                        <p className="text-xl sm:text-2xl font-bold">{totalHours.toFixed(2)} h</p>
                       </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Überstunden</p>
-                        <p className="text-2xl font-bold">{totalOvertime.toFixed(2)} h</p>
+                      <div className="min-w-0">
+                        <p className="text-xs sm:text-sm text-muted-foreground truncate">Überstunden</p>
+                        <p className="text-xl sm:text-2xl font-bold">{totalOvertime.toFixed(2)} h</p>
                       </div>
                     </div>
                   </div>
 
-                  <ScrollArea className="h-[500px] rounded-md border">
-                    <Table>
+                  {/* Die Tabelle hat 9 Spalten und passt am Handy nie in die Breite.
+                      Der innere Wrapper der Table-Komponente wird auf volle Höhe gesetzt
+                      und übernimmt beides: Quer- und Hochscrollen. So scrollt nur die
+                      Tabelle, nie die ganze Seite. */}
+                  <div className="relative h-[420px] sm:h-[500px] overflow-hidden rounded-md border [&>div]:h-full [&>div]:overflow-auto">
+                    <Table className="min-w-[860px] [&_th]:px-2 [&_td]:px-2 sm:[&_th]:px-4 sm:[&_td]:px-4">
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-[100px]">Datum</TableHead>
-                          <TableHead>Vormittag</TableHead>
-                          <TableHead>Pause</TableHead>
-                          <TableHead>Nachmittag</TableHead>
-                          <TableHead className="text-right">Stunden</TableHead>
-                          <TableHead className="text-right">Überstunden</TableHead>
-                          <TableHead>Ort</TableHead>
-                          <TableHead>Projekt</TableHead>
-                          <TableHead>Tätigkeit</TableHead>
+                          <TableHead className="w-[72px] sm:w-[100px] whitespace-nowrap">Datum</TableHead>
+                          <TableHead className="whitespace-nowrap">Vormittag</TableHead>
+                          <TableHead className="whitespace-nowrap">Pause</TableHead>
+                          <TableHead className="whitespace-nowrap">Nachmittag</TableHead>
+                          <TableHead className="text-right whitespace-nowrap">Stunden</TableHead>
+                          <TableHead className="text-right whitespace-nowrap">Überstunden</TableHead>
+                          <TableHead className="whitespace-nowrap">Ort</TableHead>
+                          <TableHead className="whitespace-nowrap">Projekt</TableHead>
+                          <TableHead className="whitespace-nowrap">Tätigkeit</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -745,7 +750,7 @@ export default function HoursReport() {
                                       </div>
                                     )}
                                   </TableCell>
-                                  <TableCell>
+                                  <TableCell className="whitespace-nowrap">
                                     <div className="flex items-center gap-1">
                                       <span>{entry.start_time?.substring(0, 5)}</span>
                                       <span>-</span>
@@ -756,12 +761,12 @@ export default function HoursReport() {
                                       <span>{lunchBreak && entry.pause_minutes > 0 ? lunchBreak.start : entry.end_time?.substring(0, 5)}</span>
                                     </div>
                                   </TableCell>
-                                  <TableCell>
+                                  <TableCell className="whitespace-nowrap">
                                     {lunchBreak && entry.pause_minutes > 0 && (
                                       <span className="text-sm">{lunchBreak.start} - {lunchBreak.end}</span>
                                     )}
                                   </TableCell>
-                                  <TableCell>
+                                  <TableCell className="whitespace-nowrap">
                                     {lunchBreak && entry.pause_minutes > 0 && (
                                       <div className="flex items-center gap-1">
                                         <span>{lunchBreak.end}</span>
@@ -770,7 +775,7 @@ export default function HoursReport() {
                                       </div>
                                     )}
                                   </TableCell>
-                                  <TableCell className="text-right font-medium">
+                                  <TableCell className="text-right font-medium whitespace-nowrap">
                                     {entry.stunden.toFixed(2)} h
                                     {hasMultipleEntries && isLastEntry && (
                                       <div className="text-xs text-primary font-bold mt-1">
@@ -778,24 +783,26 @@ export default function HoursReport() {
                                       </div>
                                     )}
                                   </TableCell>
-                                  <TableCell className="text-right">
+                                  <TableCell className="text-right whitespace-nowrap">
                                     {isLastEntry && dayOvertime > 0 && (
                                       <span className="text-orange-600 font-medium">
                                         +{dayOvertime.toFixed(2)} h
                                       </span>
                                     )}
                                   </TableCell>
-                                  <TableCell>
+                                  <TableCell className="whitespace-nowrap">
                                     <span className="flex items-center gap-1">
                                       <span>{ortIcon}</span>
                                       <span className="text-xs">{ortText}</span>
                                     </span>
                                   </TableCell>
-                                  <TableCell className="max-w-[150px] truncate">
-                                    {projektName}
+                                  {/* truncate wirkt in einer Tabellenzelle nur im inneren
+                                      Block – max-width wird auf <td> selbst ignoriert. */}
+                                  <TableCell>
+                                    <div className="max-w-[150px] truncate">{projektName}</div>
                                   </TableCell>
-                                  <TableCell className="max-w-[150px] truncate">
-                                    {entry.taetigkeit}
+                                  <TableCell>
+                                    <div className="max-w-[150px] truncate">{entry.taetigkeit}</div>
                                   </TableCell>
                                 </TableRow>
                               );
@@ -805,20 +812,20 @@ export default function HoursReport() {
                       </TableBody>
                       <TableFooter>
                         <TableRow>
-                          <TableCell colSpan={4} className="text-right font-bold">
+                          <TableCell colSpan={4} className="text-right font-bold whitespace-nowrap">
                             Gesamt:
                           </TableCell>
-                          <TableCell className="text-right font-bold">
+                          <TableCell className="text-right font-bold whitespace-nowrap">
                             {totalHours.toFixed(2)} h
                           </TableCell>
-                          <TableCell className="text-right font-bold text-orange-600">
+                          <TableCell className="text-right font-bold text-orange-600 whitespace-nowrap">
                             {totalOvertime.toFixed(2)} h
                           </TableCell>
                           <TableCell colSpan={3}></TableCell>
                         </TableRow>
                       </TableFooter>
                     </Table>
-                  </ScrollArea>
+                  </div>
                 </>
               )}
             </CardContent>

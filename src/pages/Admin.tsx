@@ -597,8 +597,8 @@ export default function Admin() {
               className="h-8 w-8 sm:h-10 sm:w-10 cursor-pointer hover:opacity-80 transition-opacity object-contain" 
               onClick={() => navigate("/")}
             />
-            <div className="flex-1">
-              <h1 className="text-xl sm:text-2xl font-bold">Admin-Bereich</h1>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold truncate">Admin-Bereich</h1>
             </div>
           </div>
         </div>
@@ -608,7 +608,7 @@ export default function Admin() {
         {/* ===== WARTENDE AKTIVIERUNGEN ===== */}
         {profiles.filter(p => !p.is_active).length > 0 && (
           <section>
-            <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+            <h2 className="text-xl sm:text-2xl font-bold mb-4 flex items-center gap-2">
               Wartende Aktivierungen
               <span className="bg-destructive text-destructive-foreground text-sm px-2 py-1 rounded-full">
                 {profiles.filter(p => !p.is_active).length}
@@ -628,16 +628,16 @@ export default function Admin() {
               <CardContent>
                 <div className="space-y-3">
                   {profiles.filter(p => !p.is_active).map((profile) => (
-                    <div key={profile.id} className="flex items-center justify-between p-4 rounded-lg border bg-card">
-                      <div className="flex items-center gap-3">
+                    <div key={profile.id} className="flex flex-wrap items-center justify-between gap-3 p-3 sm:p-4 rounded-lg border bg-card">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
                         <Avatar>
                           <AvatarFallback className="bg-destructive/10 text-destructive">
                             {profile.vorname[0]}
                             {profile.nachname[0]}
                           </AvatarFallback>
                         </Avatar>
-                        <div>
-                          <p className="font-medium">
+                        <div className="min-w-0">
+                          <p className="font-medium break-words">
                             {profile.vorname} {profile.nachname}
                           </p>
                           <p className="text-sm text-muted-foreground">
@@ -645,7 +645,7 @@ export default function Admin() {
                           </p>
                         </div>
                       </div>
-                      <Button onClick={() => handleActivateUser(profile.id, true)}>
+                      <Button className="shrink-0" onClick={() => handleActivateUser(profile.id, true)}>
                         Aktivieren
                       </Button>
                     </div>
@@ -658,7 +658,7 @@ export default function Admin() {
 
         {/* ===== BENUTZERROLLEN SEKTION ===== */}
         <section>
-          <h2 className="text-2xl font-bold mb-4">Benutzerrollen & Einladungen</h2>
+          <h2 className="text-xl sm:text-2xl font-bold mb-4">Benutzerrollen & Einladungen</h2>
           
           {/* Invitation Form */}
           <Card className="mb-6">
@@ -704,7 +704,7 @@ export default function Admin() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-bold text-primary">
+                <p className="text-2xl sm:text-3xl font-bold text-primary">
                   {profiles.filter(p => userRoles[p.id] === "administrator").length}
                 </p>
               </CardContent>
@@ -718,7 +718,7 @@ export default function Admin() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-bold text-accent">
+                <p className="text-2xl sm:text-3xl font-bold text-accent">
                   {profiles.filter(p => userRoles[p.id] === "mitarbeiter").length}
                 </p>
               </CardContent>
@@ -726,15 +726,16 @@ export default function Admin() {
           </div>
 
           {/* Users List */}
-          <Card>
+          <Card className="mb-6">
         <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
+          <div className="min-w-0">
             <CardTitle>Registrierte Benutzer</CardTitle>
             <CardDescription>
               Rollen verwalten und Mitarbeiterdaten/Dokumente bearbeiten
             </CardDescription>
           </div>
-          <Button variant="outline" onClick={() => setShowSizesDialog(true)}>
+          {/* Am Handy volle Breite, damit der lange Button-Text nicht aus der Karte läuft */}
+          <Button variant="outline" className="w-full sm:w-auto shrink-0" onClick={() => setShowSizesDialog(true)}>
             <Shirt className="w-4 h-4 mr-2" />
             Arbeitskleidung/Schuhe Größen
           </Button>
@@ -747,15 +748,15 @@ export default function Admin() {
                     id={`registered-user-${profile.id}`}
                     className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:p-4 rounded-lg border bg-card transition-shadow"
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
                       <Avatar>
                         <AvatarFallback>
                           {profile.vorname[0]}
                           {profile.nachname[0]}
                         </AvatarFallback>
                       </Avatar>
-                      <div>
-                        <p className="font-medium">
+                      <div className="min-w-0">
+                        <p className="font-medium break-words">
                           {profile.vorname} {profile.nachname}
                         </p>
                         <p className="text-sm text-muted-foreground">
@@ -763,7 +764,7 @@ export default function Admin() {
                         </p>
                       </div>
                     </div>
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 min-w-0">
                       <Select
                         value={userRoles[profile.id]}
                         onValueChange={(val) => handleRoleChange(profile.id, val as "administrator" | "mitarbeiter")}
@@ -777,20 +778,23 @@ export default function Admin() {
                         </SelectContent>
                       </Select>
 
-                      <div className="flex gap-2">
+                      {/* flex-wrap: drei Buttons passen am Handy nicht in eine Zeile */}
+                      <div className="flex flex-wrap gap-2">
                         <Button
                           variant="outline"
+                          className="flex-1 sm:flex-none"
                           onClick={() => openEmployeeEditorForUser(profile.id, 'stammdaten')}
                         >
                           Bearbeiten
                         </Button>
-                        <Button onClick={() => openEmployeeEditorForUser(profile.id, 'dokumente')}>
+                        <Button className="flex-1 sm:flex-none" onClick={() => openEmployeeEditorForUser(profile.id, 'dokumente')}>
                           <FileText className="w-4 h-4 mr-2" />
                           Dokumente
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
+                          className="h-10 sm:h-9 w-full sm:w-auto"
                           onClick={() => {
                             setUserToDelete(profile);
                             setDeleteDialogOpen(true);
@@ -828,16 +832,16 @@ export default function Admin() {
                     const documentPath = note.notizen?.replace("Krankmeldung: ", "");
 
                     return (
-                      <div key={note.id} className="flex items-center justify-between p-4 rounded-lg border bg-card">
-                        <div className="flex items-center gap-3">
+                      <div key={note.id} className="flex flex-wrap items-center justify-between gap-3 p-3 sm:p-4 rounded-lg border bg-card">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
                           <Avatar>
                             <AvatarFallback>
                               {note.profiles.vorname[0]}
                               {note.profiles.nachname[0]}
                             </AvatarFallback>
                           </Avatar>
-                          <div>
-                            <p className="font-medium">
+                          <div className="min-w-0">
+                            <p className="font-medium break-words">
                               {note.profiles.vorname} {note.profiles.nachname}
                             </p>
                             <p className="text-sm text-muted-foreground">
@@ -845,11 +849,12 @@ export default function Admin() {
                             </p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 shrink-0">
                           {documentPath && (
                             <Button
                               variant="outline"
                               size="sm"
+                              className="h-10 sm:h-9"
                               onClick={async () => {
                                 if (!documentPath) return;
 
@@ -898,6 +903,7 @@ export default function Admin() {
                           <Button
                             variant="outline"
                             size="sm"
+                            className="h-10 sm:h-9 min-w-[44px]"
                             onClick={() => handleDeleteSickNote(note.id, documentPath)}
                           >
                             <Trash2 className="w-4 h-4" />
@@ -916,36 +922,37 @@ export default function Admin() {
 
       {/* Employee Detail Dialog */}
       <Dialog open={!!selectedEmployee} onOpenChange={() => setSelectedEmployee(null)}>
-        <DialogContent className="max-w-5xl max-h-[90vh]">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="break-words pr-6">
               {selectedEmployee?.vorname} {selectedEmployee?.nachname}
             </DialogTitle>
           </DialogHeader>
 
           <Tabs value={activeEmployeeTab} onValueChange={(val) => setActiveEmployeeTab(val as any)}>
+            {/* Am Handy kleinere Schrift/Abstände, damit die drei Reiter nicht überlaufen */}
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="stammdaten">
-                <UserIcon className="w-4 h-4 mr-2" />
-                Stammdaten
+              <TabsTrigger value="stammdaten" className="px-1 sm:px-3 text-xs sm:text-sm">
+                <UserIcon className="w-4 h-4 mr-1 sm:mr-2 shrink-0" />
+                <span className="truncate">Stammdaten</span>
               </TabsTrigger>
-              <TabsTrigger value="dokumente">
-                <FileText className="w-4 h-4 mr-2" />
-                Dokumente
+              <TabsTrigger value="dokumente" className="px-1 sm:px-3 text-xs sm:text-sm">
+                <FileText className="w-4 h-4 mr-1 sm:mr-2 shrink-0" />
+                <span className="truncate">Dokumente</span>
               </TabsTrigger>
-              <TabsTrigger value="stunden">
-                <Clock className="w-4 h-4 mr-2" />
-                Stunden
+              <TabsTrigger value="stunden" className="px-1 sm:px-3 text-xs sm:text-sm">
+                <Clock className="w-4 h-4 mr-1 sm:mr-2 shrink-0" />
+                <span className="truncate">Stunden</span>
               </TabsTrigger>
             </TabsList>
 
             {/* Tab 1: Stammdaten */}
             <TabsContent value="stammdaten">
-              <ScrollArea className="h-[500px] pr-4">
+              <ScrollArea className="h-[55vh] sm:h-[500px] pr-2 sm:pr-4">
                 <form onSubmit={handleSaveEmployee} className="space-y-6">
                   <div>
-                    <h3 className="text-lg font-semibold mb-3">Persönliche Daten</h3>
-                    <div className="grid grid-cols-2 gap-4">
+                    <h3 className="text-base sm:text-lg font-semibold mb-3">Persönliche Daten</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <Label>Vorname *</Label>
                         <Input
@@ -976,9 +983,9 @@ export default function Admin() {
                   <Separator />
 
                   <div>
-                    <h3 className="text-lg font-semibold mb-3">Kontaktdaten</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="col-span-2">
+                    <h3 className="text-base sm:text-lg font-semibold mb-3">Kontaktdaten</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="sm:col-span-2">
                         <Label>Adresse</Label>
                         <Input
                           value={formData.adresse || ""}
@@ -1022,8 +1029,8 @@ export default function Admin() {
                   <Separator />
 
                   <div>
-                    <h3 className="text-lg font-semibold mb-3">Beschäftigung</h3>
-                    <div className="grid grid-cols-2 gap-4">
+                    <h3 className="text-base sm:text-lg font-semibold mb-3">Beschäftigung</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <Label>Position</Label>
                         <Input
@@ -1085,9 +1092,9 @@ export default function Admin() {
                   <Separator />
 
                   <div>
-                    <h3 className="text-lg font-semibold mb-3">Bankverbindung</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="col-span-2">
+                    <h3 className="text-base sm:text-lg font-semibold mb-3">Bankverbindung</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="sm:col-span-2">
                         <Label>IBAN</Label>
                         <Input
                           value={formData.iban || ""}
@@ -1114,8 +1121,8 @@ export default function Admin() {
                   <Separator />
 
                   <div>
-                    <h3 className="text-lg font-semibold mb-3">Arbeitskleidung</h3>
-                    <div className="grid grid-cols-2 gap-4">
+                    <h3 className="text-base sm:text-lg font-semibold mb-3">Arbeitskleidung</h3>
+                    <div className="grid grid-cols-2 gap-3 sm:gap-4">
                       <div>
                         <Label>Kleidungsgröße</Label>
                         <Input
@@ -1138,7 +1145,7 @@ export default function Admin() {
                   <Separator />
 
                   <div>
-                    <h3 className="text-lg font-semibold mb-3">Notizen</h3>
+                    <h3 className="text-base sm:text-lg font-semibold mb-3">Notizen</h3>
                     <Textarea
                       value={formData.notizen || ""}
                       onChange={(e) => setFormData({ ...formData, notizen: e.target.value })}
@@ -1159,7 +1166,7 @@ export default function Admin() {
 
             {/* Tab 2: Dokumente */}
             <TabsContent value="dokumente">
-              <ScrollArea className="h-[500px]">
+              <ScrollArea className="h-[55vh] sm:h-[500px]">
                 {selectedEmployee && (
                   <EmployeeDocumentsManager 
                     employeeId={selectedEmployee.id}
@@ -1171,7 +1178,7 @@ export default function Admin() {
 
             {/* Tab 3: Stunden */}
             <TabsContent value="stunden">
-              <ScrollArea className="h-[500px]">
+              <ScrollArea className="h-[55vh] sm:h-[500px]">
                 <div className="p-4 space-y-2">
                   <Button
                     onClick={() => {
@@ -1198,14 +1205,14 @@ export default function Admin() {
 
       {/* Sizes Overview Dialog */}
       <Dialog open={showSizesDialog} onOpenChange={setShowSizesDialog}>
-        <DialogContent className="max-w-4xl max-h-[80vh]">
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Shirt className="w-5 h-5" />
-              Arbeitskleidung & Schuhgrößen
+            <DialogTitle className="flex items-center gap-2 pr-6">
+              <Shirt className="w-5 h-5 shrink-0" />
+              <span className="break-words">Arbeitskleidung & Schuhgrößen</span>
             </DialogTitle>
           </DialogHeader>
-          <ScrollArea className="h-[500px]">
+          <ScrollArea className="h-[55vh] sm:h-[500px]">
             <div className="space-y-2">
               {employees
                 .filter(emp => emp.kleidungsgroesse || emp.schuhgroesse)
@@ -1213,28 +1220,29 @@ export default function Admin() {
                 .map((emp) => (
                   <div
                     key={emp.id}
-                    className="p-4 border rounded-lg hover:bg-accent/50 cursor-pointer transition-colors"
+                    className="p-3 sm:p-4 border rounded-lg hover:bg-accent/50 cursor-pointer transition-colors"
                     onClick={() => {
                       setShowSizesDialog(false);
                       setSelectedEmployee(emp);
                     }}
                   >
-                    <div className="grid grid-cols-4 gap-4 items-center">
-                      <div className="col-span-2">
-                        <p className="font-medium">
+                    {/* Am Handy 2 Spalten: Name oben über die volle Breite, Größen darunter nebeneinander */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 items-center">
+                      <div className="col-span-2 min-w-0">
+                        <p className="font-medium break-words">
                           {emp.vorname} {emp.nachname}
                         </p>
-                        <p className="text-sm text-muted-foreground">{emp.position || "Mitarbeiter"}</p>
+                        <p className="text-sm text-muted-foreground break-words">{emp.position || "Mitarbeiter"}</p>
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-sm text-muted-foreground">Kleidung</p>
-                        <p className="font-semibold text-lg">
+                        <p className="font-semibold text-base sm:text-lg">
                           {emp.kleidungsgroesse || "-"}
                         </p>
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-sm text-muted-foreground">Schuhe</p>
-                        <p className="font-semibold text-lg">
+                        <p className="font-semibold text-base sm:text-lg">
                           {emp.schuhgroesse || "-"}
                         </p>
                       </div>
@@ -1368,27 +1376,28 @@ export default function Admin() {
       </AlertDialog>
 
       {/* ===== URLAUBSVERWALTUNG ===== */}
-      <section className="mt-8">
-        <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-          <Calendar className="h-6 w-6" />
+      {/* container/px wie im <main>, sonst kleben diese Abschnitte am Handy am Bildschirmrand */}
+      <section className="container mx-auto px-3 sm:px-4 lg:px-6 mt-8">
+        <h2 className="text-xl sm:text-2xl font-bold mb-4 flex items-center gap-2">
+          <Calendar className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" />
           Urlaubsverwaltung
         </h2>
         <LeaveManagement profiles={profiles.filter(p => p.is_active)} />
       </section>
 
       {/* ===== ZEITKONTO ===== */}
-      <section className="mt-8">
-        <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-          <Clock className="h-6 w-6" />
+      <section className="container mx-auto px-3 sm:px-4 lg:px-6 mt-8">
+        <h2 className="text-xl sm:text-2xl font-bold mb-4 flex items-center gap-2">
+          <Clock className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" />
           Zeitkonten & Zeitausgleich
         </h2>
         <TimeAccountManagement profiles={profiles.filter(p => p.is_active)} />
       </section>
 
       {/* ===== EINSTELLUNGEN SEKTION ===== */}
-      <section className="mt-8">
-        <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-          <Settings className="h-6 w-6" />
+      <section className="container mx-auto px-3 sm:px-4 lg:px-6 mt-8 pb-8">
+        <h2 className="text-xl sm:text-2xl font-bold mb-4 flex items-center gap-2">
+          <Settings className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" />
           Einstellungen
         </h2>
         
@@ -1402,7 +1411,7 @@ export default function Admin() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="disturbance-email">Regiebericht E-Mail-Empfänger</Label>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <Input
                   id="disturbance-email"
                   type="email"
@@ -1410,10 +1419,11 @@ export default function Admin() {
                   value={regiereportEmail}
                   onChange={(e) => setRegiereportEmail(e.target.value)}
                   disabled={loadingSettings}
-                  className="flex-1"
+                  className="flex-1 min-w-0"
                 />
-                <Button 
-                  onClick={saveRegiereportEmail} 
+                <Button
+                  className="w-full sm:w-auto shrink-0"
+                  onClick={saveRegiereportEmail}
                   disabled={savingSettings || loadingSettings}
                 >
                   <Save className="h-4 w-4 mr-2" />

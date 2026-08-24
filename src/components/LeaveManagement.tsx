@@ -200,8 +200,8 @@ export default function LeaveManagement({ profiles }: LeaveManagementProps) {
       {/* Pending requests */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
+          <CardTitle className="flex flex-wrap items-center gap-2 text-xl sm:text-2xl">
+            <Calendar className="h-5 w-5 shrink-0" />
             Offene Urlaubsanträge
             {pendingRequests.length > 0 && (
               <Badge variant="destructive">{pendingRequests.length}</Badge>
@@ -219,22 +219,23 @@ export default function LeaveManagement({ profiles }: LeaveManagementProps) {
               {pendingRequests.map((req) => (
                 <div
                   key={req.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-lg border bg-card"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:p-4 rounded-lg border bg-card"
                 >
-                  <div>
-                    <p className="font-medium">{getProfileName(req.user_id)}</p>
-                    <p className="text-sm text-muted-foreground">
+                  <div className="min-w-0">
+                    <p className="font-medium break-words">{getProfileName(req.user_id)}</p>
+                    <p className="text-sm text-muted-foreground break-words">
                       {format(new Date(req.start_date), "dd.MM.yyyy", { locale: de })} –{" "}
                       {format(new Date(req.end_date), "dd.MM.yyyy", { locale: de })}
                       {" · "}{req.days} {req.days === 1 ? "Tag" : "Tage"}
                     </p>
                     {req.notizen && (
-                      <p className="text-sm mt-1">{req.notizen}</p>
+                      <p className="text-sm mt-1 break-words">{req.notizen}</p>
                     )}
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2 shrink-0">
                     <Button
                       size="sm"
+                      className="h-10 sm:h-9 flex-1 sm:flex-none"
                       onClick={() => handleReview(req.id, "genehmigt")}
                     >
                       <Check className="h-4 w-4 mr-1" /> Genehmigen
@@ -242,6 +243,7 @@ export default function LeaveManagement({ profiles }: LeaveManagementProps) {
                     <Button
                       size="sm"
                       variant="destructive"
+                      className="h-10 sm:h-9 flex-1 sm:flex-none"
                       onClick={() => handleReview(req.id, "abgelehnt")}
                     >
                       <X className="h-4 w-4 mr-1" /> Ablehnen
@@ -257,16 +259,16 @@ export default function LeaveManagement({ profiles }: LeaveManagementProps) {
       {/* Leave Balances */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Urlaubskontingent {selectedYear}</CardTitle>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <CardTitle className="text-xl sm:text-2xl">Urlaubskontingent {selectedYear}</CardTitle>
               <CardDescription>Urlaubstage pro Mitarbeiter verwalten</CardDescription>
             </div>
             <Select
               value={String(selectedYear)}
               onValueChange={(v) => setSelectedYear(Number(v))}
             >
-              <SelectTrigger className="w-[120px]">
+              <SelectTrigger className="w-[120px] shrink-0">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -296,17 +298,17 @@ export default function LeaveManagement({ profiles }: LeaveManagementProps) {
                     key={profile.id}
                     className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-lg border"
                   >
-                    <div>
-                      <p className="font-medium">
+                    <div className="min-w-0">
+                      <p className="font-medium break-words">
                         {profile.vorname} {profile.nachname}
                       </p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-sm text-muted-foreground break-words">
                         {balance
                           ? `${balance.used_days} von ${balance.total_days} Tagen verbraucht · ${remaining} übrig`
                           : "Noch kein Kontingent angelegt"}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
                       {balance && editingBalance === balance.id ? (
                         <div className="flex gap-1">
                           <Input
@@ -317,6 +319,7 @@ export default function LeaveManagement({ profiles }: LeaveManagementProps) {
                           />
                           <Button
                             size="sm"
+                            className="h-10 sm:h-9 min-w-[44px]"
                             onClick={() =>
                               updateTotalDays(balance.id, Number(editDays))
                             }
@@ -328,6 +331,7 @@ export default function LeaveManagement({ profiles }: LeaveManagementProps) {
                         <Button
                           variant="outline"
                           size="sm"
+                          className="h-10 sm:h-9"
                           onClick={() => {
                             setEditingBalance(balance.id);
                             setEditDays(String(balance.total_days));
@@ -339,6 +343,7 @@ export default function LeaveManagement({ profiles }: LeaveManagementProps) {
                         <Button
                           variant="outline"
                           size="sm"
+                          className="h-10 sm:h-9"
                           onClick={() => ensureBalance(profile.id)}
                         >
                           Kontingent anlegen
@@ -356,7 +361,7 @@ export default function LeaveManagement({ profiles }: LeaveManagementProps) {
       {processedRequests.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Bearbeitete Anträge</CardTitle>
+            <CardTitle className="text-xl sm:text-2xl">Bearbeitete Anträge</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
@@ -365,18 +370,18 @@ export default function LeaveManagement({ profiles }: LeaveManagementProps) {
                   key={req.id}
                   className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-lg border"
                 >
-                  <div>
-                    <p className="font-medium">{getProfileName(req.user_id)}</p>
-                    <p className="text-sm text-muted-foreground">
+                  <div className="min-w-0">
+                    <p className="font-medium break-words">{getProfileName(req.user_id)}</p>
+                    <p className="text-sm text-muted-foreground break-words">
                       {format(new Date(req.start_date), "dd.MM.yyyy", { locale: de })} –{" "}
                       {format(new Date(req.end_date), "dd.MM.yyyy", { locale: de })}
                       {" · "}{req.days} {req.days === 1 ? "Tag" : "Tage"}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
                     {statusBadge(req.status)}
                     {req.reviewed_by && (
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs text-muted-foreground break-words">
                         von {getProfileName(req.reviewed_by)}
                       </span>
                     )}

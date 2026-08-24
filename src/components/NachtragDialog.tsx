@@ -92,24 +92,26 @@ export const MaterialRowsEditor = ({
     <div className="space-y-2">
       <Label>Material</Label>
       {rows.map((row) => (
-        <div key={row.key} className="flex items-center gap-2">
+        // Am Handy zweizeilig: Material über die volle Breite, darunter Menge/Einheit/Löschen.
+        // Ab sm wie bisher alles in einer Zeile.
+        <div key={row.key} className="flex flex-wrap items-center gap-2">
           <Input
             placeholder="Material"
             value={row.material}
             onChange={(e) => updateRow(row.key, { material: e.target.value, material_id: null })}
-            className="flex-1 min-w-0"
+            className="w-full sm:w-auto sm:flex-1 min-w-0"
           />
           <Input
             placeholder="Menge"
             value={row.menge}
             onChange={(e) => updateRow(row.key, { menge: e.target.value })}
-            className="w-16 sm:w-20 shrink-0"
+            className="flex-1 min-w-0 sm:flex-none sm:w-20"
           />
           <Input
             placeholder="Einh."
             value={row.einheit}
             onChange={(e) => updateRow(row.key, { einheit: e.target.value })}
-            className="w-14 sm:w-20 shrink-0"
+            className="flex-1 min-w-0 sm:flex-none sm:w-20"
           />
           <Button
             type="button"
@@ -138,8 +140,8 @@ export const MaterialSummaryList = ({ materials }: { materials: MaterialSummaryI
   <ul className="text-sm space-y-1">
     {materials.map((m) => (
       <li key={m.id} className="flex gap-2">
-        <span>•</span>
-        <span>
+        <span className="shrink-0">•</span>
+        <span className="min-w-0 break-words">
           {[m.menge, m.einheit].filter(Boolean).join(" ")}
           {(m.menge || m.einheit) && " "}
           {m.material}
@@ -353,8 +355,8 @@ export function NachtragDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileSignature className="h-5 w-5" />
+          <DialogTitle className="flex items-center gap-2 pr-6">
+            <FileSignature className="h-5 w-5 shrink-0" />
             {signMode ? "Nachtrag unterschreiben" : "Neuer Nachtrag"}
           </DialogTitle>
           <DialogDescription>
@@ -368,7 +370,8 @@ export function NachtragDialog({
           /* Unterschrifts-Ansicht: Zusammenfassung für den Kunden + SignaturePad */
           <div className="space-y-4">
             <Card>
-              <CardContent className="p-4 space-y-3 text-sm">
+              {/* break-words: frei eingegebene Titel/Texte dürfen den Dialog nicht sprengen */}
+              <CardContent className="p-4 space-y-3 text-sm break-words">
                 <div>
                   <p className="text-xs text-muted-foreground mb-0.5">Nachtrag</p>
                   <p className="font-semibold">{titel}</p>
@@ -416,7 +419,7 @@ export function NachtragDialog({
             <div className="space-y-1.5">
               <Label>Projekt {projectId ? "" : "*"}</Label>
               {projectId ? (
-                <div className="rounded-md border bg-muted/50 px-3 py-2 text-sm">
+                <div className="rounded-md border bg-muted/50 px-3 py-2 text-sm break-words">
                   {selectedProjectLabel || "Projekt wird geladen..."}
                 </div>
               ) : (

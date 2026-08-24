@@ -291,9 +291,9 @@ const ProjectDetail = () => {
           title={project ? `${projectLabel(project)} – ${titleMap[type]}` : titleMap[type]}
           backPath={`/projects/${projectId}`}
         />
-        <main className="container mx-auto px-4 py-6 max-w-5xl">
+        <main className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 max-w-5xl">
           <Card>
-            <CardContent className="p-8 text-center text-muted-foreground">
+            <CardContent className="p-6 sm:p-8 text-center text-muted-foreground">
               {type === "chef"
                 ? "Der Chefordner ist nur für Administratoren zugänglich."
                 : "Dieser Ordner ist für dieses Projekt deaktiviert."}
@@ -311,21 +311,21 @@ const ProjectDetail = () => {
         backPath={`/projects/${projectId}`}
       />
 
-      <main className="container mx-auto px-4 py-6 max-w-5xl">
+      <main className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 max-w-5xl">
         <Card>
-          <CardHeader>
-            <CardTitle>{titleMap[type]}</CardTitle>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-xl sm:text-2xl break-words">{titleMap[type]}</CardTitle>
             <CardDescription>
               {files.length} {files.length === 1 ? 'Datei' : 'Dateien'}
             </CardDescription>
           </CardHeader>
 
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             {/* Upload section - Admin only */}
             {isAdmin && (
               <div className="mb-6">
                 <label htmlFor="file-upload" className="cursor-pointer">
-                  <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary/50 transition-colors">
+                  <div className="border-2 border-dashed rounded-lg p-4 sm:p-6 text-center hover:border-primary/50 transition-colors">
                     <Upload className="h-8 w-8 mx-auto mb-3 text-muted-foreground" />
                     <p className="text-base font-medium mb-1">
                       {uploading ? "Lädt hoch..." : "Datei auswählen"}
@@ -360,7 +360,7 @@ const ProjectDetail = () => {
                 {files.map((file) => (
                   <div
                     key={file.id}
-                    className="flex items-center gap-3 p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                    className="flex items-center gap-2 sm:gap-3 p-3 sm:p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
                   >
                     {urlsLoading ? (
                       <div className="w-12 h-12 sm:w-16 sm:h-16 bg-muted animate-pulse rounded shrink-0" />
@@ -377,16 +377,18 @@ const ProjectDetail = () => {
                       <FileText className="w-12 h-12 sm:w-16 sm:h-16 text-muted-foreground shrink-0" />
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{file.name}</p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="font-medium truncate text-sm sm:text-base">{file.name}</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground">
                         {new Date(file.created_at).toLocaleDateString("de-DE")}
                       </p>
                     </div>
 
-                    <div className="flex gap-2 ml-2">
+                    {/* shrink-0: Knöpfe dürfen nicht gequetscht werden, der Dateiname kürzt sich stattdessen */}
+                    <div className="flex gap-1 sm:gap-2 sm:ml-2 shrink-0">
                       <Button
                         variant="outline"
                         size="sm"
+                        className="h-10 w-10 p-0 sm:h-9 sm:w-auto sm:px-3"
                         onClick={() => handleFileOpen(file)}
                       >
                         <Eye className="w-4 h-4 sm:mr-2" />
@@ -396,6 +398,7 @@ const ProjectDetail = () => {
                         <Button
                           variant="destructive"
                           size="sm"
+                          className="h-10 w-10 p-0 sm:h-9 sm:w-9"
                           onClick={() => handleDelete(file)}
                         >
                           <Trash2 className="w-4 h-4" />

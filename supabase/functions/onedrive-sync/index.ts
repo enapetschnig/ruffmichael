@@ -4,7 +4,7 @@
 // Abgeglichen wird pro Projekt:
 //   project-files/{id}/**            <->  {Root}/{Projektname}/**
 //   project-photos/{id}/*            <->  {Root}/{Projektname}/Fotos/*
-//   project-plans/{id}/*             <->  {Root}/{Projektname}/Pläne/*
+//   project-plans/{id}/*             <->  {Root}/{Projektname}/Plan/*
 //   project-reports/{id}/*           <->  {Root}/{Projektname}/Regieberichte/*
 //   project-materials/{id}/*         <->  {Root}/{Projektname}/Material/*
 // BEWUSST NICHT synchronisiert: project-chef (vertraulich, nur Admin).
@@ -35,14 +35,17 @@ const ROOT_NAME = Deno.env.get("ONEDRIVE_ROOT") || "Ruff Michael Projekte";
 // Feste Kategorie-Ordner <-> Buckets (Chef fehlt absichtlich)
 const CATEGORY_BUCKETS: Record<string, string> = {
   "Fotos": "project-photos",
+  "Plan": "project-plans",
   "Plaene": "project-plans",
   "Pläne": "project-plans",
   "Regieberichte": "project-reports",
   "Material": "project-materials",
 };
+// Ordnernamen exakt so, wie Michael Ruff sie in OneDrive führt (ausgezählt über
+// 44 echte Projektordner): "Fotos" (Mehrzahl) und "Plan" (Einzahl).
 const CATEGORY_REMOTE_NAME: Record<string, string> = {
   "project-photos": "Fotos",
-  "project-plans": "Pläne",
+  "project-plans": "Plan",
   "project-reports": "Regieberichte",
   "project-materials": "Material",
 };

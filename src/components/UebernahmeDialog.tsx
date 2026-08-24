@@ -267,8 +267,8 @@ export function UebernahmeDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileCheck className="h-5 w-5" />
+          <DialogTitle className="flex items-center gap-2 pr-6">
+            <FileCheck className="h-5 w-5 shrink-0" />
             {signMode ? "Übernahmebestätigung unterschreiben" : "Übernahmebestätigung"}
           </DialogTitle>
           <DialogDescription>
@@ -282,7 +282,8 @@ export function UebernahmeDialog({
           /* Unterschrifts-Ansicht: Zusammenfassung für den Kunden + SignaturePad */
           <div className="space-y-4">
             <Card>
-              <CardContent className="p-4 space-y-3 text-sm">
+              {/* break-words: lange Namen/Adressen dürfen den Dialog nicht sprengen */}
+              <CardContent className="p-4 space-y-3 text-sm break-words">
                 <div>
                   <p className="text-xs text-muted-foreground mb-0.5">Kunde</p>
                   <p className="font-semibold">{kundeName}</p>
@@ -366,7 +367,7 @@ export function UebernahmeDialog({
             <div className="space-y-1.5">
               <Label>Projekt {projectId ? "" : "*"}</Label>
               {projectId ? (
-                <div className="rounded-md border bg-muted/50 px-3 py-2 text-sm">
+                <div className="rounded-md border bg-muted/50 px-3 py-2 text-sm break-words">
                   {selectedProjectLabel || "Projekt wird geladen..."}
                 </div>
               ) : (
@@ -443,8 +444,8 @@ export function UebernahmeDialog({
               />
             </div>
 
-            <div className="flex items-center justify-between rounded-lg border p-3">
-              <Label htmlFor="uebernahme-bedienungsanleitung" className="cursor-pointer">
+            <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
+              <Label htmlFor="uebernahme-bedienungsanleitung" className="cursor-pointer min-w-0">
                 Bedienungsanleitung übergeben
               </Label>
               <Switch

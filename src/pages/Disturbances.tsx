@@ -176,29 +176,30 @@ const Disturbances = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b bg-card sticky top-0 z-50 shadow-sm">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
+        <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="flex-shrink-0">
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h1 className="text-lg font-semibold">Regieberichte</h1>
+            <h1 className="text-base sm:text-lg font-semibold truncate">Regieberichte</h1>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6 max-w-4xl">
+      <main className="container mx-auto px-3 sm:px-4 lg:px-6 py-6 max-w-4xl">
         {/* Header with action button */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center mb-6">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Zap className="h-6 w-6 text-primary" />
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-between items-stretch sm:items-center mb-6">
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+              <Zap className="h-5 w-5 sm:h-6 sm:w-6 text-primary flex-shrink-0" />
               Regieberichte
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-sm sm:text-base text-muted-foreground">
               Service-Einsätze dokumentieren
             </p>
           </div>
-          <Button onClick={() => setShowForm(true)} className="gap-2">
+          {/* Am Handy volle Breite, damit der Haupt-Button gut treffbar ist */}
+          <Button onClick={() => setShowForm(true)} className="gap-2 w-full sm:w-auto flex-shrink-0">
             <Plus className="h-4 w-4" />
             Neuer Regiebericht
           </Button>
@@ -206,8 +207,8 @@ const Disturbances = () => {
 
         {/* Filter Section */}
         <Card className="mb-6">
-          <CardContent className="pt-4">
-            <div className="flex flex-col sm:flex-row gap-4">
+          <CardContent className="pt-4 px-4 sm:px-6">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -238,10 +239,10 @@ const Disturbances = () => {
         {/* Disturbances List */}
         {filteredDisturbances.length === 0 ? (
           <Card>
-            <CardContent className="py-12 text-center">
+            <CardContent className="py-12 px-4 sm:px-6 text-center">
               <Zap className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">Keine Einträge gefunden</h3>
-              <p className="text-muted-foreground mb-4">
+              <h3 className="text-base sm:text-lg font-medium mb-2">Keine Einträge gefunden</h3>
+              <p className="text-sm sm:text-base text-muted-foreground mb-4">
                 {searchQuery || statusFilter !== "alle"
                   ? "Keine Einträge entsprechen Ihren Filterkriterien"
                   : "Erstellen Sie Ihren ersten Regiebericht"}
@@ -262,28 +263,28 @@ const Disturbances = () => {
                 className="cursor-pointer hover:shadow-md transition-shadow"
                 onClick={() => navigate(`/disturbances/${disturbance.id}`)}
               >
-                <CardContent className="pt-4">
+                <CardContent className="pt-4 px-4 sm:px-6">
                   <div className="flex flex-col sm:flex-row gap-4 justify-between">
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h3 className="font-semibold text-lg flex items-center gap-2">
-                            <User className="h-4 w-4 text-muted-foreground" />
-                            {disturbance.kunde_name}
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div className="flex flex-col sm:flex-row items-start sm:justify-between gap-2">
+                        <div className="min-w-0">
+                          <h3 className="font-semibold text-base sm:text-lg flex items-start gap-2 break-words">
+                            <User className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />
+                            <span className="min-w-0 break-words">{disturbance.kunde_name}</span>
                           </h3>
                           {isAdmin && (disturbance.profile_vorname || disturbance.profile_nachname) && (
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-xs text-muted-foreground break-words">
                               Erstellt von: {disturbance.profile_vorname} {disturbance.profile_nachname}
                             </p>
                           )}
                         </div>
-                        <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex items-center gap-2 flex-wrap sm:flex-shrink-0">
                           {getStatusBadge(disturbance.status, disturbance.is_verrechnet)}
                           {isAdmin && disturbance.status !== "offen" && (
                             <Button
                               variant={disturbance.is_verrechnet ? "secondary" : "outline"}
                               size="sm"
-                              className="h-6 text-xs"
+                              className="h-8 text-xs"
                               onClick={(e) => handleToggleVerrechnet(e, disturbance.id, disturbance.is_verrechnet)}
                             >
                               {disturbance.is_verrechnet ? "✓ Verrechnet" : "Verrechnen"}
@@ -292,24 +293,24 @@ const Disturbances = () => {
                         </div>
                       </div>
 
-                      <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
-                          <Calendar className="h-4 w-4" />
+                          <Calendar className="h-4 w-4 flex-shrink-0" />
                           {format(new Date(disturbance.datum), "dd.MM.yyyy", { locale: de })}
                         </span>
                         <span className="flex items-center gap-1">
-                          <Clock className="h-4 w-4" />
+                          <Clock className="h-4 w-4 flex-shrink-0" />
                           {disturbance.start_time.slice(0, 5)} - {disturbance.end_time.slice(0, 5)} ({disturbance.stunden.toFixed(1)}h)
                         </span>
                         {disturbance.kunde_adresse && (
-                          <span className="flex items-center gap-1">
-                            <MapPin className="h-4 w-4" />
-                            {disturbance.kunde_adresse}
+                          <span className="flex items-start gap-1 min-w-0 max-w-full">
+                            <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                            <span className="min-w-0 break-words">{disturbance.kunde_adresse}</span>
                           </span>
                         )}
                       </div>
 
-                      <p className="text-sm line-clamp-2">{disturbance.beschreibung}</p>
+                      <p className="text-sm line-clamp-2 break-words">{disturbance.beschreibung}</p>
                     </div>
                   </div>
                 </CardContent>

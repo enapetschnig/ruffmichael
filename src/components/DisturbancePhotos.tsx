@@ -195,10 +195,10 @@ export const DisturbancePhotos = ({ disturbanceId, canEdit }: DisturbancePhotosP
   return (
     <>
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Camera className="h-5 w-5" />
+        <CardHeader className="px-4 sm:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle className="text-base sm:text-lg flex items-center gap-2 min-w-0">
+              <Camera className="h-5 w-5 flex-shrink-0" />
               Fotos
             </CardTitle>
             {canEdit && (
@@ -223,7 +223,7 @@ export const DisturbancePhotos = ({ disturbanceId, canEdit }: DisturbancePhotosP
             onChange={handleUpload}
           />
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 sm:px-6">
           {loading ? (
             <div className="text-center py-8 text-muted-foreground">
               Lädt Fotos...
@@ -243,19 +243,21 @@ export const DisturbancePhotos = ({ disturbanceId, canEdit }: DisturbancePhotosP
                     onClick={() => setSelectedPhoto(getPublicUrl(photo.file_path))}
                   />
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded-lg pointer-events-none" />
+                  {/* Lupe nur am Desktop: am Handy öffnet schon der Tipp aufs Bild die Großansicht */}
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="absolute top-1 right-1 h-7 w-7 bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
+                    className="absolute top-1 right-1 h-7 w-7 bg-black/50 text-white hidden sm:inline-flex opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
                     onClick={() => setSelectedPhoto(getPublicUrl(photo.file_path))}
                   >
                     <ZoomIn className="h-4 w-4" />
                   </Button>
                   {canEdit && (
+                    // Am Handy dauerhaft sichtbar (kein Hover) und größeres Tippziel
                     <Button
                       variant="destructive"
                       size="icon"
-                      className="absolute bottom-1 right-1 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute bottom-1 right-1 h-9 w-9 sm:h-7 sm:w-7 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                       onClick={() => handleDelete(photo)}
                     >
                       <Trash2 className="h-4 w-4" />

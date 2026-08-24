@@ -151,21 +151,22 @@ export default function Employees() {
   }
 
   return (
-    <div className="container mx-auto p-4">
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+    <div className="container mx-auto p-3 sm:p-4">
+      {/* Am Handy untereinander – Titel + zwei lange Buttons passen sonst nicht in eine Zeile */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6">
+        <div className="flex items-center gap-2 min-w-0">
+          <Button variant="ghost" size="icon" className="shrink-0" onClick={() => navigate(-1)}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <h1 className="text-3xl font-bold">Mitarbeiterverwaltung</h1>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold break-words min-w-0">Mitarbeiterverwaltung</h1>
         </div>
 
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowSizesDialog(true)}>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" className="w-full sm:w-auto" onClick={() => setShowSizesDialog(true)}>
             <Shirt className="w-4 h-4 mr-2" />
             Arbeitskleidung/Schuhe Größen
           </Button>
-          <Button onClick={() => setShowCreateDialog(true)}>
+          <Button className="w-full sm:w-auto" onClick={() => setShowCreateDialog(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Neuer Mitarbeiter
           </Button>
@@ -179,32 +180,33 @@ export default function Employees() {
             className="cursor-pointer hover:shadow-lg transition-shadow"
             onClick={() => setSelectedEmployee(emp)}
           >
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Avatar>
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl min-w-0">
+                <Avatar className="shrink-0">
                   <AvatarFallback>
                     {emp.vorname[0]}
                     {emp.nachname[0]}
                   </AvatarFallback>
                 </Avatar>
-                {emp.vorname} {emp.nachname}
+                <span className="min-w-0 break-words">{emp.vorname} {emp.nachname}</span>
               </CardTitle>
-              <CardDescription>{emp.position || "Mitarbeiter"}</CardDescription>
+              <CardDescription className="break-words">{emp.position || "Mitarbeiter"}</CardDescription>
             </CardHeader>
 
-            <CardContent>
+            <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
               <div className="space-y-2 text-sm">
-                <div className="flex items-center gap-2">
-                  <Mail className="w-4 h-4 text-muted-foreground" />
-                  {emp.email || "Keine E-Mail"}
+                {/* min-w-0 + truncate: lange E-Mails/Adressen dürfen die Karte nicht sprengen */}
+                <div className="flex items-center gap-2 min-w-0">
+                  <Mail className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span className="min-w-0 truncate">{emp.email || "Keine E-Mail"}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Phone className="w-4 h-4 text-muted-foreground" />
-                  {emp.telefon || "Keine Telefonnummer"}
+                <div className="flex items-center gap-2 min-w-0">
+                  <Phone className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span className="min-w-0 truncate">{emp.telefon || "Keine Telefonnummer"}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-muted-foreground" />
-                  {emp.plz} {emp.ort || "Kein Ort"}
+                <div className="flex items-center gap-2 min-w-0">
+                  <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span className="min-w-0 truncate">{emp.plz} {emp.ort || "Kein Ort"}</span>
                 </div>
                 {emp.eintritt_datum && (
                   <div className="text-muted-foreground mt-2">
@@ -219,36 +221,37 @@ export default function Employees() {
 
       {/* Detail-Dialog */}
       <Dialog open={!!selectedEmployee} onOpenChange={() => setSelectedEmployee(null)}>
-        <DialogContent className="max-w-5xl max-h-[90vh]">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="break-words pr-6">
               {selectedEmployee?.vorname} {selectedEmployee?.nachname}
             </DialogTitle>
           </DialogHeader>
 
           <Tabs defaultValue="stammdaten">
+            {/* Am Handy kleinere Schrift/Abstände, damit die drei Reiter nicht überlaufen */}
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="stammdaten">
-                <User className="w-4 h-4 mr-2" />
-                Stammdaten
+              <TabsTrigger value="stammdaten" className="px-1 sm:px-3 text-xs sm:text-sm">
+                <User className="w-4 h-4 mr-1 sm:mr-2 shrink-0" />
+                <span className="truncate">Stammdaten</span>
               </TabsTrigger>
-              <TabsTrigger value="dokumente">
-                <FileText className="w-4 h-4 mr-2" />
-                Dokumente
+              <TabsTrigger value="dokumente" className="px-1 sm:px-3 text-xs sm:text-sm">
+                <FileText className="w-4 h-4 mr-1 sm:mr-2 shrink-0" />
+                <span className="truncate">Dokumente</span>
               </TabsTrigger>
-              <TabsTrigger value="stunden">
-                <Clock className="w-4 h-4 mr-2" />
-                Überstunden
+              <TabsTrigger value="stunden" className="px-1 sm:px-3 text-xs sm:text-sm">
+                <Clock className="w-4 h-4 mr-1 sm:mr-2 shrink-0" />
+                <span className="truncate">Überstunden</span>
               </TabsTrigger>
             </TabsList>
 
             {/* Tab 1: Stammdaten */}
             <TabsContent value="stammdaten">
-              <ScrollArea className="h-[500px] pr-4">
+              <ScrollArea className="h-[55vh] sm:h-[500px] pr-2 sm:pr-4">
                 <form onSubmit={handleSaveEmployee} className="space-y-6">
                   <div>
-                    <h3 className="text-lg font-semibold mb-3">Persönliche Daten</h3>
-                    <div className="grid grid-cols-2 gap-4">
+                    <h3 className="text-base sm:text-lg font-semibold mb-3">Persönliche Daten</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <Label>Vorname *</Label>
                         <Input
@@ -279,9 +282,9 @@ export default function Employees() {
                   <Separator />
 
                   <div>
-                    <h3 className="text-lg font-semibold mb-3">Kontaktdaten</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="col-span-2">
+                    <h3 className="text-base sm:text-lg font-semibold mb-3">Kontaktdaten</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="sm:col-span-2">
                         <Label>Adresse</Label>
                         <Input
                           value={formData.adresse || ""}
@@ -325,8 +328,8 @@ export default function Employees() {
                   <Separator />
 
                   <div>
-                    <h3 className="text-lg font-semibold mb-3">Beschäftigung</h3>
-                    <div className="grid grid-cols-2 gap-4">
+                    <h3 className="text-base sm:text-lg font-semibold mb-3">Beschäftigung</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <Label>SV-Nummer</Label>
                         <Input
@@ -392,9 +395,9 @@ export default function Employees() {
                   <Separator />
 
                   <div>
-                    <h3 className="text-lg font-semibold mb-3">Bankverbindung</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="col-span-2">
+                    <h3 className="text-base sm:text-lg font-semibold mb-3">Bankverbindung</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="sm:col-span-2">
                         <Label>IBAN</Label>
                         <Input
                           value={formData.iban || ""}
@@ -423,8 +426,8 @@ export default function Employees() {
                   <Separator />
 
                   <div>
-                    <h3 className="text-lg font-semibold mb-3">Arbeitskleidung</h3>
-                    <div className="grid grid-cols-2 gap-4">
+                    <h3 className="text-base sm:text-lg font-semibold mb-3">Arbeitskleidung</h3>
+                    <div className="grid grid-cols-2 gap-3 sm:gap-4">
                       <div>
                         <Label>Kleidungsgröße</Label>
                         <Select
@@ -566,22 +569,23 @@ export default function Employees() {
 
       {/* Größen-Übersicht Dialog */}
       <Dialog open={showSizesDialog} onOpenChange={setShowSizesDialog}>
-        <DialogContent className="max-w-4xl max-h-[90vh]">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Shirt className="w-5 h-5" />
-              Arbeitskleidung & Schuhgrößen - Übersicht
+            <DialogTitle className="flex items-center gap-2 pr-6">
+              <Shirt className="w-5 h-5 shrink-0" />
+              <span className="break-words">Arbeitskleidung & Schuhgrößen - Übersicht</span>
             </DialogTitle>
           </DialogHeader>
-          <ScrollArea className="max-h-[600px]">
-            <div className="rounded-md border">
-              <table className="w-full">
+          <ScrollArea className="max-h-[55vh] sm:max-h-[600px]">
+            {/* Tabelle scrollt für sich seitlich – die Seite selbst darf nie horizontal scrollen */}
+            <div className="rounded-md border overflow-x-auto">
+              <table className="w-full min-w-[520px] text-sm sm:text-base">
                 <thead className="bg-muted/50">
                   <tr>
-                    <th className="px-4 py-3 text-left font-semibold">Name</th>
-                    <th className="px-4 py-3 text-left font-semibold">Position</th>
-                    <th className="px-4 py-3 text-center font-semibold">Kleidungsgröße</th>
-                    <th className="px-4 py-3 text-center font-semibold">Schuhgröße</th>
+                    <th className="px-2 sm:px-4 py-3 text-left font-semibold whitespace-nowrap">Name</th>
+                    <th className="px-2 sm:px-4 py-3 text-left font-semibold whitespace-nowrap">Position</th>
+                    <th className="px-2 sm:px-4 py-3 text-center font-semibold whitespace-nowrap">Kleidungsgröße</th>
+                    <th className="px-2 sm:px-4 py-3 text-center font-semibold whitespace-nowrap">Schuhgröße</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -598,13 +602,13 @@ export default function Employees() {
                           setSelectedEmployee(emp);
                         }}
                       >
-                        <td className="px-4 py-3 font-medium">
+                        <td className="px-2 sm:px-4 py-3 font-medium">
                           {emp.vorname} {emp.nachname}
                         </td>
-                        <td className="px-4 py-3 text-muted-foreground">
+                        <td className="px-2 sm:px-4 py-3 text-muted-foreground">
                           {emp.position || "Mitarbeiter"}
                         </td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-2 sm:px-4 py-3 text-center">
                           {emp.kleidungsgroesse ? (
                             <span className="inline-flex items-center justify-center w-12 h-8 rounded-md bg-primary/10 text-primary font-semibold">
                               {emp.kleidungsgroesse}
@@ -613,7 +617,7 @@ export default function Employees() {
                             <span className="text-muted-foreground text-sm">-</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-2 sm:px-4 py-3 text-center">
                           {emp.schuhgroesse ? (
                             <span className="inline-flex items-center justify-center w-12 h-8 rounded-md bg-secondary/50 text-secondary-foreground font-semibold">
                               {emp.schuhgroesse}

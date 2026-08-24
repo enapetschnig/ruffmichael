@@ -103,7 +103,8 @@ export function MaterialPicker({ onSelect, triggerLabel }: MaterialPickerProps):
             />
           </div>
         </div>
-        <div className="max-h-[60vh] overflow-y-auto border-t">
+        {/* Am Handy niedriger: bei geöffneter Tastatur bleibt die Liste sonst zur Hälfte verdeckt */}
+        <div className="max-h-[50vh] sm:max-h-[60vh] overflow-y-auto border-t">
           {loading ? (
             <p className="text-center text-sm text-muted-foreground py-8">
               Lade Materialien...

@@ -354,6 +354,7 @@ export function DrawingEditor({ open, onOpenChange, defaultProjectId, onSaved }:
     }
   };
 
+  // Am Handy größere Tippfläche (40px), am Desktop wie bisher kompakt (36px).
   const toolButton = (t: Tool, icon: React.ReactNode, label: string) => (
     <Button
       key={t}
@@ -363,7 +364,7 @@ export function DrawingEditor({ open, onOpenChange, defaultProjectId, onSaved }:
       onClick={() => { commitTextDraft(); setTool(t); }}
       title={label}
       aria-label={label}
-      className="h-9 w-9"
+      className="h-10 w-10 sm:h-9 sm:w-9 shrink-0"
     >
       {icon}
     </Button>
@@ -372,16 +373,16 @@ export function DrawingEditor({ open, onOpenChange, defaultProjectId, onSaved }:
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onOpenChange(false); }}>
       <DialogContent className="max-w-[98vw] w-[98vw] h-[94dvh] p-3 sm:p-4 flex flex-col gap-2">
-        <DialogHeader className="space-y-0.5">
-          <DialogTitle>Zeichnung erstellen</DialogTitle>
-          <DialogDescription>
+        <DialogHeader className="space-y-0.5 pr-8">
+          <DialogTitle className="text-base sm:text-lg">Zeichnung erstellen</DialogTitle>
+          <DialogDescription className="text-xs sm:text-sm">
             Frei zeichnen (auch mit Stift/Tablet), Formen und Text einfügen — wird im Fotos-Ordner des Projekts gespeichert.
           </DialogDescription>
         </DialogHeader>
 
-        {/* Werkzeugleiste */}
+        {/* Werkzeugleiste — bricht am Handy in mehrere Zeilen um */}
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             {toolButton("pen", <Pencil className="h-4 w-4" />, "Stift (frei zeichnen)")}
             {toolButton("line", <Slash className="h-4 w-4" />, "Linie")}
             {toolButton("rect", <Square className="h-4 w-4" />, "Rechteck")}
@@ -390,10 +391,11 @@ export function DrawingEditor({ open, onOpenChange, defaultProjectId, onSaved }:
             {toolButton("eraser", <Eraser className="h-4 w-4" />, "Radierer")}
           </div>
 
-          <div className="h-6 w-px bg-border" />
+          {/* Trenner nur am größeren Bildschirm — am Handy umbricht die Leiste ohnehin */}
+          <div className="hidden sm:block h-6 w-px bg-border" />
 
           {/* Farben */}
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             {COLORS.map((c) => (
               <button
                 key={c}
@@ -401,16 +403,17 @@ export function DrawingEditor({ open, onOpenChange, defaultProjectId, onSaved }:
                 onClick={() => setColor(c)}
                 title={`Farbe ${c}`}
                 aria-label={`Farbe ${c}`}
-                className={`h-7 w-7 rounded-full border-2 ${color === c ? "ring-2 ring-primary ring-offset-1" : ""}`}
+                className={`h-9 w-9 sm:h-7 sm:w-7 shrink-0 rounded-full border-2 ${color === c ? "ring-2 ring-primary ring-offset-1" : ""}`}
                 style={{ backgroundColor: c, borderColor: "#e5e7eb" }}
               />
             ))}
           </div>
 
-          <div className="h-6 w-px bg-border" />
+          {/* Trenner nur am größeren Bildschirm — am Handy umbricht die Leiste ohnehin */}
+          <div className="hidden sm:block h-6 w-px bg-border" />
 
           {/* Strichstärke (steuert bei Text auch die Schriftgröße) */}
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             {WIDTHS.map((w) => (
               <button
                 key={w}
@@ -418,27 +421,28 @@ export function DrawingEditor({ open, onOpenChange, defaultProjectId, onSaved }:
                 onClick={() => setWidth(w)}
                 title={`Stärke ${w}`}
                 aria-label={`Stärke ${w}`}
-                className={`h-9 w-9 rounded-md border flex items-center justify-center ${width === w ? "border-primary bg-primary/10" : "border-input"}`}
+                className={`h-10 w-10 sm:h-9 sm:w-9 shrink-0 rounded-md border flex items-center justify-center ${width === w ? "border-primary bg-primary/10" : "border-input"}`}
               >
                 <span className="rounded-full bg-foreground" style={{ width: w + 2, height: w + 2 }} />
               </button>
             ))}
           </div>
 
-          <div className="h-6 w-px bg-border" />
+          {/* Trenner nur am größeren Bildschirm — am Handy umbricht die Leiste ohnehin */}
+          <div className="hidden sm:block h-6 w-px bg-border" />
 
-          <div className="flex items-center gap-1">
-            <Button type="button" size="icon" variant="outline" className="h-9 w-9" onClick={undo} disabled={undoStack.length === 0} title="Rückgängig" aria-label="Rückgängig">
+          <div className="flex flex-wrap items-center gap-1">
+            <Button type="button" size="icon" variant="outline" className="h-10 w-10 sm:h-9 sm:w-9 shrink-0" onClick={undo} disabled={undoStack.length === 0} title="Rückgängig" aria-label="Rückgängig">
               <Undo2 className="h-4 w-4" />
             </Button>
-            <Button type="button" size="icon" variant="outline" className="h-9 w-9" onClick={redo} disabled={redoStack.length === 0} title="Wiederholen" aria-label="Wiederholen">
+            <Button type="button" size="icon" variant="outline" className="h-10 w-10 sm:h-9 sm:w-9 shrink-0" onClick={redo} disabled={redoStack.length === 0} title="Wiederholen" aria-label="Wiederholen">
               <Redo2 className="h-4 w-4" />
             </Button>
             <Button
               type="button"
               size="icon"
               variant="outline"
-              className="h-9 w-9"
+              className="h-10 w-10 sm:h-9 sm:w-9 shrink-0"
               onClick={() => { setTextDraft(null); if (shapes.length > 0) commit([]); }}
               disabled={shapes.length === 0}
               title="Alles löschen"
@@ -461,6 +465,7 @@ export function DrawingEditor({ open, onOpenChange, defaultProjectId, onSaved }:
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerUp}
           />
+          {/* max-w: das Texteingabefeld darf am Handy nie breiter als die Zeichenfläche sein */}
           {textDraft && (
             <Input
               autoFocus
@@ -472,7 +477,7 @@ export function DrawingEditor({ open, onOpenChange, defaultProjectId, onSaved }:
               }}
               onBlur={commitTextDraft}
               placeholder="Text eingeben…"
-              className="absolute z-10 w-56 bg-white"
+              className="absolute z-10 w-56 max-w-[calc(100%-1rem)] bg-white"
               style={{ left: Math.min(textDraft.pos.x, (wrapRef.current?.clientWidth ?? 300) - 230), top: textDraft.pos.y }}
             />
           )}
@@ -480,22 +485,23 @@ export function DrawingEditor({ open, onOpenChange, defaultProjectId, onSaved }:
 
         {/* Projekt + Speichern */}
         <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
-          <div className="flex-1 space-y-1">
+          <div className="flex-1 min-w-0 space-y-1">
             <Label>Projekt (Speicherort: Fotos-Ordner) *</Label>
             <Select value={projectId} onValueChange={setProjectId}>
               <SelectTrigger>
                 <SelectValue placeholder="Projekt auswählen" />
               </SelectTrigger>
-              <SelectContent>
+              {/* Lange Projekt-/Adresstexte dürfen die Liste nicht über den Bildschirm hinaus ziehen */}
+              <SelectContent className="max-w-[calc(100vw-2rem)]">
                 {projects.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
+                  <SelectItem key={p.id} value={p.id} className="break-words">
                     {projectLabel(p)}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={handleSave} disabled={!projectId || shapes.length === 0 || saving} className="gap-2 sm:w-auto w-full">
+          <Button onClick={handleSave} disabled={!projectId || shapes.length === 0 || saving} className="gap-2 sm:w-auto w-full shrink-0">
             <Save className="h-4 w-4" />
             {saving ? "Speichert…" : "In Projekt speichern"}
           </Button>

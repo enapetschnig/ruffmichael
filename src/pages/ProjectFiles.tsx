@@ -555,19 +555,20 @@ const ProjectFiles = () => {
           <Button
             variant="ghost"
             size="sm"
-            className={`h-8 px-2 ${path.length === 0 ? "font-semibold" : ""}`}
+            className={`h-9 px-2 max-w-full ${path.length === 0 ? "font-semibold" : ""}`}
             onClick={() => setPath([])}
           >
-            <Home className="h-4 w-4 mr-1" />
-            Projektordner
+            <Home className="h-4 w-4 mr-1 shrink-0" />
+            <span className="truncate">Projektordner</span>
           </Button>
           {path.map((segment, index) => (
-            <span key={`${segment}-${index}`} className="flex items-center gap-0.5">
+            <span key={`${segment}-${index}`} className="flex items-center gap-0.5 min-w-0 max-w-full">
               <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+              {/* Ordnernamen können sehr lang sein: immer begrenzen und kürzen */}
               <Button
                 variant="ghost"
                 size="sm"
-                className={`h-8 px-2 max-w-[10rem] sm:max-w-none ${
+                className={`h-9 px-2 max-w-[9rem] sm:max-w-[18rem] ${
                   index === path.length - 1 ? "font-semibold" : ""
                 }`}
                 onClick={() => setPath(path.slice(0, index + 1))}
@@ -631,7 +632,7 @@ const ProjectFiles = () => {
                 {folders.map((folder) => (
                   <div
                     key={folder.name}
-                    className="flex items-center gap-3 px-3 sm:px-4 py-3 hover:bg-muted/50 cursor-pointer transition-colors"
+                    className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 hover:bg-muted/50 cursor-pointer transition-colors"
                     onClick={() => setPath([...path, folder.name])}
                   >
                     <Folder className="h-5 w-5 text-primary shrink-0 fill-primary/20" />
@@ -643,7 +644,7 @@ const ProjectFiles = () => {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 shrink-0"
+                          className="h-10 w-10 sm:h-8 sm:w-8 shrink-0"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <MoreVertical className="h-4 w-4" />
@@ -683,13 +684,13 @@ const ProjectFiles = () => {
                 {files.map((file) => (
                   <div
                     key={file.name}
-                    className="flex items-center gap-3 px-3 sm:px-4 py-3 hover:bg-muted/50 cursor-pointer transition-colors"
+                    className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 hover:bg-muted/50 cursor-pointer transition-colors"
                     onClick={() => handleOpenFile(file.name)}
                   >
                     <FileIcon className="h-5 w-5 text-muted-foreground shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="truncate text-sm font-medium">{file.name}</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="truncate text-xs text-muted-foreground">
                         {[formatBytes(file.metadata?.size), formatDate(file.updated_at || file.created_at)]
                           .filter(Boolean)
                           .join(" · ")}
@@ -700,7 +701,7 @@ const ProjectFiles = () => {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 shrink-0"
+                          className="h-10 w-10 sm:h-8 sm:w-8 shrink-0"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <MoreVertical className="h-4 w-4" />
@@ -749,10 +750,11 @@ const ProjectFiles = () => {
           if (!busy) setCreateOpen(open);
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-w-[calc(100vw-1.5rem)] sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Neuer Ordner</DialogTitle>
-            <DialogDescription>
+            {/* break-words: der Ordnername im Text kann sehr lang sein */}
+            <DialogDescription className="break-words">
               {path.length > 0
                 ? `Neuen Ordner in "${path[path.length - 1]}" erstellen.`
                 : "Neuen Ordner im Projektstamm erstellen."}
@@ -794,14 +796,14 @@ const ProjectFiles = () => {
           if (!open && !busy) setRenameTarget(null);
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-w-[calc(100vw-1.5rem)] sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {renameTarget?.kind === "folder"
                 ? "Ordner umbenennen"
                 : "Datei umbenennen"}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="break-words">
               {renameTarget?.kind === "folder"
                 ? "Alle enthaltenen Dateien werden mit verschoben."
                 : "Geben Sie einen neuen Dateinamen ein."}
@@ -842,10 +844,10 @@ const ProjectFiles = () => {
           if (!open && !busy) setMoveTarget(null);
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-w-[calc(100vw-1.5rem)] sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Ordner verschieben</DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="break-words">
               {`Wählen Sie das Ziel für "${moveTarget ?? ""}". Alle enthaltenen Dateien werden mit verschoben.`}
             </DialogDescription>
           </DialogHeader>
@@ -861,14 +863,14 @@ const ProjectFiles = () => {
                 <SelectTrigger>
                   <SelectValue placeholder="Zielordner wählen" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-w-[calc(100vw-2rem)]">
                   {path.length > 0 && (
                     <SelectItem value={ROOT_VALUE}>
                       Projektstamm (oberste Ebene)
                     </SelectItem>
                   )}
                   {moveDestinations.map((dest) => (
-                    <SelectItem key={dest} value={dest}>
+                    <SelectItem key={dest} value={dest} className="break-words">
                       {dest.split("/").join(" / ")}
                     </SelectItem>
                   ))}
@@ -907,12 +909,13 @@ const ProjectFiles = () => {
           if (!open && !busy) setDeleteTarget(null);
         }}
       >
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-[calc(100vw-1.5rem)] sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <AlertDialogHeader>
             <AlertDialogTitle>
               {deleteTarget?.kind === "folder" ? "Ordner löschen?" : "Datei löschen?"}
             </AlertDialogTitle>
-            <AlertDialogDescription>
+            {/* break-words: lange Datei-/Ordnernamen im Text dürfen nicht überlaufen */}
+            <AlertDialogDescription className="break-words">
               {deleteTarget?.kind === "folder"
                 ? `Der Ordner "${deleteTarget?.name}" und alle darin enthaltenen Dateien und Unterordner werden unwiderruflich gelöscht.`
                 : `Die Datei "${deleteTarget?.name}" wird unwiderruflich gelöscht.`}

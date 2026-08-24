@@ -283,17 +283,18 @@ export default function Index() {
       <header className="border-b bg-card sticky top-0 z-50 shadow-sm">
         <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
           <div className="flex justify-between items-center gap-3">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <img src="/ruff-logo.png" alt="Ruff Michael Logo" className="h-8 sm:h-10 w-auto" />
-              <div className="hidden sm:block h-8 w-px bg-border" />
-              <div className="flex flex-col">
+            {/* min-w-0 + truncate: lange Namen dürfen die Kopfzeile nicht breiter machen */}
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <img src="/ruff-logo.png" alt="Ruff Michael Logo" className="h-8 sm:h-10 w-auto shrink-0" />
+              <div className="hidden sm:block h-8 w-px bg-border shrink-0" />
+              <div className="flex flex-col min-w-0">
                 <span className="text-xs sm:text-sm text-muted-foreground">Hallo</span>
-                <span className="text-sm sm:text-base font-semibold">{userName || "Benutzer"}</span>
+                <span className="text-sm sm:text-base font-semibold truncate">{userName || "Benutzer"}</span>
               </div>
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" className="shrink-0 h-10 sm:h-9">
                   <UserIcon className="h-4 w-4 mr-2" />
                   <span className="hidden sm:inline">Menü</span>
                 </Button>
@@ -630,7 +631,7 @@ export default function Index() {
                           {new Date(entry.datum).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}
                         </p>
                       </div>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                      <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                     </div>
                   </CardContent>
                 </Card>
@@ -662,15 +663,15 @@ export default function Index() {
         {/* Projects Overview */}
         {projects.length > 0 && (
           <div className="mt-6 sm:mt-8">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl sm:text-2xl font-bold">Aktive Projekte</h2>
-              <Button variant="ghost" size="sm" onClick={() => navigate("/projects")}>
+            <div className="flex items-center justify-between gap-2 mb-4">
+              <h2 className="text-xl sm:text-2xl font-bold min-w-0">Aktive Projekte</h2>
+              <Button variant="ghost" size="sm" className="shrink-0" onClick={() => navigate("/projects")}>
                 Alle anzeigen
                 <ArrowRight className="h-4 w-4 ml-1" />
               </Button>
             </div>
             
-            <div className="grid gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 gap-3 sm:gap-4">
               {projects.map((project) => (
                 <Card 
                   key={project.id} 

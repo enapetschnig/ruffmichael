@@ -1,1 +1,6 @@
 project_id = "xaugcspfgtuozlijdfqu"
+
+# Das CRM schickt nur das gemeinsame Geheimnis, keinen JWT — sonst blockt das
+# Gateway, bevor die Funktion läuft. Sie schützt sich selbst über COCKPIT_SECRET.
+[functions.wunsch-datei]
+verify_jwt = false

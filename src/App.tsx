@@ -1,12 +1,13 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { OnboardingProvider } from "./contexts/OnboardingContext";
 import { InstallPromptDialog } from "./components/InstallPromptDialog";
 import { OfflineBanner } from "./components/OfflineBanner";
+import { AenderungswunschKnopf } from "./components/aenderungswunsch/AenderungswunschKnopf";
 import { useOnboarding } from "./contexts/OnboardingContext";
 import { supabase } from "@/integrations/supabase/client";
 import { startAutoSync } from "@/lib/offlineQueue";
@@ -33,6 +34,29 @@ import Uebernahmen from "./pages/Uebernahmen";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
+
+/**
+ * Melde-Knopf für alle Seiten, die ihre Kopfzeile selbst bauen (Startseite,
+ * Projekte, Admin …) und deshalb den Knopf aus dem PageHeader nicht bekommen.
+ * Er blendet sich selbst aus, sobald auf der Seite ein [data-seitenkopf] steht.
+ * Auf der Anmeldeseite und ohne Anmeldung gibt es ihn nicht — melden kann nur,
+ * wer angemeldet ist (die RLS verlangt eine eigene Benutzerkennung).
+ */
+function SchwebenderMeldeKnopf() {
+  const ort = useLocation();
+  const [angemeldet, setAngemeldet] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setAngemeldet(!!data.session));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, sitzung) =>
+      setAngemeldet(!!sitzung),
+    );
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  if (!angemeldet || ort.pathname === "/auth") return null;
+  return <AenderungswunschKnopf gestalt="schwebend" />;
+}
 
 function AppContent() {
   const {
@@ -83,6 +107,9 @@ function AppContent() {
         <Route path="/uebernahmen" element={<Uebernahmen />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
+
+      {/* Melden auch auf Seiten ohne zentrale Kopfzeile */}
+      <SchwebenderMeldeKnopf />
 
       {/* Install Prompt Dialog */}
       <InstallPromptDialog

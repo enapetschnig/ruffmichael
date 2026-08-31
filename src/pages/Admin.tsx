@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Shield, User as UserIcon, Send, Mail, Phone, MapPin, Shirt, FileText, Clock, Trash2, Settings, Save, Calendar } from "lucide-react";
+import { ArrowLeft, Shield, User as UserIcon, Send, Mail, Phone, MapPin, Shirt, FileText, Clock, Trash2, Settings, Save, Calendar, MessageSquarePlus } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -19,6 +19,8 @@ import { format } from "date-fns";
 import EmployeeDocumentsManager from "@/components/EmployeeDocumentsManager";
 import LeaveManagement from "@/components/LeaveManagement";
 import TimeAccountManagement from "@/components/TimeAccountManagement";
+import { AenderungswuenscheListe } from "@/components/aenderungswunsch/AenderungswuenscheListe";
+import { NeuerungenPflege } from "@/components/neuerungen/NeuerungenPflege";
 
 type Profile = {
   id: string;
@@ -1392,6 +1394,19 @@ export default function Admin() {
           Zeitkonten & Zeitausgleich
         </h2>
         <TimeAccountManagement profiles={profiles.filter(p => p.is_active)} />
+      </section>
+
+      {/* ===== ÄNDERUNGSWÜNSCHE ===== */}
+      {/* Oben veröffentlichen ("Das ist neu"), darunter die eingegangenen Meldungen. */}
+      <section className="container mx-auto px-3 sm:px-4 lg:px-6 mt-8">
+        <h2 className="text-xl sm:text-2xl font-bold mb-4 flex items-center gap-2">
+          <MessageSquarePlus className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" />
+          Änderungswünsche
+        </h2>
+        <div className="space-y-6">
+          <NeuerungenPflege />
+          <AenderungswuenscheListe />
+        </div>
       </section>
 
       {/* ===== EINSTELLUNGEN SEKTION ===== */}

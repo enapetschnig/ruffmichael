@@ -21,6 +21,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import ChangePasswordDialog from "@/components/ChangePasswordDialog";
+import { AenderungswunschKnopf } from "@/components/aenderungswunsch/AenderungswunschKnopf";
+import { ErledigteWuensche } from "@/components/aenderungswunsch/ErledigteWuensche";
+import { NeuerungenBanner } from "@/components/neuerungen/NeuerungenBanner";
 
 type Project = {
   id: string;
@@ -280,7 +283,9 @@ export default function Index() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b bg-card sticky top-0 z-50 shadow-sm">
+      {/* data-seitenkopf: diese Seite baut ihre Kopfzeile selbst und trägt den
+          Melde-Knopf direkt hier — der schwebende Knopf blendet sich dadurch aus. */}
+      <header className="border-b bg-card sticky top-0 z-50 shadow-sm" data-seitenkopf>
         <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
           <div className="flex justify-between items-center gap-3">
             {/* min-w-0 + truncate: lange Namen dürfen die Kopfzeile nicht breiter machen */}
@@ -292,9 +297,11 @@ export default function Index() {
                 <span className="text-sm sm:text-base font-semibold truncate">{userName || "Benutzer"}</span>
               </div>
             </div>
+            <div className="flex items-center gap-2 shrink-0">
+            <AenderungswunschKnopf gestalt="kopf" />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="shrink-0 h-10 sm:h-9">
+                <Button variant="outline" size="sm" className="shrink-0 h-10 sm:h-9" data-bildschirmfoto="aus">
                   <UserIcon className="h-4 w-4 mr-2" />
                   <span className="hidden sm:inline">Menü</span>
                 </Button>
@@ -320,12 +327,19 @@ export default function Index() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 lg:py-8">
+        {/* Rückmeldung auf eigene Meldungen: sieht JEDER für seine eigenen Wünsche. */}
+        <ErledigteWuensche />
+
+        {/* "Das ist neu": bewusst nur für Administratoren (Kundenentscheid 28.08.2026). */}
+        {user && isAdmin && <NeuerungenBanner userId={user.id} />}
+
         <div className="mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-2">
             {isAdmin ? "Admin Dashboard" : "Mein Dashboard"}

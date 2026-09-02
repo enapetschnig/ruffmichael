@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Plus, Trash2, Lock, FileDown, Clock, ArrowRight, Ban, Euro, ChevronUp, ChevronDown, Loader2, ExternalLink } from "lucide-react";
+import { Plus, Trash2, Lock, FileDown, Clock, ArrowRight, Ban, Euro, ChevronUp, ChevronDown, Loader2, Pencil } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,8 +16,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import { BelegVorschau } from "@/components/BelegVorschau";
 import {
-  TYP_LABEL, STATUS_LABEL, STATUS_VARIANT, EINHEITEN, eur, zahl, datum, heuteISO, plusTage,
+  TYP_LABEL, TYP_DATEINAME, STATUS_LABEL, STATUS_VARIANT, EINHEITEN, eur, zahl, datum, heuteISO, plusTage,
   istRechnung, istAngebot, offen, belegTitel, belegPdf, ladeFirmendaten,
   type Beleg, type BelegPosition, type Zahlung,
 } from "@/lib/faktura";
@@ -34,7 +35,8 @@ const BelegDetail = () => {
   const [pos, setPos] = useState<BelegPosition[]>([]);
   const [zahlungen, setZahlungen] = useState<Zahlung[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  // Vorschau-Fenster: Blob-URL (Entwurf) oder signierte URL (festgeschrieben)
+  const [vorschau, setVorschau] = useState<{ open: boolean; url: string | null; entwurf: boolean }>({ open: false, url: null, entwurf: true });
   const [stundenOpen, setStundenOpen] = useState(false);
   const [stunden, setStunden] = useState<(OffeneStunden & { gewaehlt: boolean; satzWert: string })[]>([]);
   const [zahlungOpen, setZahlungOpen] = useState(false);
@@ -150,20 +152,36 @@ const BelegDetail = () => {
     const r = await belegPdf(b.id);
     setBusy(null);
     if (r.error) toast({ variant: "destructive", title: "PDF fehlgeschlagen", description: r.error });
-    else { setPdfUrl(r.url ?? null); toast({ title: "Festgeschrieben", description: "Nummer vergeben, PDF im Projektordner „Anbote“ abgelegt." }); }
+    else {
+      toast({ title: "Festgeschrieben", description: "Nummer vergeben, PDF im Projektordner „Anbote“ abgelegt." });
+      setVorschau({ open: true, url: r.url ?? null, entwurf: false });
+    }
     laden();
   };
+  // Vorschau im Fenster: Entwurf → PDF nur im Browser (nichts wird abgelegt),
+  // festgeschrieben → das abgelegte PDF (wird dabei aktualisiert, falls z. B.
+  // Firmendaten nachgetragen wurden).
   const pdfAnzeigen = async () => {
     if (!b) return;
     setBusy("pdf");
+    setVorschau({ open: true, url: null, entwurf: entwurf });
     const r = await belegPdf(b.id);
     setBusy(null);
-    if (r.error) return toast({ variant: "destructive", title: "PDF fehlgeschlagen", description: r.error });
+    if (r.error) { setVorschau({ open: false, url: null, entwurf }); return toast({ variant: "destructive", title: "PDF fehlgeschlagen", description: r.error }); }
     if (r.base64) {
       const bytes = Uint8Array.from(atob(r.base64), (c) => c.charCodeAt(0));
-      const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
-      window.open(url, "_blank");
-    } else if (r.url) { setPdfUrl(r.url); window.open(r.url, "_blank"); }
+      setVorschau({ open: true, url: URL.createObjectURL(new Blob([bytes], { type: "application/pdf" })), entwurf: true });
+    } else if (r.url) {
+      setVorschau({ open: true, url: r.url, entwurf: false });
+    }
+  };
+  // Angebot nach dem Festschreiben wieder bearbeiten (Nummer bleibt erhalten).
+  const angebotBearbeiten = async () => {
+    if (!b) return;
+    const { error } = await supabase.from("belege").update({ status: "entwurf" }).eq("id", b.id);
+    if (error) return toast({ variant: "destructive", title: "Nicht möglich", description: error.message });
+    toast({ title: "In Bearbeitung", description: `${belegTitel(b)} kann jetzt geändert werden. Danach erneut festschreiben — die Nummer bleibt.` });
+    laden();
   };
   const rechnungAusAngebot = async () => {
     if (!b) return;
@@ -239,6 +257,9 @@ const BelegDetail = () => {
             {entwurf && b.project_id && (rechnung || b.typ === "gutschrift" ? true : false) && (
               <Button variant="outline" size="sm" className="gap-1" onClick={stundenLaden} disabled={busy !== null}><Clock className="h-4 w-4" />Stunden holen</Button>
             )}
+            {!entwurf && istAngebot(b.typ) && b.status !== "angenommen" && (
+              <Button variant="outline" size="sm" className="gap-1" onClick={angebotBearbeiten} disabled={busy !== null}><Pencil className="h-4 w-4" />Bearbeiten</Button>
+            )}
             {entwurf && <Button size="sm" className="gap-1" onClick={() => setFrage("festschreiben")} disabled={busy !== null}>
               {busy === "fest" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}Festschreiben
             </Button>}
@@ -256,7 +277,6 @@ const BelegDetail = () => {
         </div>
         {b.storniert_durch && <p className="text-sm text-destructive">Storniert — Gutschrift: <button className="underline" onClick={() => navigate(`/belege/${b.storniert_durch}`)}>öffnen</button></p>}
         {b.vorgaenger_id && <p className="text-sm text-muted-foreground">Bezug: <button className="underline" onClick={() => navigate(`/belege/${b.vorgaenger_id}`)}>Vorgänger-Beleg öffnen</button></p>}
-        {pdfUrl && <a className="text-sm underline inline-flex items-center gap-1" href={pdfUrl} target="_blank" rel="noreferrer"><ExternalLink className="h-3 w-3" />PDF öffnen</a>}
         {!entwurf && istAngebot(b.typ) && (
           <div className="flex flex-wrap gap-2 text-sm items-center">
             <span className="text-muted-foreground">Angebotsstatus:</span>
@@ -448,6 +468,16 @@ const BelegDetail = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Vorschau / PDF im Fenster */}
+      <BelegVorschau
+        open={vorschau.open}
+        onClose={() => setVorschau({ open: false, url: null, entwurf })}
+        titel={belegTitel(b)}
+        url={vorschau.url}
+        dateiname={`${TYP_DATEINAME[b.typ]} ${b.nummer ?? "Entwurf"}.pdf`}
+        entwurf={vorschau.entwurf}
+      />
 
       {/* Sicherheitsabfragen */}
       <AlertDialog open={frage !== null} onOpenChange={(o) => !o && setFrage(null)}>

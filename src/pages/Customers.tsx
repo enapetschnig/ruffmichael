@@ -231,6 +231,8 @@ const Customers = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  // Belege je Kunde (nur Admin): Anzahl, offener Betrag, letztes Datum
+  const [belegSummen, setBelegSummen] = useState<Record<string, { belege: number; offen: number; letzter: string | null }>>({});
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
@@ -252,6 +254,12 @@ const Customers = () => {
         .maybeSingle();
       setIsAdmin(roleData?.role === "administrator");
       await fetchCustomers();
+      if (roleData?.role === "administrator" && !isOffline()) {
+        const { data } = await supabase.rpc("faktura_kunden_summen");
+        const map: Record<string, { belege: number; offen: number; letzter: string | null }> = {};
+        (data ?? []).forEach((r) => { if (r.customer_id) map[r.customer_id] = { belege: r.belege, offen: Number(r.offen), letzter: r.letzter }; });
+        setBelegSummen(map);
+      }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -456,7 +464,22 @@ const Customers = () => {
                             Nr. {c.kundennr}
                           </span>
                         )}
+                        {c.reverse_charge && (
+                          <span className="text-[11px] font-normal text-muted-foreground border rounded px-1.5 py-0.5" title="Übergang der Steuerschuld bei Bauleistungen">RC</span>
+                        )}
                       </div>
+                      {/* Angebote & Rechnungen dieses Kunden — nur Admin, ein Klick zur gefilterten Belegliste */}
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          className="text-sm text-primary underline-offset-2 hover:underline text-left"
+                          onClick={(e) => { e.stopPropagation(); navigate(`/belege?kunde=${c.id}${belegSummen[c.id] ? "" : "&neu=1"}`); }}
+                        >
+                          {belegSummen[c.id]
+                            ? `${belegSummen[c.id].belege} Beleg${belegSummen[c.id].belege === 1 ? "" : "e"}${belegSummen[c.id].offen > 0 ? ` · offen ${new Intl.NumberFormat("de-AT", { style: "currency", currency: "EUR" }).format(belegSummen[c.id].offen)}` : ""}`
+                            : "Angebot / Rechnung schreiben"}
+                        </button>
+                      )}
                       {customerAddress(c) && (
                         <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                           <MapPin className="h-3.5 w-3.5 shrink-0" />

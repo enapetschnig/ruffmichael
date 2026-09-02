@@ -184,16 +184,36 @@ export function FakturaEinstellungen() {
             <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-600" />
             <span>Vor dem ersten Festschreiben mit dem alten Programm abgleichen: Die Zähler wurden aus den PDFs in OneDrive ermittelt (Rechnungen zuletzt 2583, Angebote 1150) — es kann neuere geben. Nach der ersten vergebenen Nummer nicht mehr zurückdrehen.</span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {kreise.map((k) => (
-              <div key={k.kreis} className="space-y-1.5">
-                <Label className="capitalize">{k.kreis === "angebot" ? "Angebote / Auftragsbestätigungen" : k.kreis === "rechnung" ? "Rechnungen (auch Teil-/Schluss-)" : "Gutschriften"}</Label>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">{new Date().getFullYear()}-</span>
-                  <Input type="number" min={1} value={k.naechste_nummer} onChange={(e) => kreisAendern(k.kreis, e.target.value)} className="w-32" />
+          <div className="space-y-4">
+            {kreise.map((k) => {
+              const jahr = new Date().getFullYear();
+              const beispiel = `${k.praefix}${k.jahr_format === "JJJJ" ? `${jahr}${k.trenner}` : k.jahr_format === "JJ" ? `${String(jahr).slice(2)}${k.trenner}` : ""}${String(k.naechste_nummer).padStart(k.breite, "0")}`;
+              const patch = (p: Partial<Nummernkreis>) => {
+                setKreise((l) => l.map((x) => (x.kreis === k.kreis ? { ...x, ...p } : x)));
+                supabase.from("faktura_nummernkreise").update(p).eq("kreis", k.kreis).then(({ error }) => {
+                  if (error) toast({ variant: "destructive", title: "Fehler", description: error.message });
+                });
+              };
+              return (
+                <div key={k.kreis} className="rounded-md border p-3 space-y-2">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <div className="font-medium">{k.kreis === "angebot" ? "Angebote / Auftragsbestätigungen" : k.kreis === "rechnung" ? "Rechnungen (auch Teil- und Schlussrechnungen)" : "Gutschriften"}</div>
+                    <div className="text-sm text-muted-foreground">Nächste Nummer: <span className="font-mono font-semibold text-foreground">{beispiel}</span></div>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    <div className="space-y-1"><Label className="text-xs">Nächste Nr.</Label><Input type="number" min={1} value={k.naechste_nummer} onChange={(e) => kreisAendern(k.kreis, e.target.value)} /></div>
+                    <div className="space-y-1"><Label className="text-xs">Präfix</Label><Input value={k.praefix} placeholder="z. B. RE" onChange={(e) => patch({ praefix: e.target.value })} /></div>
+                    <div className="space-y-1"><Label className="text-xs">Jahr</Label>
+                      <Select value={k.jahr_format || "keins"} onValueChange={(v) => patch({ jahr_format: v === "keins" ? "" : v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent><SelectItem value="JJJJ">2026</SelectItem><SelectItem value="JJ">26</SelectItem><SelectItem value="keins">kein Jahr</SelectItem></SelectContent>
+                      </Select></div>
+                    <div className="space-y-1"><Label className="text-xs">Trennzeichen</Label><Input value={k.trenner} onChange={(e) => patch({ trenner: e.target.value })} /></div>
+                    <div className="space-y-1"><Label className="text-xs">Stellen</Label><Input type="number" min={1} max={8} value={k.breite} onChange={(e) => patch({ breite: Math.max(1, Math.min(8, parseInt(e.target.value, 10) || 4)) })} /></div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </CardContent>
       </Card>

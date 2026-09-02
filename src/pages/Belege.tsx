@@ -37,10 +37,12 @@ const Belege = () => {
   const [neuOpen, setNeuOpen] = useState(false);
   const [kunden, setKunden] = useState<KundeOpt[]>([]);
   const [projekte, setProjekte] = useState<ProjektOpt[]>([]);
-  const [neu, setNeu] = useState<{ typ: BelegTyp; kunde: string; projekt: string }>({ typ: "angebot", kunde: "", projekt: params.get("projekt") ?? "" });
+  const [neu, setNeu] = useState<{ typ: BelegTyp; kunde: string; projekt: string }>({ typ: "angebot", kunde: params.get("kunde") ?? "", projekt: params.get("projekt") ?? "" });
   const [anlegen, setAnlegen] = useState(false);
   // Aus der Projektübersicht kommend: nur die Belege dieses Projekts zeigen
   const projektFilter = params.get("projekt");
+  // Aus der Kundenliste kommend: nur die Belege dieses Kunden
+  const kundeFilter = params.get("kunde");
   // Firmendaten unvollständig → Hinweis, bevor die erste Rechnung rausgeht
   const [firmaFehlt, setFirmaFehlt] = useState<string[]>([]);
 
@@ -86,6 +88,7 @@ const Belege = () => {
     const q = suche.trim().toLowerCase();
     return belege.filter((b) => {
       if (projektFilter && b.project_id !== projektFilter) return false;
+      if (kundeFilter && b.customer_id !== kundeFilter) return false;
       if (filter === "angebote" && istRechnung(b.typ)) return false;
       if (filter === "rechnungen" && !istRechnung(b.typ) && b.typ !== "gutschrift") return false;
       if (filter === "offen" && offen(b) <= 0) return false;
@@ -161,6 +164,12 @@ const Belege = () => {
         {projektFilter && (
           <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 p-3 text-sm">
             <span className="flex-1 min-w-0">Nur Belege des Projekts <b>{projectLabel((projekte.find((p) => p.id === projektFilter) ?? { name: "…" }) as never)}</b></span>
+            <Button size="sm" variant="ghost" onClick={() => navigate("/belege")}>Alle Belege</Button>
+          </div>
+        )}
+        {kundeFilter && (
+          <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 p-3 text-sm">
+            <span className="flex-1 min-w-0">Nur Belege von <b>{(() => { const k = kunden.find((x) => x.id === kundeFilter); return k ? (k.firma?.trim() || customerDisplayName({ vorname: k.vorname ?? "", nachname: k.nachname })) : "…"; })()}</b></span>
             <Button size="sm" variant="ghost" onClick={() => navigate("/belege")}>Alle Belege</Button>
           </div>
         )}

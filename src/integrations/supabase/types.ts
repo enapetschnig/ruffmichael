@@ -889,20 +889,29 @@ export type Database = {
       faktura_nummernkreise: {
         Row: {
           breite: number
+          jahr_format: string
           kreis: string
           naechste_nummer: number
+          praefix: string
+          trenner: string
           updated_at: string
         }
         Insert: {
           breite?: number
+          jahr_format?: string
           kreis: string
           naechste_nummer: number
+          praefix?: string
+          trenner?: string
           updated_at?: string
         }
         Update: {
           breite?: number
+          jahr_format?: string
           kreis?: string
           naechste_nummer?: number
+          praefix?: string
+          trenner?: string
           updated_at?: string
         }
         Relationships: []
@@ -1877,6 +1886,19 @@ export type Database = {
       beleg_stornieren: { Args: { p_beleg: string }; Returns: string }
       beleg_summen_neu: { Args: { p_beleg: string }; Returns: undefined }
       ensure_user_profile: { Args: never; Returns: Json }
+      faktura_kunden_summen: {
+        Args: never
+        Returns: {
+          belege: number
+          customer_id: string
+          letzter: string
+          offen: number
+        }[]
+      }
+      faktura_nummer_bauen: {
+        Args: { p_datum: string; p_kreis: string; p_nummer: number }
+        Returns: string
+      }
       faktura_offene_stunden: {
         Args: { p_projekt: string }
         Returns: {

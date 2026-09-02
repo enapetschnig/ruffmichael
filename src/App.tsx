@@ -31,6 +31,8 @@ import ProjectFiles from "./pages/ProjectFiles";
 import MaterialCatalog from "./pages/MaterialCatalog";
 import Nachtraege from "./pages/Nachtraege";
 import Uebernahmen from "./pages/Uebernahmen";
+import Belege from "./pages/Belege";
+import BelegDetail from "./pages/BelegDetail";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -105,6 +107,8 @@ function AppContent() {
         <Route path="/materialien" element={<MaterialCatalog />} />
         <Route path="/nachtraege" element={<Nachtraege />} />
         <Route path="/uebernahmen" element={<Uebernahmen />} />
+        <Route path="/belege" element={<Belege />} />
+        <Route path="/belege/:belegId" element={<BelegDetail />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
 

@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, FolderKanban, Users, BarChart3, LogOut, FileText, ArrowRight, Info, User as UserIcon, Zap, Contact, Package, FilePlus2, ClipboardList, FileCheck, Paintbrush } from "lucide-react";
+import { Clock, FolderKanban, Users, BarChart3, LogOut, FileText, ArrowRight, Info, User as UserIcon, Zap, Contact, Package, FilePlus2, ClipboardList, FileCheck, Paintbrush, Receipt } from "lucide-react";
 import { ErstaufnahmeDialog, type ErstaufnahmePrefill } from "@/components/ErstaufnahmeDialog";
 import { DashboardVoiceAssistant } from "@/components/DashboardVoiceAssistant";
 import { DrawingEditor } from "@/components/DrawingEditor";
@@ -505,6 +505,27 @@ export default function Index() {
               <Button className="w-full" size="sm" variant="outline">Übernahmen öffnen</Button>
             </CardContent>
           </Card>
+
+          {/* Angebote & Rechnungen — nur Admin (Preise!) */}
+          {isAdmin && (
+            <Card
+              className="cursor-pointer hover:shadow-lg transition-all hover:border-primary/50"
+              onClick={() => navigate("/belege")}
+            >
+              <CardHeader className="space-y-2 pb-3">
+                <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Receipt className="h-6 w-6 text-primary" />
+                </div>
+                <CardTitle className="text-lg sm:text-xl">Angebote &amp; Rechnungen</CardTitle>
+                <CardDescription className="text-sm">
+                  Belege schreiben, Stunden verrechnen, offene Posten
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button className="w-full" size="sm" variant="outline">Belege öffnen</Button>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Materialdatenbank - Für alle (Preise nur Admin) */}
           <Card

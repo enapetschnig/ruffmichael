@@ -21,6 +21,7 @@ import LeaveManagement from "@/components/LeaveManagement";
 import TimeAccountManagement from "@/components/TimeAccountManagement";
 import { AenderungswuenscheListe } from "@/components/aenderungswunsch/AenderungswuenscheListe";
 import { NeuerungenPflege } from "@/components/neuerungen/NeuerungenPflege";
+import { FakturaEinstellungen } from "@/components/FakturaEinstellungen";
 
 type Profile = {
   id: string;
@@ -1416,6 +1417,11 @@ export default function Admin() {
           Einstellungen
         </h2>
         
+        {/* Angebote & Rechnungen: Firmendaten, Stundensätze, Nummernkreise */}
+        <div className="mb-6">
+          <FakturaEinstellungen />
+        </div>
+
         <Card>
           <CardHeader>
             <CardTitle>E-Mail-Einstellungen</CardTitle>

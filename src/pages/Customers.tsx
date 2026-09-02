@@ -43,6 +43,11 @@ export interface Customer {
   email: string | null;
   liefer_strasse: string | null;
   liefer_ort: string | null;
+  firma?: string | null;
+  uid?: string | null;
+  ist_unternehmer?: boolean;
+  reverse_charge?: boolean;
+  zahlungsziel_tage?: number | null;
 }
 
 export const customerDisplayName = (c: Pick<Customer, "vorname" | "nachname">) =>
@@ -61,6 +66,12 @@ const emptyForm = {
   email: "",
   liefer_strasse: "",
   liefer_ort: "",
+  // Rechnungsdaten (für Angebote & Rechnungen)
+  firma: "",
+  uid: "",
+  ist_unternehmer: false,
+  reverse_charge: false,
+  zahlungsziel_tage: "",
 };
 
 type CustomerForm = typeof emptyForm;
@@ -143,6 +154,34 @@ export const CustomerFormFields = ({
     </div>
 
     <div className="rounded-lg border p-3 space-y-3">
+      <div className="text-sm font-medium">Rechnungsdaten</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="kunde-firma">Firma (falls Firmenkunde)</Label>
+          <Input id="kunde-firma" value={form.firma} onChange={(e) => setForm({ ...form, firma: e.target.value })} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="kunde-uid">UID (ATU…)</Label>
+          <Input id="kunde-uid" value={form.uid} onChange={(e) => setForm({ ...form, uid: e.target.value })} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="kunde-zz">Zahlungsziel (Tage, leer = Standard)</Label>
+          <Input id="kunde-zz" type="number" min={0} value={form.zahlungsziel_tage} onChange={(e) => setForm({ ...form, zahlungsziel_tage: e.target.value })} />
+        </div>
+        <div className="space-y-2 pt-1">
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" className="h-4 w-4" checked={form.ist_unternehmer} onChange={(e) => setForm({ ...form, ist_unternehmer: e.target.checked, reverse_charge: e.target.checked ? form.reverse_charge : false })} />
+            Ist Unternehmer (Firma, Hausverwaltung …)
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" className="h-4 w-4" disabled={!form.ist_unternehmer} checked={form.reverse_charge} onChange={(e) => setForm({ ...form, reverse_charge: e.target.checked })} />
+            Reverse Charge bei Bauleistungen (§ 19 Abs. 1a UStG) — UID Pflicht
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div className="rounded-lg border p-3 space-y-3">
       <div className="flex items-center gap-2 text-sm font-medium">
         <Truck className="h-4 w-4 text-primary" />
         Lieferadresse (optional, falls abweichend)
@@ -179,6 +218,11 @@ export const customerFormToRow = (form: CustomerForm) => ({
   email: form.email.trim() || null,
   liefer_strasse: form.liefer_strasse.trim() || null,
   liefer_ort: form.liefer_ort.trim() || null,
+  firma: form.firma.trim() || null,
+  uid: form.uid.trim() || null,
+  ist_unternehmer: !!form.ist_unternehmer,
+  reverse_charge: !!form.ist_unternehmer && !!form.reverse_charge,
+  zahlungsziel_tage: form.zahlungsziel_tage === "" ? null : Number(form.zahlungsziel_tage),
 });
 
 const Customers = () => {
@@ -252,6 +296,11 @@ const Customers = () => {
       email: c.email ?? "",
       liefer_strasse: c.liefer_strasse ?? "",
       liefer_ort: c.liefer_ort ?? "",
+      firma: c.firma ?? "",
+      uid: c.uid ?? "",
+      ist_unternehmer: !!c.ist_unternehmer,
+      reverse_charge: !!c.reverse_charge,
+      zahlungsziel_tage: c.zahlungsziel_tage == null ? "" : String(c.zahlungsziel_tage),
     });
     setDialogOpen(true);
   };

@@ -10,10 +10,61 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.1"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
+      aenderungswuensche: {
+        Row: {
+          abschrift: string
+          abschrift_fehler: string | null
+          antwort: string | null
+          art: string
+          audio_pfad: string | null
+          bild_pfad: string | null
+          created_at: string
+          erstellt_von: string | null
+          id: string
+          melder_gesehen_am: string | null
+          seite: string | null
+          status: string
+          text: string
+          updated_at: string
+        }
+        Insert: {
+          abschrift?: string
+          abschrift_fehler?: string | null
+          antwort?: string | null
+          art?: string
+          audio_pfad?: string | null
+          bild_pfad?: string | null
+          created_at?: string
+          erstellt_von?: string | null
+          id?: string
+          melder_gesehen_am?: string | null
+          seite?: string | null
+          status?: string
+          text?: string
+          updated_at?: string
+        }
+        Update: {
+          abschrift?: string
+          abschrift_fehler?: string | null
+          antwort?: string | null
+          art?: string
+          audio_pfad?: string | null
+          bild_pfad?: string | null
+          created_at?: string
+          erstellt_von?: string | null
+          id?: string
+          melder_gesehen_am?: string | null
+          seite?: string | null
+          status?: string
+          text?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           key: string
@@ -32,197 +83,342 @@ export type Database = {
         }
         Relationships: []
       }
-      erstaufnahme_checklist_items: {
+      beleg_positionen: {
         Row: {
+          art: string
+          beleg_id: string
+          beschreibung: string | null
           created_at: string
+          einheit: string
+          einzelpreis: number
+          gesamt: number | null
           id: string
-          is_active: boolean
-          sort_order: number
+          menge: number
+          pos: number
+          quelle_ids: string[]
+          quelle_typ: string
+          rabatt_prozent: number
           text: string
-          updated_at: string
         }
         Insert: {
+          art?: string
+          beleg_id: string
+          beschreibung?: string | null
           created_at?: string
+          einheit?: string
+          einzelpreis?: number
+          gesamt?: number | null
           id?: string
-          is_active?: boolean
-          sort_order?: number
+          menge?: number
+          pos?: number
+          quelle_ids?: string[]
+          quelle_typ?: string
+          rabatt_prozent?: number
           text: string
-          updated_at?: string
         }
         Update: {
+          art?: string
+          beleg_id?: string
+          beschreibung?: string | null
           created_at?: string
+          einheit?: string
+          einzelpreis?: number
+          gesamt?: number | null
           id?: string
-          is_active?: boolean
-          sort_order?: number
+          menge?: number
+          pos?: number
+          quelle_ids?: string[]
+          quelle_typ?: string
+          rabatt_prozent?: number
           text?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      erstaufnahmen: {
-        Row: {
-          checklist: Json
-          created_at: string
-          created_by: string | null
-          customer_id: string | null
-          id: string
-          notizen: string | null
-          project_id: string | null
-          projekt_name: string | null
-          updated_at: string
-        }
-        Insert: {
-          checklist?: Json
-          created_at?: string
-          created_by?: string | null
-          customer_id?: string | null
-          id?: string
-          notizen?: string | null
-          project_id?: string | null
-          projekt_name?: string | null
-          updated_at?: string
-        }
-        Update: {
-          checklist?: Json
-          created_at?: string
-          created_by?: string | null
-          customer_id?: string | null
-          id?: string
-          notizen?: string | null
-          project_id?: string | null
-          projekt_name?: string | null
-          updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "erstaufnahmen_customer_id_fkey"
+            foreignKeyName: "beleg_positionen_beleg_id_fkey"
+            columns: ["beleg_id"]
+            isOneToOne: false
+            referencedRelation: "belege"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      beleg_zahlungen: {
+        Row: {
+          art: string
+          beleg_id: string
+          betrag: number
+          created_at: string
+          datum: string
+          id: string
+          notiz: string | null
+        }
+        Insert: {
+          art?: string
+          beleg_id: string
+          betrag: number
+          created_at?: string
+          datum?: string
+          id?: string
+          notiz?: string | null
+        }
+        Update: {
+          art?: string
+          beleg_id?: string
+          betrag?: number
+          created_at?: string
+          datum?: string
+          id?: string
+          notiz?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "beleg_zahlungen_beleg_id_fkey"
+            columns: ["beleg_id"]
+            isOneToOne: false
+            referencedRelation: "belege"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      belege: {
+        Row: {
+          betreff: string | null
+          bezahlt: number
+          brutto: number
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          datum: string
+          einleitung: string | null
+          faellig_am: string | null
+          festgeschrieben_am: string | null
+          gesendet_am: string | null
+          gueltig_bis: string | null
+          id: string
+          jahr: number | null
+          kunde_email: string | null
+          kunde_name: string
+          kunde_plz_ort: string | null
+          kunde_strasse: string | null
+          kunde_uid: string | null
+          kunde_zusatz: string | null
+          laufnummer: number | null
+          leistung_bis: string | null
+          leistung_von: string | null
+          netto: number
+          notizen: string | null
+          nummer: string | null
+          pdf_pfad: string | null
+          project_id: string | null
+          reverse_charge: boolean
+          schlusstext: string | null
+          skonto_prozent: number | null
+          skonto_tage: number | null
+          status: string
+          storniert_durch: string | null
+          typ: string
+          updated_at: string
+          ust: number
+          ust_satz: number
+          vorgaenger_id: string | null
+        }
+        Insert: {
+          betreff?: string | null
+          bezahlt?: number
+          brutto?: number
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          datum?: string
+          einleitung?: string | null
+          faellig_am?: string | null
+          festgeschrieben_am?: string | null
+          gesendet_am?: string | null
+          gueltig_bis?: string | null
+          id?: string
+          jahr?: number | null
+          kunde_email?: string | null
+          kunde_name: string
+          kunde_plz_ort?: string | null
+          kunde_strasse?: string | null
+          kunde_uid?: string | null
+          kunde_zusatz?: string | null
+          laufnummer?: number | null
+          leistung_bis?: string | null
+          leistung_von?: string | null
+          netto?: number
+          notizen?: string | null
+          nummer?: string | null
+          pdf_pfad?: string | null
+          project_id?: string | null
+          reverse_charge?: boolean
+          schlusstext?: string | null
+          skonto_prozent?: number | null
+          skonto_tage?: number | null
+          status?: string
+          storniert_durch?: string | null
+          typ: string
+          updated_at?: string
+          ust?: number
+          ust_satz?: number
+          vorgaenger_id?: string | null
+        }
+        Update: {
+          betreff?: string | null
+          bezahlt?: number
+          brutto?: number
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          datum?: string
+          einleitung?: string | null
+          faellig_am?: string | null
+          festgeschrieben_am?: string | null
+          gesendet_am?: string | null
+          gueltig_bis?: string | null
+          id?: string
+          jahr?: number | null
+          kunde_email?: string | null
+          kunde_name?: string
+          kunde_plz_ort?: string | null
+          kunde_strasse?: string | null
+          kunde_uid?: string | null
+          kunde_zusatz?: string | null
+          laufnummer?: number | null
+          leistung_bis?: string | null
+          leistung_von?: string | null
+          netto?: number
+          notizen?: string | null
+          nummer?: string | null
+          pdf_pfad?: string | null
+          project_id?: string | null
+          reverse_charge?: boolean
+          schlusstext?: string | null
+          skonto_prozent?: number | null
+          skonto_tage?: number | null
+          status?: string
+          storniert_durch?: string | null
+          typ?: string
+          updated_at?: string
+          ust?: number
+          ust_satz?: number
+          vorgaenger_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "belege_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "erstaufnahmen_project_id_fkey"
+            foreignKeyName: "belege_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "belege_storniert_durch_fkey"
+            columns: ["storniert_durch"]
+            isOneToOne: false
+            referencedRelation: "belege"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "belege_vorgaenger_id_fkey"
+            columns: ["vorgaenger_id"]
+            isOneToOne: false
+            referencedRelation: "belege"
             referencedColumns: ["id"]
           },
         ]
       }
-      uebernahmen: {
+      cockpit_verbindung: {
         Row: {
-          auftrag_nr: string | null
-          bedienungsanleitung: boolean
-          created_at: string
-          created_by: string | null
-          datum: string
-          id: string
-          kunde_name: string
-          leistungsverzeichnis: string | null
-          ort: string | null
-          pdf_path: string | null
-          plz_ort: string | null
-          project_id: string
-          strasse: string | null
-          unterschrift: string | null
-          updated_at: string
-          zusatz_leistungen: string | null
+          app_key: string
+          einzig: boolean
+          secret: string
+          url: string
         }
         Insert: {
-          auftrag_nr?: string | null
-          bedienungsanleitung?: boolean
-          created_at?: string
-          created_by?: string | null
-          datum?: string
-          id?: string
-          kunde_name: string
-          leistungsverzeichnis?: string | null
-          ort?: string | null
-          pdf_path?: string | null
-          plz_ort?: string | null
-          project_id: string
-          strasse?: string | null
-          unterschrift?: string | null
-          updated_at?: string
-          zusatz_leistungen?: string | null
+          app_key?: string
+          einzig?: boolean
+          secret: string
+          url: string
         }
         Update: {
-          auftrag_nr?: string | null
-          bedienungsanleitung?: boolean
-          created_at?: string
-          created_by?: string | null
-          datum?: string
-          id?: string
-          kunde_name?: string
-          leistungsverzeichnis?: string | null
-          ort?: string | null
-          pdf_path?: string | null
-          plz_ort?: string | null
-          project_id?: string
-          strasse?: string | null
-          unterschrift?: string | null
-          updated_at?: string
-          zusatz_leistungen?: string | null
+          app_key?: string
+          einzig?: boolean
+          secret?: string
+          url?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "uebernahmen_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       customers: {
         Row: {
           created_at: string
           created_by: string | null
           email: string | null
-          kundennr: string | null
+          firma: string | null
           id: string
+          ist_unternehmer: boolean
+          kundennr: string | null
           liefer_ort: string | null
           liefer_strasse: string | null
           mobil: string | null
           nachname: string
           ort: string | null
+          reverse_charge: boolean
           strasse: string | null
           telefon: string | null
+          uid: string | null
           updated_at: string
           vorname: string
+          zahlungsziel_tage: number | null
         }
         Insert: {
           created_at?: string
           created_by?: string | null
           email?: string | null
-          kundennr?: string | null
+          firma?: string | null
           id?: string
+          ist_unternehmer?: boolean
+          kundennr?: string | null
           liefer_ort?: string | null
           liefer_strasse?: string | null
           mobil?: string | null
           nachname: string
           ort?: string | null
+          reverse_charge?: boolean
           strasse?: string | null
           telefon?: string | null
+          uid?: string | null
           updated_at?: string
           vorname?: string
+          zahlungsziel_tage?: number | null
         }
         Update: {
           created_at?: string
           created_by?: string | null
           email?: string | null
-          kundennr?: string | null
+          firma?: string | null
           id?: string
+          ist_unternehmer?: boolean
+          kundennr?: string | null
           liefer_ort?: string | null
           liefer_strasse?: string | null
           mobil?: string | null
           nachname?: string
           ort?: string | null
+          reverse_charge?: boolean
           strasse?: string | null
           telefon?: string | null
+          uid?: string | null
           updated_at?: string
           vorname?: string
+          zahlungsziel_tage?: number | null
         }
         Relationships: []
       }
@@ -528,6 +724,219 @@ export type Database = {
         }
         Relationships: []
       }
+      erstaufnahme_checklist_items: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          sort_order: number
+          text: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          sort_order?: number
+          text: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          sort_order?: number
+          text?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      erstaufnahmen: {
+        Row: {
+          checklist: Json
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          id: string
+          notizen: string | null
+          project_id: string | null
+          projekt_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          checklist?: Json
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          id?: string
+          notizen?: string | null
+          project_id?: string | null
+          projekt_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          checklist?: Json
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          id?: string
+          notizen?: string | null
+          project_id?: string | null
+          projekt_name?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "erstaufnahmen_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "erstaufnahmen_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      faktura_firmendaten: {
+        Row: {
+          angebot_einleitung: string | null
+          angebot_gueltig_tage: number
+          angebot_schluss: string | null
+          bank: string | null
+          bic: string | null
+          einzig: boolean
+          email: string | null
+          firma: string
+          firmenbuch: string | null
+          fusstext: string | null
+          gericht: string | null
+          iban: string | null
+          plz_ort: string | null
+          rechnung_einleitung: string | null
+          rechnung_schluss: string | null
+          skonto_prozent: number | null
+          skonto_tage: number | null
+          strasse: string | null
+          telefon: string | null
+          uid: string | null
+          updated_at: string
+          ust_satz: number
+          web: string | null
+          zahlungsziel_tage: number
+          zusatz: string | null
+        }
+        Insert: {
+          angebot_einleitung?: string | null
+          angebot_gueltig_tage?: number
+          angebot_schluss?: string | null
+          bank?: string | null
+          bic?: string | null
+          einzig?: boolean
+          email?: string | null
+          firma?: string
+          firmenbuch?: string | null
+          fusstext?: string | null
+          gericht?: string | null
+          iban?: string | null
+          plz_ort?: string | null
+          rechnung_einleitung?: string | null
+          rechnung_schluss?: string | null
+          skonto_prozent?: number | null
+          skonto_tage?: number | null
+          strasse?: string | null
+          telefon?: string | null
+          uid?: string | null
+          updated_at?: string
+          ust_satz?: number
+          web?: string | null
+          zahlungsziel_tage?: number
+          zusatz?: string | null
+        }
+        Update: {
+          angebot_einleitung?: string | null
+          angebot_gueltig_tage?: number
+          angebot_schluss?: string | null
+          bank?: string | null
+          bic?: string | null
+          einzig?: boolean
+          email?: string | null
+          firma?: string
+          firmenbuch?: string | null
+          fusstext?: string | null
+          gericht?: string | null
+          iban?: string | null
+          plz_ort?: string | null
+          rechnung_einleitung?: string | null
+          rechnung_schluss?: string | null
+          skonto_prozent?: number | null
+          skonto_tage?: number | null
+          strasse?: string | null
+          telefon?: string | null
+          uid?: string | null
+          updated_at?: string
+          ust_satz?: number
+          web?: string | null
+          zahlungsziel_tage?: number
+          zusatz?: string | null
+        }
+        Relationships: []
+      }
+      faktura_nummernkreise: {
+        Row: {
+          breite: number
+          kreis: string
+          naechste_nummer: number
+          updated_at: string
+        }
+        Insert: {
+          breite?: number
+          kreis: string
+          naechste_nummer: number
+          updated_at?: string
+        }
+        Update: {
+          breite?: number
+          kreis?: string
+          naechste_nummer?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      faktura_stundensaetze: {
+        Row: {
+          bezeichnung: string
+          created_at: string
+          id: string
+          is_active: boolean
+          satz: number
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          bezeichnung: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          satz: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          bezeichnung?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          satz?: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       invitation_logs: {
         Row: {
           gesendet_am: string | null
@@ -551,148 +960,6 @@ export type Database = {
           telefonnummer?: string
         }
         Relationships: []
-      }
-      invoice_items: {
-        Row: {
-          beschreibung: string
-          created_at: string
-          einheit: string | null
-          einzelpreis: number
-          gesamtpreis: number
-          id: string
-          invoice_id: string
-          menge: number
-          position: number
-        }
-        Insert: {
-          beschreibung: string
-          created_at?: string
-          einheit?: string | null
-          einzelpreis?: number
-          gesamtpreis?: number
-          id?: string
-          invoice_id: string
-          menge?: number
-          position?: number
-        }
-        Update: {
-          beschreibung?: string
-          created_at?: string
-          einheit?: string | null
-          einzelpreis?: number
-          gesamtpreis?: number
-          id?: string
-          invoice_id?: string
-          menge?: number
-          position?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "invoice_items_invoice_id_fkey"
-            columns: ["invoice_id"]
-            isOneToOne: false
-            referencedRelation: "invoices"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      invoices: {
-        Row: {
-          brutto_summe: number
-          created_at: string
-          datum: string
-          faellig_am: string | null
-          id: string
-          jahr: number
-          kunde_adresse: string | null
-          kunde_email: string | null
-          kunde_land: string | null
-          kunde_name: string
-          kunde_ort: string | null
-          kunde_plz: string | null
-          kunde_telefon: string | null
-          kunde_uid: string | null
-          laufnummer: number
-          leistungsdatum: string | null
-          mwst_betrag: number
-          mwst_satz: number
-          netto_summe: number
-          notizen: string | null
-          nummer: string
-          project_id: string | null
-          status: string
-          typ: string
-          updated_at: string
-          user_id: string
-          zahlungsbedingungen: string | null
-        }
-        Insert: {
-          brutto_summe?: number
-          created_at?: string
-          datum?: string
-          faellig_am?: string | null
-          id?: string
-          jahr?: number
-          kunde_adresse?: string | null
-          kunde_email?: string | null
-          kunde_land?: string | null
-          kunde_name: string
-          kunde_ort?: string | null
-          kunde_plz?: string | null
-          kunde_telefon?: string | null
-          kunde_uid?: string | null
-          laufnummer: number
-          leistungsdatum?: string | null
-          mwst_betrag?: number
-          mwst_satz?: number
-          netto_summe?: number
-          notizen?: string | null
-          nummer: string
-          project_id?: string | null
-          status?: string
-          typ?: string
-          updated_at?: string
-          user_id: string
-          zahlungsbedingungen?: string | null
-        }
-        Update: {
-          brutto_summe?: number
-          created_at?: string
-          datum?: string
-          faellig_am?: string | null
-          id?: string
-          jahr?: number
-          kunde_adresse?: string | null
-          kunde_email?: string | null
-          kunde_land?: string | null
-          kunde_name?: string
-          kunde_ort?: string | null
-          kunde_plz?: string | null
-          kunde_telefon?: string | null
-          kunde_uid?: string | null
-          laufnummer?: number
-          leistungsdatum?: string | null
-          mwst_betrag?: number
-          mwst_satz?: number
-          netto_summe?: number
-          notizen?: string | null
-          nummer?: string
-          project_id?: string | null
-          status?: string
-          typ?: string
-          updated_at?: string
-          user_id?: string
-          zahlungsbedingungen?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "invoices_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       leave_balances: {
         Row: {
@@ -869,51 +1136,6 @@ export type Database = {
         }
         Relationships: []
       }
-      nachtrag_materials: {
-        Row: {
-          created_at: string
-          einheit: string | null
-          id: string
-          material: string
-          material_id: string | null
-          menge: string | null
-          nachtrag_id: string
-        }
-        Insert: {
-          created_at?: string
-          einheit?: string | null
-          id?: string
-          material: string
-          material_id?: string | null
-          menge?: string | null
-          nachtrag_id: string
-        }
-        Update: {
-          created_at?: string
-          einheit?: string | null
-          id?: string
-          material?: string
-          material_id?: string | null
-          menge?: string | null
-          nachtrag_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "nachtrag_materials_material_id_fkey"
-            columns: ["material_id"]
-            isOneToOne: false
-            referencedRelation: "materials"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "nachtrag_materials_nachtrag_id_fkey"
-            columns: ["nachtrag_id"]
-            isOneToOne: false
-            referencedRelation: "nachtraege"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       nachtraege: {
         Row: {
           beschreibung: string | null
@@ -961,6 +1183,147 @@ export type Database = {
           },
         ]
       }
+      nachtrag_materials: {
+        Row: {
+          created_at: string
+          einheit: string | null
+          id: string
+          material: string
+          material_id: string | null
+          menge: string | null
+          nachtrag_id: string
+        }
+        Insert: {
+          created_at?: string
+          einheit?: string | null
+          id?: string
+          material: string
+          material_id?: string | null
+          menge?: string | null
+          nachtrag_id: string
+        }
+        Update: {
+          created_at?: string
+          einheit?: string | null
+          id?: string
+          material?: string
+          material_id?: string | null
+          menge?: string | null
+          nachtrag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nachtrag_materials_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nachtrag_materials_nachtrag_id_fkey"
+            columns: ["nachtrag_id"]
+            isOneToOne: false
+            referencedRelation: "nachtraege"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      neuerungen: {
+        Row: {
+          aenderungswunsch_id: string | null
+          created_at: string
+          id: string
+          text: string | null
+          titel: string
+        }
+        Insert: {
+          aenderungswunsch_id?: string | null
+          created_at?: string
+          id?: string
+          text?: string | null
+          titel: string
+        }
+        Update: {
+          aenderungswunsch_id?: string | null
+          created_at?: string
+          id?: string
+          text?: string | null
+          titel?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "neuerungen_aenderungswunsch_id_fkey"
+            columns: ["aenderungswunsch_id"]
+            isOneToOne: false
+            referencedRelation: "aenderungswuensche"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      neuerungen_gelesen: {
+        Row: {
+          gelesen_am: string
+          neuerung_id: string
+          user_id: string
+        }
+        Insert: {
+          gelesen_am?: string
+          neuerung_id: string
+          user_id: string
+        }
+        Update: {
+          gelesen_am?: string
+          neuerung_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "neuerungen_gelesen_neuerung_id_fkey"
+            columns: ["neuerung_id"]
+            isOneToOne: false
+            referencedRelation: "neuerungen"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onedrive_sync_state: {
+        Row: {
+          bucket: string
+          last_synced: string
+          od_item_id: string | null
+          od_modified: string | null
+          project_id: string
+          rel_path: string
+          supa_updated: string | null
+        }
+        Insert: {
+          bucket: string
+          last_synced?: string
+          od_item_id?: string | null
+          od_modified?: string | null
+          project_id: string
+          rel_path: string
+          supa_updated?: string | null
+        }
+        Update: {
+          bucket?: string
+          last_synced?: string
+          od_item_id?: string | null
+          od_modified?: string | null
+          project_id?: string
+          rel_path?: string
+          supa_updated?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onedrive_sync_state_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           anleitung_completed: boolean | null
@@ -968,6 +1331,7 @@ export type Database = {
           id: string
           is_active: boolean | null
           nachname: string
+          stundensatz_id: string | null
           updated_at: string
           vorname: string
         }
@@ -977,6 +1341,7 @@ export type Database = {
           id: string
           is_active?: boolean | null
           nachname: string
+          stundensatz_id?: string | null
           updated_at?: string
           vorname: string
         }
@@ -986,10 +1351,19 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           nachname?: string
+          stundensatz_id?: string | null
           updated_at?: string
           vorname?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_stundensatz_id_fkey"
+            columns: ["stundensatz_id"]
+            isOneToOne: false
+            referencedRelation: "faktura_stundensaetze"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       project_statuses: {
         Row: {
@@ -1027,6 +1401,7 @@ export type Database = {
           hidden_categories: string[]
           id: string
           name: string
+          onedrive_folder_id: string | null
           plz: string
           status: string | null
           status_id: string | null
@@ -1040,6 +1415,7 @@ export type Database = {
           hidden_categories?: string[]
           id?: string
           name: string
+          onedrive_folder_id?: string | null
           plz: string
           status?: string | null
           status_id?: string | null
@@ -1053,6 +1429,7 @@ export type Database = {
           hidden_categories?: string[]
           id?: string
           name?: string
+          onedrive_folder_id?: string | null
           plz?: string
           status?: string | null
           status_id?: string | null
@@ -1184,6 +1561,7 @@ export type Database = {
       }
       time_entries: {
         Row: {
+          abgerechnet_in: string | null
           created_at: string
           datum: string
           disturbance_id: string | null
@@ -1203,6 +1581,7 @@ export type Database = {
           week_type: string | null
         }
         Insert: {
+          abgerechnet_in?: string | null
           created_at?: string
           datum: string
           disturbance_id?: string | null
@@ -1222,6 +1601,7 @@ export type Database = {
           week_type?: string | null
         }
         Update: {
+          abgerechnet_in?: string | null
           created_at?: string
           datum?: string
           disturbance_id?: string | null
@@ -1241,6 +1621,13 @@ export type Database = {
           week_type?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "time_entries_abgerechnet_in_fkey"
+            columns: ["abgerechnet_in"]
+            isOneToOne: false
+            referencedRelation: "belege"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "time_entries_disturbance_id_fkey"
             columns: ["disturbance_id"]
@@ -1292,6 +1679,71 @@ export type Database = {
             columns: ["target_entry_id"]
             isOneToOne: false
             referencedRelation: "time_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      uebernahmen: {
+        Row: {
+          auftrag_nr: string | null
+          bedienungsanleitung: boolean
+          created_at: string
+          created_by: string | null
+          datum: string
+          id: string
+          kunde_name: string
+          leistungsverzeichnis: string | null
+          ort: string | null
+          pdf_path: string | null
+          plz_ort: string | null
+          project_id: string
+          strasse: string | null
+          unterschrift: string | null
+          updated_at: string
+          zusatz_leistungen: string | null
+        }
+        Insert: {
+          auftrag_nr?: string | null
+          bedienungsanleitung?: boolean
+          created_at?: string
+          created_by?: string | null
+          datum?: string
+          id?: string
+          kunde_name: string
+          leistungsverzeichnis?: string | null
+          ort?: string | null
+          pdf_path?: string | null
+          plz_ort?: string | null
+          project_id: string
+          strasse?: string | null
+          unterschrift?: string | null
+          updated_at?: string
+          zusatz_leistungen?: string | null
+        }
+        Update: {
+          auftrag_nr?: string | null
+          bedienungsanleitung?: boolean
+          created_at?: string
+          created_by?: string | null
+          datum?: string
+          id?: string
+          kunde_name?: string
+          leistungsverzeichnis?: string | null
+          ort?: string | null
+          pdf_path?: string | null
+          plz_ort?: string | null
+          project_id?: string
+          strasse?: string | null
+          unterschrift?: string | null
+          updated_at?: string
+          zusatz_leistungen?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "uebernahmen_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -1372,7 +1824,74 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      beleg_festschreiben: {
+        Args: { p_beleg: string }
+        Returns: {
+          betreff: string | null
+          bezahlt: number
+          brutto: number
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          datum: string
+          einleitung: string | null
+          faellig_am: string | null
+          festgeschrieben_am: string | null
+          gesendet_am: string | null
+          gueltig_bis: string | null
+          id: string
+          jahr: number | null
+          kunde_email: string | null
+          kunde_name: string
+          kunde_plz_ort: string | null
+          kunde_strasse: string | null
+          kunde_uid: string | null
+          kunde_zusatz: string | null
+          laufnummer: number | null
+          leistung_bis: string | null
+          leistung_von: string | null
+          netto: number
+          notizen: string | null
+          nummer: string | null
+          pdf_pfad: string | null
+          project_id: string | null
+          reverse_charge: boolean
+          schlusstext: string | null
+          skonto_prozent: number | null
+          skonto_tage: number | null
+          status: string
+          storniert_durch: string | null
+          typ: string
+          updated_at: string
+          ust: number
+          ust_satz: number
+          vorgaenger_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "belege"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      beleg_stornieren: { Args: { p_beleg: string }; Returns: string }
+      beleg_summen_neu: { Args: { p_beleg: string }; Returns: undefined }
       ensure_user_profile: { Args: never; Returns: Json }
+      faktura_offene_stunden: {
+        Args: { p_projekt: string }
+        Returns: {
+          bis: string
+          bloecke: number
+          entry_ids: string[]
+          gruppe: string
+          mitarbeiter: string
+          satz: number
+          stunden: number
+          stundensatz_id: string
+          user_id: string
+          von: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1402,12 +1921,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1431,11 +1950,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1456,11 +1975,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1481,11 +2000,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1498,11 +2017,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

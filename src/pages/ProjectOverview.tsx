@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, FileText, FileCheck, FolderOpen, Package, Camera, ImagePlus, Lock, FileSignature, Plus, CheckCircle2, Pencil, Settings } from "lucide-react";
+import { ArrowLeft, FileText, FileCheck, FolderOpen, Package, Camera, ImagePlus, Lock, FileSignature, Plus, CheckCircle2, Pencil, Settings, Receipt } from "lucide-react";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -262,6 +262,13 @@ const ProjectOverview = () => {
                 <Pencil className="h-4 w-4" />
                 <span className="hidden sm:inline">Bearbeiten</span>
               </Button>
+              {/* Angebote & Rechnungen zum Projekt: nur Admin (Preise). */}
+              {isAdmin && (
+                <Button variant="outline" size="sm" className="gap-1" onClick={() => navigate(`/belege?projekt=${projectId}`)}>
+                  <Receipt className="h-4 w-4" />
+                  <span className="hidden sm:inline">Belege</span>
+                </Button>
+              )}
               {/* Ordner konfigurieren: nur Admin. */}
               {isAdmin && (
                 <Button variant="outline" size="sm" className="gap-1" onClick={openSettings}>

@@ -78,7 +78,20 @@ export const datum = (iso: string | null | undefined): string => {
   return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString("de-AT", { day: "2-digit", month: "2-digit", year: "numeric" });
 };
 
-export const heuteISO = () => new Date().toISOString().slice(0, 10);
+// Lokales Datum (Wien), nicht UTC — sonst bekommt ein Beleg um 00:30 das Vordatum.
+export const heuteISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+/** „12,5" oder „12.5" → 12.5; leer/ungültig → null. Handys tippen Komma. */
+export const parseZahl = (s: string | number | null | undefined): number | null => {
+  if (s === null || s === undefined) return null;
+  const t = String(s).trim().replace(/\s/g, "").replace(",", ".");
+  if (t === "") return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+};
 
 export const plusTage = (isoDatum: string, tage: number): string => {
   const d = new Date(isoDatum);

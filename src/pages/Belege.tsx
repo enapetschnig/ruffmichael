@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Plus, Search, FileText, Receipt, AlertCircle } from "lucide-react";
+import { Plus, Search, FileText, Receipt, AlertCircle, Check, ChevronsUpDown } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,20 +10,63 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { getSessionUser } from "@/lib/auth";
 import { customerDisplayName } from "@/pages/Customers";
 import { projectLabel } from "@/lib/projectLabel";
+import { cn } from "@/lib/utils";
 import {
-  TYP_LABEL, STATUS_LABEL, STATUS_VARIANT, eur, datum, heuteISO, plusTage, istRechnung, offen,
+  TYP_LABEL, STATUS_LABEL, STATUS_VARIANT, eur, datum, heuteISO, plusTage, istRechnung, istAngebot, offen,
   ladeFirmendaten, type Beleg, type BelegTyp,
 } from "@/lib/faktura";
 
 type KundeOpt = { id: string; kundennr: string | null; vorname: string | null; nachname: string; firma: string | null; strasse: string | null; ort: string | null; uid: string | null; ist_unternehmer: boolean; reverse_charge: boolean; zahlungsziel_tage: number | null; email: string | null };
-type ProjektOpt = { id: string; name: string; plz: string | null; adresse: string | null; customer_id: string | null; customers: { strasse: string | null; ort: string | null } | null };
+type ProjektOpt = { id: string; name: string; plz: string | null; adresse: string | null; customer_id: string | null; status: string; customers: { strasse: string | null; ort: string | null } | null };
 
 const NEU_TYPEN: BelegTyp[] = ["angebot", "rechnung", "teilrechnung", "schlussrechnung"];
+const kundeName = (k: KundeOpt) => k.firma?.trim() || customerDisplayName({ vorname: k.vorname ?? "", nachname: k.nachname });
+
+/** Auswahlfeld mit Suche — 116 Kunden ohne Suche sind am Handy nicht bedienbar. */
+function Auswahl<T extends { id: string }>({ wert, optionen, label, suchtext, platzhalter, leer, onChange }: {
+  wert: string; optionen: T[]; label: (o: T) => string; suchtext: (o: T) => string; platzhalter: string; leer?: string; onChange: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const gewaehlt = optionen.find((o) => o.id === wert);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between font-normal h-11">
+          <span className={cn("truncate", !gewaehlt && "text-muted-foreground")}>{gewaehlt ? label(gewaehlt) : platzhalter}</span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
+        <Command filter={(value, search) => (value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0)}>
+          <CommandInput placeholder="Tippen zum Suchen…" />
+          <CommandList className="max-h-64">
+            <CommandEmpty>Nichts gefunden.</CommandEmpty>
+            <CommandGroup>
+              {leer && (
+                <CommandItem value="__leer__" onSelect={() => { onChange(""); setOpen(false); }}>
+                  <Check className={cn("mr-2 h-4 w-4", wert ? "opacity-0" : "opacity-100")} />{leer}
+                </CommandItem>
+              )}
+              {optionen.map((o) => (
+                <CommandItem key={o.id} value={`${suchtext(o)} ${o.id}`} onSelect={() => { onChange(o.id); setOpen(false); }}>
+                  <Check className={cn("mr-2 h-4 w-4", wert === o.id ? "opacity-100" : "opacity-0")} />
+                  <span className="truncate">{label(o)}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 /** Liste aller Angebote und Rechnungen (nur Admin). */
 const Belege = () => {
@@ -39,9 +82,8 @@ const Belege = () => {
   const [projekte, setProjekte] = useState<ProjektOpt[]>([]);
   const [neu, setNeu] = useState<{ typ: BelegTyp; kunde: string; projekt: string }>({ typ: "angebot", kunde: params.get("kunde") ?? "", projekt: params.get("projekt") ?? "" });
   const [anlegen, setAnlegen] = useState(false);
-  // Aus der Projektübersicht kommend: nur die Belege dieses Projekts zeigen
+  // Aus der Projektübersicht / Kundenliste kommend: nur die passenden Belege
   const projektFilter = params.get("projekt");
-  // Aus der Kundenliste kommend: nur die Belege dieses Kunden
   const kundeFilter = params.get("kunde");
   // Firmendaten unvollständig → Hinweis, bevor die erste Rechnung rausgeht
   const [firmaFehlt, setFirmaFehlt] = useState<string[]>([]);
@@ -55,7 +97,7 @@ const Belege = () => {
       await laden();
       const [k, p] = await Promise.all([
         supabase.from("customers").select("id, kundennr, vorname, nachname, firma, strasse, ort, uid, ist_unternehmer, reverse_charge, zahlungsziel_tage, email").order("nachname"),
-        supabase.from("projects").select("id, name, plz, adresse, customer_id, customers(strasse, ort)").order("name"),
+        supabase.from("projects").select("id, name, plz, adresse, customer_id, status, customers(strasse, ort)").order("name"),
       ]);
       setKunden((k.data as KundeOpt[]) ?? []);
       setProjekte((p.data as unknown as ProjektOpt[]) ?? []);
@@ -77,35 +119,44 @@ const Belege = () => {
     setLoading(false);
   };
 
-  // Projekt gewählt → Kunde des Projekts vorschlagen
+  // Projekt gewählt → Kunde des Projekts vorschlagen (nur wenn noch keiner gewählt)
   useEffect(() => {
     if (!neu.projekt || neu.kunde) return;
     const p = projekte.find((x) => x.id === neu.projekt);
     if (p?.customer_id) setNeu((n) => ({ ...n, kunde: p.customer_id! }));
   }, [neu.projekt, neu.kunde, projekte]);
+  const projektKundeWeicht = useMemo(() => {
+    const p = projekte.find((x) => x.id === neu.projekt);
+    return !!(p?.customer_id && neu.kunde && p.customer_id !== neu.kunde);
+  }, [neu.projekt, neu.kunde, projekte]);
+
+  // Basis = nach Projekt/Kunde gefiltert (für Kennzahlen UND Liste)
+  const basis = useMemo(() => belege.filter((b) =>
+    (!projektFilter || b.project_id === projektFilter) && (!kundeFilter || b.customer_id === kundeFilter)
+  ), [belege, projektFilter, kundeFilter]);
 
   const gefiltert = useMemo(() => {
     const q = suche.trim().toLowerCase();
-    return belege.filter((b) => {
-      if (projektFilter && b.project_id !== projektFilter) return false;
-      if (kundeFilter && b.customer_id !== kundeFilter) return false;
-      if (filter === "angebote" && istRechnung(b.typ)) return false;
+    return basis.filter((b) => {
+      if (filter === "angebote" && !istAngebot(b.typ)) return false;
       if (filter === "rechnungen" && !istRechnung(b.typ) && b.typ !== "gutschrift") return false;
       if (filter === "offen" && offen(b) <= 0) return false;
       if (filter === "entwuerfe" && b.status !== "entwurf") return false;
       if (!q) return true;
       return [b.nummer, b.kunde_name, b.betreff, TYP_LABEL[b.typ]].filter(Boolean).some((v) => String(v).toLowerCase().includes(q));
     });
-  }, [belege, filter, suche]);
+  }, [basis, filter, suche]);
 
-  const offenSumme = belege.reduce((s, b) => s + offen(b), 0);
-  const entwuerfe = belege.filter((b) => b.status === "entwurf").length;
-  const monat = new Date().toISOString().slice(0, 7);
-  const umsatzMonat = belege.filter((b) => istRechnung(b.typ) && b.status !== "entwurf" && b.status !== "storniert" && b.datum.startsWith(monat)).reduce((s, b) => s + Number(b.netto), 0);
+  const offenSumme = basis.reduce((s, b) => s + offen(b), 0);
+  const entwuerfe = basis.filter((b) => b.status === "entwurf").length;
+  const monat = heuteISO().slice(0, 7);
+  const umsatzMonat = basis.filter((b) => istRechnung(b.typ) && b.status !== "entwurf" && b.status !== "storniert" && b.datum.startsWith(monat)).reduce((s, b) => s + Number(b.netto), 0);
+  const gefiltertHinweis = projektFilter || kundeFilter ? " (gefiltert)" : "";
 
   const belegAnlegen = async () => {
     const k = kunden.find((x) => x.id === neu.kunde);
     if (!k) return toast({ variant: "destructive", title: "Kunde fehlt", description: "Bitte einen Kunden wählen." });
+    if (anlegen) return;
     setAnlegen(true);
     const firma = await ladeFirmendaten();
     const user = await getSessionUser();
@@ -117,13 +168,17 @@ const Belege = () => {
       project_id: neu.projekt || null,
       customer_id: k.id,
       // Snapshot der Kundendaten
-      kunde_name: k.firma?.trim() || customerDisplayName({ vorname: k.vorname ?? "", nachname: k.nachname }),
+      kunde_name: kundeName(k),
       kunde_zusatz: k.firma?.trim() ? customerDisplayName({ vorname: k.vorname ?? "", nachname: k.nachname }) : null,
       kunde_strasse: k.strasse, kunde_plz_ort: k.ort, kunde_uid: k.uid, kunde_email: k.email,
       datum: heute,
       faellig_am: rechnung ? plusTage(heute, zahlungsziel) : null,
       gueltig_bis: neu.typ === "angebot" ? plusTage(heute, firma?.angebot_gueltig_tage ?? 30) : null,
-      reverse_charge: rechnung ? !!k.reverse_charge : false,
+      // Leistungszeitraum ist Pflicht auf der Rechnung — Vorbelegung heute, „Stunden holen“ erweitert
+      leistung_von: rechnung ? heute : null,
+      leistung_bis: rechnung ? heute : null,
+      // Reverse Charge gilt auch fürs Angebot: der Kunde soll keine USt sehen, die es nicht gibt
+      reverse_charge: !!k.reverse_charge,
       ust_satz: firma?.ust_satz ?? 20,
       skonto_prozent: rechnung ? firma?.skonto_prozent ?? null : null,
       skonto_tage: rechnung ? firma?.skonto_tage ?? null : null,
@@ -150,6 +205,8 @@ const Belege = () => {
     navigate(`/belege/${data.id}`);
   };
 
+  const filterKunde = kundeFilter ? kunden.find((x) => x.id === kundeFilter) : null;
+
   return (
     <div className="min-h-screen bg-background">
       <PageHeader title="Angebote & Rechnungen" backPath="/" />
@@ -169,14 +226,14 @@ const Belege = () => {
         )}
         {kundeFilter && (
           <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 p-3 text-sm">
-            <span className="flex-1 min-w-0">Nur Belege von <b>{(() => { const k = kunden.find((x) => x.id === kundeFilter); return k ? (k.firma?.trim() || customerDisplayName({ vorname: k.vorname ?? "", nachname: k.nachname })) : "…"; })()}</b></span>
+            <span className="flex-1 min-w-0">Nur Belege von <b>{filterKunde ? kundeName(filterKunde) : "…"}</b></span>
             <Button size="sm" variant="ghost" onClick={() => navigate("/belege")}>Alle Belege</Button>
           </div>
         )}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Card><CardContent className="p-4"><div className="text-xs uppercase tracking-wide text-muted-foreground">Offene Forderungen</div><div className="text-2xl font-bold tabular-nums">{eur(offenSumme)}</div></CardContent></Card>
-          <Card><CardContent className="p-4"><div className="text-xs uppercase tracking-wide text-muted-foreground">Umsatz netto {new Date().toLocaleDateString("de-AT", { month: "long" })}</div><div className="text-2xl font-bold tabular-nums">{eur(umsatzMonat)}</div></CardContent></Card>
-          <Card><CardContent className="p-4"><div className="text-xs uppercase tracking-wide text-muted-foreground">Entwürfe</div><div className="text-2xl font-bold tabular-nums">{entwuerfe}</div></CardContent></Card>
+          <Card><CardContent className="p-4"><div className="text-xs uppercase tracking-wide text-muted-foreground">Offene Forderungen{gefiltertHinweis}</div><div className="text-2xl font-bold tabular-nums">{eur(offenSumme)}</div></CardContent></Card>
+          <Card><CardContent className="p-4"><div className="text-xs uppercase tracking-wide text-muted-foreground">Umsatz netto {new Date().toLocaleDateString("de-AT", { month: "long" })}{gefiltertHinweis}</div><div className="text-2xl font-bold tabular-nums">{eur(umsatzMonat)}</div></CardContent></Card>
+          <Card><CardContent className="p-4"><div className="text-xs uppercase tracking-wide text-muted-foreground">Entwürfe{gefiltertHinweis}</div><div className="text-2xl font-bold tabular-nums">{entwuerfe}</div></CardContent></Card>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
@@ -184,7 +241,7 @@ const Belege = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input className="pl-9" placeholder="Nummer, Kunde, Betreff…" value={suche} onChange={(e) => setSuche(e.target.value)} />
           </div>
-          <Button onClick={() => setNeuOpen(true)} className="gap-2 shrink-0"><Plus className="h-4 w-4" />Neuer Beleg</Button>
+          <Button onClick={() => setNeuOpen(true)} className="gap-2 shrink-0 h-11 sm:h-10"><Plus className="h-4 w-4" />Neuer Beleg</Button>
         </div>
         <Tabs value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
           <TabsList className="grid w-full grid-cols-5">
@@ -201,18 +258,19 @@ const Belege = () => {
         ) : gefiltert.length === 0 ? (
           <Card><CardContent className="py-10 text-center text-muted-foreground">
             <Receipt className="h-10 w-10 mx-auto mb-2 opacity-40" />
-            {belege.length === 0 ? "Noch keine Belege. Mit „Neuer Beleg“ das erste Angebot oder die erste Rechnung anlegen." : "Nichts gefunden."}
+            {basis.length === 0 ? "Noch keine Belege. Mit „Neuer Beleg“ das erste Angebot oder die erste Rechnung anlegen." : "Nichts gefunden."}
           </CardContent></Card>
         ) : (
           <div className="space-y-2">
             {gefiltert.map((b) => {
               const rest = offen(b);
               const ueberfaellig = rest > 0 && b.faellig_am && b.faellig_am < heuteISO();
+              const istRe = istRechnung(b.typ) || b.typ === "gutschrift";
               return (
                 <Card key={b.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/belege/${b.id}`)}>
                   <CardContent className="p-3 sm:p-4 flex items-center gap-3">
-                    <div className={`h-10 w-10 rounded-lg flex items-center justify-center shrink-0 ${istRechnung(b.typ) || b.typ === "gutschrift" ? "bg-primary/10 text-primary" : "bg-accent/10 text-accent"}`}>
-                      {istRechnung(b.typ) || b.typ === "gutschrift" ? <Receipt className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
+                    <div className={`h-10 w-10 rounded-lg flex items-center justify-center shrink-0 ${istRe ? "bg-primary/10 text-primary" : "bg-accent/10 text-accent"}`}>
+                      {istRe ? <Receipt className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -236,7 +294,7 @@ const Belege = () => {
       </main>
 
       <Dialog open={neuOpen} onOpenChange={setNeuOpen}>
-        <DialogContent className="max-w-sm sm:max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-sm sm:max-w-md max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Neuer Beleg</DialogTitle>
             <DialogDescription>Kundendaten werden in den Beleg übernommen. Die Nummer wird erst beim Festschreiben vergeben.</DialogDescription>
@@ -245,33 +303,20 @@ const Belege = () => {
             <div className="space-y-1.5">
               <Label>Belegart</Label>
               <Select value={neu.typ} onValueChange={(v) => setNeu({ ...neu, typ: v as BelegTyp })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
                 <SelectContent>{NEU_TYPEN.map((t) => <SelectItem key={t} value={t}>{TYP_LABEL[t]}</SelectItem>)}</SelectContent>
               </Select>
               {neu.typ === "schlussrechnung" && <p className="text-xs text-muted-foreground">Festgeschriebene Teilrechnungen des Projekts werden automatisch abgezogen.</p>}
             </div>
             <div className="space-y-1.5">
               <Label>Projekt (optional)</Label>
-              <Select value={neu.projekt || "none"} onValueChange={(v) => setNeu({ ...neu, projekt: v === "none" ? "" : v })}>
-                <SelectTrigger><SelectValue placeholder="Kein Projekt" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">— ohne Projekt —</SelectItem>
-                  {projekte.map((p) => <SelectItem key={p.id} value={p.id}>{projectLabel(p as never)}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <Auswahl wert={neu.projekt} optionen={projekte} label={(p) => projectLabel(p as never)} suchtext={(p) => `${p.name} ${p.plz ?? ""} ${p.adresse ?? ""}`} platzhalter="Kein Projekt" leer="— ohne Projekt —" onChange={(id) => setNeu({ ...neu, projekt: id })} />
             </div>
             <div className="space-y-1.5">
               <Label>Kunde *</Label>
-              <Select value={neu.kunde} onValueChange={(v) => setNeu({ ...neu, kunde: v })}>
-                <SelectTrigger><SelectValue placeholder="Kunde wählen" /></SelectTrigger>
-                <SelectContent>
-                  {kunden.map((k) => (
-                    <SelectItem key={k.id} value={k.id}>
-                      {k.kundennr ? `${k.kundennr} · ` : ""}{k.firma?.trim() || customerDisplayName({ vorname: k.vorname ?? "", nachname: k.nachname })}{k.ort ? ` (${k.ort})` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Auswahl wert={neu.kunde} optionen={kunden} label={(k) => `${k.kundennr ? `${k.kundennr} · ` : ""}${kundeName(k)}${k.ort ? ` (${k.ort})` : ""}`} suchtext={(k) => `${k.kundennr ?? ""} ${k.firma ?? ""} ${k.vorname ?? ""} ${k.nachname} ${k.ort ?? ""} ${k.strasse ?? ""}`} platzhalter="Kunde wählen — tippen zum Suchen" onChange={(id) => setNeu({ ...neu, kunde: id })} />
+              {projektKundeWeicht && <p className="text-xs text-amber-700 dark:text-amber-400">Achtung: Das Projekt gehört einem anderen Kunden.</p>}
+              {neu.kunde && kunden.find((k) => k.id === neu.kunde)?.reverse_charge && <p className="text-xs text-muted-foreground">Reverse Charge ist bei diesem Kunden hinterlegt — der Beleg wird ohne USt erstellt.</p>}
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setNeuOpen(false)}>Abbrechen</Button>

@@ -181,7 +181,10 @@ const ProjectOverview = () => {
 
     // Selbst erstellte Ordner (project-files, oberste Ebene)
     const { data: top } = await supabase.storage.from("project-files").list(projectId, { limit: 1000 });
-    const folderNames = (top ?? []).filter((i) => i.id === null).map((i) => i.name);
+    // „Anbote“ enthält Angebote und Rechnungen mit Preisen — nur für Administratoren
+    // (die Datenbank sperrt den Ordner für Mitarbeiter ohnehin; hier bleibt die Kachel weg).
+    const folderNames = (top ?? []).filter((i) => i.id === null).map((i) => i.name)
+      .filter((name) => isAdmin || name !== "Anbote");
     const folders: CustomFolder[] = await Promise.all(
       folderNames.map(async (name) => ({ name, count: await countFilesUnder(`${projectId}/${name}`) }))
     );

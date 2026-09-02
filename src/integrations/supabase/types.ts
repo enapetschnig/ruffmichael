@@ -94,7 +94,7 @@ export type Database = {
           gesamt: number | null
           id: string
           menge: number
-          pos: number
+          pos: number | null
           quelle_ids: string[]
           quelle_typ: string
           rabatt_prozent: number
@@ -110,7 +110,7 @@ export type Database = {
           gesamt?: number | null
           id?: string
           menge?: number
-          pos?: number
+          pos?: number | null
           quelle_ids?: string[]
           quelle_typ?: string
           rabatt_prozent?: number
@@ -126,7 +126,7 @@ export type Database = {
           gesamt?: number | null
           id?: string
           menge?: number
-          pos?: number
+          pos?: number | null
           quelle_ids?: string[]
           quelle_typ?: string
           rabatt_prozent?: number
@@ -196,6 +196,7 @@ export type Database = {
           gueltig_bis: string | null
           id: string
           jahr: number | null
+          kreis: string | null
           kunde_email: string | null
           kunde_name: string
           kunde_plz_ort: string | null
@@ -237,6 +238,7 @@ export type Database = {
           gueltig_bis?: string | null
           id?: string
           jahr?: number | null
+          kreis?: string | null
           kunde_email?: string | null
           kunde_name: string
           kunde_plz_ort?: string | null
@@ -278,6 +280,7 @@ export type Database = {
           gueltig_bis?: string | null
           id?: string
           jahr?: number | null
+          kreis?: string | null
           kunde_email?: string | null
           kunde_name?: string
           kunde_plz_ort?: string | null
@@ -1850,6 +1853,7 @@ export type Database = {
           gueltig_bis: string | null
           id: string
           jahr: number | null
+          kreis: string | null
           kunde_email: string | null
           kunde_name: string
           kunde_plz_ort: string | null
@@ -1914,6 +1918,10 @@ export type Database = {
           von: string
         }[]
       }
+      faktura_stunden_markieren: {
+        Args: { p_beleg: string; p_ids: string[] }
+        Returns: number
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1921,6 +1929,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      heute_wien: { Args: never; Returns: string }
       next_invoice_number: {
         Args: { p_jahr?: number; p_typ: string }
         Returns: string

@@ -280,7 +280,7 @@ const Customers = () => {
     const q = search.trim().toLowerCase();
     if (!q) return customers;
     return customers.filter((c) =>
-      [c.kundennr, c.vorname, c.nachname, c.strasse, c.ort, c.telefon, c.mobil, c.email, c.liefer_strasse, c.liefer_ort]
+      [c.kundennr, c.firma, c.uid, c.vorname, c.nachname, c.strasse, c.ort, c.telefon, c.mobil, c.email, c.liefer_strasse, c.liefer_ort]
         .filter(Boolean)
         .some((v) => (v as string).toLowerCase().includes(q))
     );
@@ -457,7 +457,11 @@ const Customers = () => {
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className="font-semibold text-base flex items-center gap-2 flex-wrap">
                         {/* min-w-0 + break-words: lange Firmennamen brechen um, statt die Seite breiter zu machen */}
-                        <span className="min-w-0 break-words">{customerDisplayName(c) || "(ohne Name)"}</span>
+                        {/* Firmenkunde: Firma groß, Ansprechperson darunter — so heißt er auch am Beleg */}
+                        <span className="min-w-0 break-words">{c.firma?.trim() || customerDisplayName(c) || "(ohne Name)"}</span>
+                        {c.firma?.trim() && customerDisplayName(c) && (
+                          <span className="text-sm font-normal text-muted-foreground min-w-0 break-words">{customerDisplayName(c)}</span>
+                        )}
                         {/* Kundennummer aus der Faktura-Software (nur wenn vorhanden) */}
                         {c.kundennr && (
                           <span className="text-xs font-normal text-muted-foreground bg-muted rounded px-1.5 py-0.5">

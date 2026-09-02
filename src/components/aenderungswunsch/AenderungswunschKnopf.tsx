@@ -49,7 +49,9 @@ export function AenderungswunschKnopf({
     setArbeitet(true);
     setSeite(ort.pathname);
     try {
-      setBild(await bildschirmfotoMachen());
+      // Belegseiten zeigen Preise und Kundendaten — die gehen nicht als Foto ins
+      // externe CRM. Der Text der Meldung reicht dort aus.
+      setBild(ort.pathname.startsWith("/belege") ? null : await bildschirmfotoMachen());
     } catch {
       setBild(null);
     }

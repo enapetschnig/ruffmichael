@@ -72,17 +72,8 @@ const toStorageKey = (name: string): string =>
     .replace(/ß/g, "ss")
     .replace(/[^a-zA-Z0-9._ ()-]/g, "_");
 
-const emptyCustomerForm = {
-  vorname: "",
-  nachname: "",
-  strasse: "",
-  ort: "",
-  telefon: "",
-  mobil: "",
-  email: "",
-  liefer_strasse: "",
-  liefer_ort: "",
-};
+// Kundenvorlage kommt aus der Kundenverwaltung — eine Quelle für alle Felder.
+import { emptyCustomerForm } from "@/pages/Customers";
 
 const Projects = () => {
   const navigate = useNavigate();
@@ -600,6 +591,7 @@ const Projects = () => {
         reportsRes,
         signedRes,
         uebernahmenRes,
+        belegeCountRes,
       ] = await Promise.all([
         supabase
           .from('time_entries')
@@ -618,6 +610,12 @@ const Projects = () => {
           .from('uebernahmen')
           .select('id', { count: 'exact', head: true })
           .eq('project_id', id),
+        // Angebote/Rechnungen mit Nummer: Aufbewahrungspflicht — Projekt bleibt
+        supabase
+          .from('belege')
+          .select('id', { count: 'exact', head: true })
+          .eq('project_id', id)
+          .or('status.neq.entwurf,nummer.not.is.null'),
       ]);
 
       const firstError =
@@ -628,13 +626,15 @@ const Projects = () => {
       const reportsN = reportsRes.count ?? 0;
       const signedN = signedRes.count ?? 0;
       const uebernahmenN = uebernahmenRes.count ?? 0;
+      const belegeN = belegeCountRes.count ?? 0;
 
-      if (timeN + reportsN + signedN + uebernahmenN > 0) {
+      if (timeN + reportsN + signedN + uebernahmenN + belegeN > 0) {
         const blockers: string[] = [];
         if (timeN > 0) blockers.push(timeN === 1 ? '1 gebuchter Zeiteintrag' : `${timeN} gebuchte Zeiteinträge`);
         if (reportsN > 0) blockers.push(reportsN === 1 ? '1 Regiebericht' : `${reportsN} Regieberichte`);
         if (signedN > 0) blockers.push(signedN === 1 ? '1 unterschriebener Nachtrag' : `${signedN} unterschriebene Nachträge`);
         if (uebernahmenN > 0) blockers.push(uebernahmenN === 1 ? '1 Übernahmebestätigung' : `${uebernahmenN} Übernahmebestätigungen`);
+        if (belegeN > 0) blockers.push(belegeN === 1 ? '1 Angebot/Rechnung' : `${belegeN} Angebote/Rechnungen`);
 
         toast({
           title: "Löschen nicht möglich",
@@ -644,7 +644,15 @@ const Projects = () => {
         return;
       }
 
-      // Ab hier stehen keine Blocker mehr im Weg → alle Storage-Buckets aufräumen.
+      // Zuerst der Datensatz: Wenn die Datenbank das Löschen verweigert (Trigger,
+      // Fremdschlüssel), ist noch keine einzige Datei weg.
+      const { error: deleteError } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', id);
+      if (deleteError) throw deleteError;
+
+      // Ab hier ist das Projekt weg → alle Storage-Buckets aufräumen.
       const buckets = ['project-plans', 'project-reports', 'project-materials', 'project-photos', 'project-chef'];
 
       for (const bucket of buckets) {
@@ -674,14 +682,6 @@ const Projects = () => {
         .from('documents')
         .delete()
         .eq('project_id', id);
-
-      // Finally delete the project
-      const { error } = await supabase
-        .from('projects')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
 
       toast({
         title: "Erfolg",

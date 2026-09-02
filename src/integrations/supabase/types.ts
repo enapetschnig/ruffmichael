@@ -1930,10 +1930,6 @@ export type Database = {
         Returns: boolean
       }
       heute_wien: { Args: never; Returns: string }
-      next_invoice_number: {
-        Args: { p_jahr?: number; p_typ: string }
-        Returns: string
-      }
     }
     Enums: {
       app_role: "administrator" | "mitarbeiter"

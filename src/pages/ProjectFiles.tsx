@@ -12,6 +12,7 @@ import {
   Pencil,
   Trash2,
   Upload,
+  Lock,
 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { enqueue } from "@/lib/offlineQueue";
@@ -246,6 +247,10 @@ const ProjectFiles = () => {
   };
 
   const validateFolderName = (name: string): string | null => {
+    // „Anbote“ auf oberster Ebene ist für Angebote & Rechnungen reserviert
+    if (path.length === 0 && name.trim().toLowerCase() === "anbote") {
+      return "„Anbote“ ist für Angebote & Rechnungen reserviert und wird automatisch verwaltet.";
+    }
     if (!name) return "Bitte einen Namen eingeben.";
     if (name.includes("/")) return 'Der Name darf kein "/" enthalten.';
     if (
@@ -639,6 +644,13 @@ const ProjectFiles = () => {
                     <span className="flex-1 min-w-0 truncate font-medium">
                       {folder.name}
                     </span>
+                    {/* „Anbote“ (Angebote & Rechnungen) darf nicht umbenannt, verschoben oder
+                        gelöscht werden — die Belege verweisen auf genau diesen Pfad. */}
+                    {path.length === 0 && folder.name === "Anbote" ? (
+                      <span className="h-10 w-10 sm:h-8 sm:w-8 shrink-0 inline-flex items-center justify-center text-muted-foreground" title="Wird von Angebote & Rechnungen verwaltet">
+                        <Lock className="h-4 w-4" />
+                      </span>
+                    ) : (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -678,6 +690,7 @@ const ProjectFiles = () => {
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
+                    )}
                   </div>
                 ))}
 

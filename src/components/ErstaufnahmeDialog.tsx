@@ -43,17 +43,8 @@ import { cachedSelect } from "@/lib/offlineStore";
 // WICHTIG: Diese Komponente wird von Mitarbeitern und Kunden gesehen.
 // Es dürfen hier NIEMALS Preise geladen oder angezeigt werden.
 
-const emptyCustomerForm = {
-  vorname: "",
-  nachname: "",
-  strasse: "",
-  ort: "",
-  telefon: "",
-  mobil: "",
-  email: "",
-  liefer_strasse: "",
-  liefer_ort: "",
-};
+// Kundenvorlage kommt aus der Kundenverwaltung — eine Quelle für alle Felder.
+import { emptyCustomerForm } from "@/pages/Customers";
 
 type ErstaufnahmeCustomer = Pick<
   Customer,

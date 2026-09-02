@@ -76,12 +76,20 @@ const emptyForm = {
 
 type CustomerForm = typeof emptyForm;
 
+// Eine Vorlage für alle Stellen, die Kunden anlegen (Kundenverwaltung,
+// Projektanlage, Erstaufnahme) — lokale Kopien liefen auseinander und
+// stürzten ab, sobald hier Felder dazukamen.
+export const emptyCustomerForm: CustomerForm = { ...emptyForm };
+
 export const CustomerFormFields = ({
   form,
   setForm,
+  zeigeRechnungsdaten = false,
 }: {
   form: CustomerForm;
   setForm: (f: CustomerForm) => void;
+  /** Rechnungsdaten (UID, Reverse Charge, Zahlungsziel) nur für Administratoren anzeigen */
+  zeigeRechnungsdaten?: boolean;
 }) => (
   <div className="space-y-4">
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -153,6 +161,7 @@ export const CustomerFormFields = ({
       />
     </div>
 
+    {zeigeRechnungsdaten && (
     <div className="rounded-lg border p-3 space-y-3">
       <div className="text-sm font-medium">Rechnungsdaten</div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -180,6 +189,7 @@ export const CustomerFormFields = ({
         </div>
       </div>
     </div>
+    )}
 
     <div className="rounded-lg border p-3 space-y-3">
       <div className="flex items-center gap-2 text-sm font-medium">
@@ -218,11 +228,12 @@ export const customerFormToRow = (form: CustomerForm) => ({
   email: form.email.trim() || null,
   liefer_strasse: form.liefer_strasse.trim() || null,
   liefer_ort: form.liefer_ort.trim() || null,
-  firma: form.firma.trim() || null,
-  uid: form.uid.trim() || null,
+  // Rechnungsdaten defensiv: ältere Aufrufer ohne diese Felder dürfen nie abstürzen
+  firma: (form.firma ?? "").trim() || null,
+  uid: (form.uid ?? "").trim() || null,
   ist_unternehmer: !!form.ist_unternehmer,
   reverse_charge: !!form.ist_unternehmer && !!form.reverse_charge,
-  zahlungsziel_tage: form.zahlungsziel_tage === "" ? null : Number(form.zahlungsziel_tage),
+  zahlungsziel_tage: form.zahlungsziel_tage == null || form.zahlungsziel_tage === "" || !Number.isFinite(Number(form.zahlungsziel_tage)) ? null : Number(form.zahlungsziel_tage),
 });
 
 const Customers = () => {
@@ -420,7 +431,7 @@ const Customers = () => {
               <DialogHeader>
                 <DialogTitle>{editing ? "Kunde bearbeiten" : "Neuen Kunden anlegen"}</DialogTitle>
               </DialogHeader>
-              <CustomerFormFields form={form} setForm={setForm} />
+              <CustomerFormFields form={form} setForm={setForm} zeigeRechnungsdaten={isAdmin} />
               <Button onClick={handleSave} disabled={saving} className="w-full">
                 {saving ? "Speichern..." : editing ? "Änderungen speichern" : "Kunde anlegen"}
               </Button>

@@ -183,7 +183,7 @@ export function AenderungswuenscheListe() {
       ].filter(Boolean);
       return teile.join("\n");
     });
-    const text = `# Änderungswünsche CS Powermetall (${sichtbar.length})\n`
+    const text = `# Änderungswünsche Ruff Michael (${sichtbar.length})\n`
       + `Stand: ${new Date().toLocaleString("de-AT")}\n\n`
       + zeilen.join("\n\n---\n\n");
     try {

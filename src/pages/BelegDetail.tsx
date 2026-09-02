@@ -66,12 +66,14 @@ const BelegDetail = () => {
 
   const laden = async () => {
     if (!belegId) return;
-    const [{ data: beleg }, { data: p }, { data: z }, { data: nf }] = await Promise.all([
+    const [{ data: beleg, error: belegFehler }, { data: p }, { data: z }, { data: nf }] = await Promise.all([
       supabase.from("belege").select("*").eq("id", belegId).maybeSingle(),
       supabase.from("beleg_positionen").select("*").eq("beleg_id", belegId).order("pos").order("created_at"),
       supabase.from("beleg_zahlungen").select("*").eq("beleg_id", belegId).order("datum"),
       supabase.from("belege").select("id, typ, nummer, status").eq("vorgaenger_id", belegId).order("created_at"),
     ]);
+    // Verbindungsfehler ≠ „nicht gefunden“: ohne Netz ehrlich sagen, was los ist
+    if (belegFehler) { toast({ title: "Keine Verbindung", description: "Der Beleg konnte nicht geladen werden — bitte Internet prüfen." }); return navigate("/"); }
     if (!beleg) { toast({ variant: "destructive", title: "Beleg nicht gefunden" }); return navigate("/belege"); }
     setB(beleg); setPos(p ?? []); setZahlungen(z ?? []); setNachfolger((nf as Nachfolger[]) ?? []);
   };
@@ -235,7 +237,14 @@ const BelegDetail = () => {
     setBusy(null);
     if (r.error) toast({ variant: "destructive", title: "PDF fehlgeschlagen", description: r.error });
     else {
-      toast({ title: "Festgeschrieben", description: b.typ === "gutschrift" && b.vorgaenger_id ? "Gutschrift gebucht — die Rechnung gilt jetzt als storniert." : "Nummer vergeben, PDF im Projektordner „Anbote“ abgelegt." });
+      toast({
+        title: "Festgeschrieben",
+        description: b.typ === "gutschrift" && b.vorgaenger_id
+          ? "Gutschrift gebucht — die Rechnung gilt jetzt als storniert."
+          : b.project_id
+            ? "Nummer vergeben, PDF im Projektordner „Anbote“ abgelegt — OneDrive folgt beim nächsten Abgleich."
+            : "Nummer vergeben. Ohne Projekt bleibt das PDF nur in der App — über „PDF“ öffnen oder teilen.",
+      });
       setVorschau({ open: true, url: r.url ?? null, blob: null, entwurf: false });
     }
     laden();
@@ -611,7 +620,9 @@ const BelegDetail = () => {
               {zahlungLoeschenId && "Die Zahlung wird entfernt, der offene Betrag steigt entsprechend."}
               {!zahlungLoeschenId && frage === "festschreiben" && (b.nummer
                 ? `${belegTitel(b)} wird mit der bestehenden Nummer erneut festgeschrieben, das PDF im Projektordner wird ersetzt.`
-                : "Die nächste Nummer wird vergeben. Rechnungen sind danach unveränderbar; das PDF wird im Projektordner „Anbote“ abgelegt und nach OneDrive übertragen.")}
+                : b.project_id
+                  ? "Die nächste Nummer wird vergeben. Rechnungen sind danach unveränderbar; das PDF wird im Projektordner „Anbote“ abgelegt und nach OneDrive übertragen."
+                  : "Die nächste Nummer wird vergeben. Rechnungen sind danach unveränderbar. Ohne Projekt bleibt das PDF nur in der App (kein OneDrive).")}
               {!zahlungLoeschenId && frage === "storno" && "Es wird eine Gutschrift über den vollen Betrag vorbereitet (als Entwurf zum Prüfen). Erst wenn die Gutschrift festgeschrieben ist, gilt die Rechnung als storniert und die Stunden werden wieder frei."}
               {!zahlungLoeschenId && frage === "loeschen" && "Der Entwurf wird gelöscht, übernommene Stunden werden wieder freigegeben."}
             </AlertDialogDescription>

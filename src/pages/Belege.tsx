@@ -92,7 +92,12 @@ const Belege = () => {
     (async () => {
       const user = await getSessionUser();
       if (!user) return navigate("/auth");
-      const { data: rolle } = await supabase.from("user_roles").select("role").eq("user_id", user.id).eq("role", "administrator").maybeSingle();
+      const { data: rolle, error: rolleFehler } = await supabase.from("user_roles").select("role").eq("user_id", user.id).eq("role", "administrator").maybeSingle();
+      // Ohne Netz keine falsche Diagnose: Belege brauchen eine Verbindung (kein Offline-Cache, Preise)
+      if (rolleFehler || (typeof navigator !== "undefined" && !navigator.onLine)) {
+        toast({ title: "Nur mit Internet", description: "Angebote & Rechnungen brauchen eine Internetverbindung." });
+        return navigate("/");
+      }
       if (!rolle) { toast({ variant: "destructive", title: "Kein Zugriff", description: "Angebote und Rechnungen sind nur für Administratoren." }); return navigate("/"); }
       await laden();
       const [k, p] = await Promise.all([
@@ -311,6 +316,7 @@ const Belege = () => {
             <div className="space-y-1.5">
               <Label>Projekt (optional)</Label>
               <Auswahl wert={neu.projekt} optionen={projekte} label={(p) => projectLabel(p as never)} suchtext={(p) => `${p.name} ${p.plz ?? ""} ${p.adresse ?? ""}`} platzhalter="Kein Projekt" leer="— ohne Projekt —" onChange={(id) => setNeu({ ...neu, projekt: id })} />
+              {!neu.projekt && <p className="text-xs text-muted-foreground">Ohne Projekt bleibt das PDF nur in der App (kein OneDrive-Ordner, keine Stunden zum Holen).</p>}
             </div>
             <div className="space-y-1.5">
               <Label>Kunde *</Label>

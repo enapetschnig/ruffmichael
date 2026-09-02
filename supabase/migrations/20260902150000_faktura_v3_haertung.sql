@@ -395,3 +395,13 @@ BEGIN
   END IF;
   RETURN COALESCE(NEW, OLD);
 END $$;
+
+-- Projektanlage (auch durch Mitarbeiter) legt in jedem Standardordner eine
+-- leere .keep-Datei an — auch in „Anbote". Der Platzhalter ist unkritisch
+-- (kein Inhalt) und muss erlaubt bleiben, sonst fehlt der Ordner in OneDrive.
+DROP POLICY IF EXISTS "Projektdateien hochladen" ON storage.objects;
+CREATE POLICY "Projektdateien hochladen" ON storage.objects FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'project-files'
+         AND ((storage.foldername(name))[2] IS DISTINCT FROM 'Anbote'
+              OR name LIKE '%/Anbote/.keep'
+              OR public.has_role(auth.uid(), 'administrator'::app_role)));

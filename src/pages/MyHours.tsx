@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Clock, Building2, Hammer, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Clock, Building2, Hammer, Pencil, Trash2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -26,6 +26,8 @@ type TimeEntry = {
   pause_end: string | null;
   location_type: string;
   notizen: string | null;
+  // gesetzt, sobald der Block auf einer Rechnung ist → gesperrt
+  abgerechnet_in?: string | null;
   projects: {
     name: string;
     plz: string | null;
@@ -227,7 +229,7 @@ const MyHours = () => {
       toast({
         variant: "destructive",
         title: "Fehler",
-        description: "Eintrag konnte nicht aktualisiert werden",
+        description: error.message?.includes("verrechnet") ? error.message : "Eintrag konnte nicht aktualisiert werden",
       });
     } else {
       toast({
@@ -308,7 +310,7 @@ const MyHours = () => {
       toast({
         variant: "destructive",
         title: "Fehler",
-        description: "Eintrag konnte nicht gelöscht werden",
+        description: error.message?.includes("verrechnet") ? error.message : "Eintrag konnte nicht gelöscht werden",
       });
     } else {
       toast({
@@ -457,6 +459,12 @@ const MyHours = () => {
                           {entry.stunden.toFixed(2)} h
                         </TableCell>
                         <TableCell className="text-right">
+                          {entry.abgerechnet_in ? (
+                            /* Bereits auf einer Rechnung: gesperrt — die Datenbank lehnt Änderungen ohnehin ab */
+                            <span className="inline-flex h-10 w-10 sm:h-8 sm:w-8 items-center justify-center text-muted-foreground" title="Bereits verrechnet — kann nicht mehr geändert werden">
+                              <Lock className="h-4 w-4" />
+                            </span>
+                          ) : (
                           <Button
                             size="sm"
                             variant="ghost"
@@ -469,6 +477,7 @@ const MyHours = () => {
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}

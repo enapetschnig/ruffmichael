@@ -109,6 +109,9 @@ export function ErstaufnahmeDialog({
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
   const [checklistState, setChecklistState] = useState<Record<string, ChecklistEntryState>>({});
   const [editChecklist, setEditChecklist] = useState(false);
+  // Die Checkliste ist eine GLOBALE Vorlage für alle künftigen Erstaufnahmen —
+  // ändern darf sie nur der Admin (die Datenbank erzwingt es zusätzlich).
+  const [istAdmin, setIstAdmin] = useState(false);
   const [newItemText, setNewItemText] = useState("");
 
   const [saving, setSaving] = useState(false);
@@ -195,6 +198,13 @@ export function ErstaufnahmeDialog({
     setNewItemText("");
     (async () => {
       const [, items] = await Promise.all([fetchCustomers(), fetchChecklistItems()]);
+      const nutzer = await getSessionUser();
+      if (nutzer) {
+        const { data: rolle } = await supabase
+          .from("user_roles").select("role")
+          .eq("user_id", nutzer.id).eq("role", "administrator").maybeSingle();
+        setIstAdmin(!!rolle);
+      }
       if (prefill) applyPrefill(prefill, items);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -711,6 +721,7 @@ export function ErstaufnahmeDialog({
               );
             })}
 
+            {istAdmin && (
             <Button
               type="button"
               variant="ghost"
@@ -721,8 +732,9 @@ export function ErstaufnahmeDialog({
               <Settings2 className="h-3.5 w-3.5" />
               Checkliste anpassen
             </Button>
+            )}
 
-            {editChecklist && (
+            {istAdmin && editChecklist && (
               <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
                 <p className="text-xs text-muted-foreground">
                   Änderungen werden sofort gespeichert und gelten als neue Vorlage für künftige

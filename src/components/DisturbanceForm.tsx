@@ -298,6 +298,23 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
       setSaving(false);
       return;
     }
+    // Pause länger als die Arbeitszeit ergäbe stillschweigend 0 Stunden —
+    // lieber nachfragen, als eine Nullbuchung zu speichern.
+    const spanneMinuten = (endH * 60 + endM) - (startH * 60 + startM);
+    if (formData.pauseMinutes >= spanneMinuten) {
+      toast({
+        variant: "destructive",
+        title: "Pause zu lang",
+        description: `Die Pause (${formData.pauseMinutes} Min.) ist so lang wie die Arbeitszeit (${spanneMinuten} Min.) oder länger — es blieben 0 Stunden übrig.`,
+      });
+      setSaving(false);
+      return;
+    }
+    if (formData.pauseMinutes < 0) {
+      toast({ variant: "destructive", title: "Fehler", description: "Die Pause kann nicht negativ sein." });
+      setSaving(false);
+      return;
+    }
 
     const stunden = calculateHours();
 

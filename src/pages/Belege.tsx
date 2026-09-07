@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Plus, Search, FileText, Receipt, AlertCircle, Check, ChevronsUpDown, Layers, FileCheck, UserPlus, Loader2 } from "lucide-react";
+import { Plus, Search, FileText, Receipt, AlertCircle, Check, ChevronsUpDown, Layers, FileCheck, UserPlus, Loader2, Download } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { getSessionUser } from "@/lib/auth";
 import { customerDisplayName, CustomerFormFields, customerFormToRow, emptyCustomerForm } from "@/pages/Customers";
+import { BelegExport } from "@/components/BelegExport";
 import { projectLabel } from "@/lib/projectLabel";
 import { cn } from "@/lib/utils";
 import {
@@ -30,7 +31,7 @@ const NEU_TYPEN: { typ: BelegTyp; icon: React.ReactNode; text: string }[] = [
   { typ: "angebot", icon: <FileText className="h-5 w-5" />, text: "Preisvorschlag an den Kunden — wird später mit einem Klick zur Rechnung" },
   { typ: "rechnung", icon: <Receipt className="h-5 w-5" />, text: "Abrechnung einer fertigen Leistung — Stunden und Regieberichte lassen sich holen" },
   { typ: "teilrechnung", icon: <Layers className="h-5 w-5" />, text: "Abschlag nach Baufortschritt — der Rest kommt auf die Schlussrechnung" },
-  { typ: "schlussrechnung", icon: <FileCheck className="h-5 w-5" />, text: "Abschluss eines Projekts — zieht festgeschriebene Teilrechnungen automatisch ab" },
+  { typ: "schlussrechnung", icon: <FileCheck className="h-5 w-5" />, text: "Abschluss eines Projekts — zieht erstellte Teilrechnungen automatisch ab" },
 ];
 const kundeName = (k: KundeOpt) => k.firma?.trim() || customerDisplayName({ vorname: k.vorname ?? "", nachname: k.nachname });
 
@@ -98,6 +99,7 @@ const Belege = () => {
   const [anlegen, setAnlegen] = useState(false);
   // Neuen Kunden direkt aus dem Beleg-Dialog anlegen (wenn er noch nicht existiert)
   const [neuerKundeOpen, setNeuerKundeOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [kundeForm, setKundeForm] = useState({ ...emptyCustomerForm });
   const [kundeSpeichert, setKundeSpeichert] = useState(false);
   // Aus der Projektübersicht / Kundenliste kommend: nur die passenden Belege
@@ -137,8 +139,15 @@ const Belege = () => {
 
   const laden = async () => {
     setLoading(true);
-    const { data } = await supabase.from("belege").select("*").order("created_at", { ascending: false });
-    setBelege(data ?? []);
+    // Seitenweise laden — PostgREST liefert höchstens 1000 Zeilen je Anfrage, und Michael hat viele Belege
+    const alle: Beleg[] = [];
+    for (let von = 0; ; von += 1000) {
+      const { data, error } = await supabase.from("belege").select("*").order("created_at", { ascending: false }).range(von, von + 999);
+      if (error) { toast({ variant: "destructive", title: "Belege nicht geladen", description: error.message }); break; }
+      alle.push(...(data ?? []));
+      if (!data || data.length < 1000) break;
+    }
+    setBelege(alle);
     setLoading(false);
   };
 
@@ -287,7 +296,12 @@ const Belege = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input className="pl-9" placeholder="Nummer, Kunde, Betreff…" value={suche} onChange={(e) => setSuche(e.target.value)} />
           </div>
-          <Button onClick={() => setNeuOpen(true)} className="gap-2 shrink-0 h-11 sm:h-10"><Plus className="h-4 w-4" />Neuer Beleg</Button>
+          <div className="flex gap-2 shrink-0">
+            <Button variant="outline" onClick={() => setExportOpen(true)} className="gap-2 h-11 sm:h-10" title="Belege eines Monats exportieren">
+              <Download className="h-4 w-4" />Export
+            </Button>
+            <Button onClick={() => setNeuOpen(true)} className="gap-2 h-11 sm:h-10"><Plus className="h-4 w-4" />Neuer Beleg</Button>
+          </div>
         </div>
         <Tabs value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
           <TabsList className="grid w-full grid-cols-5">
@@ -343,7 +357,7 @@ const Belege = () => {
         <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-xl max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Neuer Beleg</DialogTitle>
-            <DialogDescription>Kundendaten werden in den Beleg übernommen. Die Nummer wird erst beim Festschreiben vergeben.</DialogDescription>
+            <DialogDescription>Kundendaten werden in den Beleg übernommen. Die Nummer wird erst vergeben, wenn du danach „Angebot erstellen“ bzw. „Rechnung erstellen“ drückst.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
@@ -394,6 +408,10 @@ const Belege = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Monatsexport für die Buchhaltung */}
+      <BelegExport open={exportOpen} onOpenChange={setExportOpen} belege={belege}
+        hinweis={projektFilter || kundeFilter ? "Der Projekt-/Kundenfilter der Liste gilt hier nicht — exportiert werden alle Belege des gewählten Zeitraums." : undefined} />
 
       {/* Neuer Kunde — direkt aus dem Beleg heraus, damit man nicht erst in die Kundenverwaltung muss */}
       <Dialog open={neuerKundeOpen} onOpenChange={(o) => { if (!kundeSpeichert) setNeuerKundeOpen(o); }}>

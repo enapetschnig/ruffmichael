@@ -39,7 +39,7 @@ export const TYP_DATEINAME: Record<BelegTyp, string> = {
 
 export const STATUS_LABEL: Record<BelegStatus, string> = {
   entwurf: "Entwurf",
-  festgeschrieben: "Festgeschrieben",
+  festgeschrieben: "Erstellt",
   gesendet: "Gesendet",
   angenommen: "Angenommen",
   abgelehnt: "Abgelehnt",

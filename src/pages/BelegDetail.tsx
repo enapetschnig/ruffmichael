@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  Plus, Trash2, Lock, FileDown, Clock, ArrowRight, Ban, Euro, ChevronUp, ChevronDown, Loader2, Pencil, Receipt,
+  Plus, Trash2, Lock, FileDown, Clock, ArrowRight, Ban, Euro, ChevronUp, ChevronDown, Loader2, Pencil, Receipt, Check,
   ClipboardList, AlertTriangle, FileText,
 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
@@ -341,7 +341,12 @@ const BelegDetail = () => {
     setBusy("fest");
     await wartenBisGespeichert();
     const { error } = await supabase.rpc("beleg_festschreiben", { p_beleg: b.id });
-    if (error) { setBusy(null); return toast({ variant: "destructive", title: "Nicht festgeschrieben", description: error.message }); }
+    if (error) { setBusy(null); return toast({ variant: "destructive", title: `${TYP_LABEL[b.typ]} nicht erstellt`, description: error.message }); }
+    // Ein bearbeitetes Angebot, zu dem es schon eine Rechnung gibt, bleibt „angenommen“
+    if (istAngebot(b.typ) && b.nummer) {
+      const { data: re } = await supabase.from("belege").select("id").eq("vorgaenger_id", b.id).in("typ", ["rechnung", "teilrechnung", "schlussrechnung"]).neq("status", "storniert").limit(1);
+      if (re && re.length) await supabase.from("belege").update({ status: "angenommen" }).eq("id", b.id);
+    }
     await laden();
     // PDF gleich erzeugen und in OneDrive ablegen
     const r = await belegPdf(b.id);
@@ -349,7 +354,7 @@ const BelegDetail = () => {
     if (r.error) toast({ variant: "destructive", title: "PDF fehlgeschlagen", description: r.error });
     else {
       toast({
-        title: "Festgeschrieben",
+        title: `${TYP_LABEL[b.typ]} erstellt`,
         description: b.typ === "gutschrift" && b.vorgaenger_id
           ? "Gutschrift gebucht — die Rechnung gilt jetzt als storniert."
           : b.project_id
@@ -384,7 +389,7 @@ const BelegDetail = () => {
     if (!b) return;
     const { error } = await supabase.from("belege").update({ status: "entwurf" }).eq("id", b.id);
     if (error) return toast({ variant: "destructive", title: "Nicht möglich", description: error.message });
-    toast({ title: "In Bearbeitung", description: `${belegTitel(b)} kann jetzt geändert werden. Danach erneut festschreiben — die Nummer bleibt.` });
+    toast({ title: "In Bearbeitung", description: `${belegTitel(b)} kann jetzt geändert werden. Danach wieder „${TYP_LABEL[b.typ]} erstellen“ — die Nummer bleibt gleich.` });
     laden();
   };
   const uebernahmeOeffnen = () => {
@@ -420,7 +425,7 @@ const BelegDetail = () => {
     await supabase.from("belege").update({ status: "angenommen" }).eq("id", b.id);
     setBusy(null);
     setUebernahmeOpen(false);
-    toast({ title: `${TYP_LABEL[uebernahme.typ]} angelegt`, description: `${gewaehlt.filter((p) => p.art === "position").length} Positionen aus ${belegTitel(b)} übernommen — jetzt prüfen und festschreiben.` });
+    toast({ title: `${TYP_LABEL[uebernahme.typ]} vorbereitet`, description: `${gewaehlt.filter((p) => p.art === "position").length} Positionen aus ${belegTitel(b)} übernommen — jetzt prüfen und „${TYP_LABEL[uebernahme.typ]} erstellen“ drücken.` });
     navigate(`/belege/${neu.id}`);
   };
   const stornieren = async () => {
@@ -429,7 +434,7 @@ const BelegDetail = () => {
     const { data, error } = await supabase.rpc("beleg_stornieren", { p_beleg: b.id });
     setBusy(null);
     if (error) return toast({ variant: "destructive", title: "Storno nicht möglich", description: error.message });
-    toast({ title: "Gutschrift vorbereitet", description: "Prüfen und festschreiben — erst dann gilt die Rechnung als storniert." });
+    toast({ title: "Gutschrift vorbereitet", description: "Prüfen und mit „Gutschrift erstellen“ abschließen — erst dann gilt die Rechnung als storniert." });
     navigate(`/belege/${data}`);
   };
   const loeschen = async () => {
@@ -462,7 +467,7 @@ const BelegDetail = () => {
   if (!b) return <div className="min-h-screen bg-background"><PageHeader title="Beleg" backPath="/belege" /><p className="text-center text-muted-foreground py-10">Lade…</p></div>;
 
   const sortiert = [...pos].sort((a, c) => a.pos - c.pos || a.created_at.localeCompare(c.created_at));
-  const folgeRechnung = nachfolger.find((n) => istRechnung(n.typ));
+  const folgeRechnung = nachfolger.find((n) => istRechnung(n.typ) && n.status !== "storniert");
   const folgeGutschrift = nachfolger.find((n) => n.typ === "gutschrift");
   const loeschbar = entwurf && !b.nummer;
   const preisFehlt = sortiert.filter((p) => p.art === "position" && p.quelle_typ === "regiebericht" && Number(p.einzelpreis) === 0).length;
@@ -481,7 +486,7 @@ const BelegDetail = () => {
       <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0">
         <FileText className="h-4 w-4 text-muted-foreground" />
         <span className="text-sm font-medium">Vorschau</span>
-        <span className="text-xs text-muted-foreground truncate flex-1 min-w-0">{entwurf ? "zeigt jede Eingabe sofort — noch ohne Nummer" : "festgeschrieben"}</span>
+        <span className="text-xs text-muted-foreground truncate flex-1 min-w-0">{entwurf ? "zeigt jede Eingabe sofort — noch ohne Nummer" : "erstellt — Nummer ist vergeben"}</span>
         <Button variant="outline" size="sm" className="gap-1 h-8" onClick={pdfAnzeigen} disabled={busy !== null}>
           {busy === "pdf" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}<span className="hidden sm:inline">PDF · Teilen · Drucken</span><span className="sm:hidden">PDF</span>
         </Button>
@@ -499,8 +504,8 @@ const BelegDetail = () => {
         {/* Status + Aktionen */}
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={STATUS_VARIANT[b.status]}>{STATUS_LABEL[b.status]}</Badge>
-          {!entwurf && <span className="text-xs text-muted-foreground flex items-center gap-1"><Lock className="h-3 w-3" /> festgeschrieben am {datum(b.festgeschrieben_am)}</span>}
-          {entwurf && b.nummer && <span className="text-xs text-muted-foreground">Nummer {b.nummer} bleibt beim erneuten Festschreiben erhalten</span>}
+          {!entwurf && <span className="text-xs text-muted-foreground flex items-center gap-1"><Lock className="h-3 w-3" /> erstellt am {datum(b.festgeschrieben_am)}</span>}
+          {entwurf && b.nummer && <span className="text-xs text-muted-foreground">Nummer {b.nummer} bleibt erhalten</span>}
           <div className="ml-auto flex flex-wrap gap-2">
             <Button variant="outline" size="sm" className="gap-1 xl:hidden" onClick={pdfAnzeigen} disabled={busy !== null}>
               {busy === "pdf" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}{entwurf ? "PDF" : "PDF"}
@@ -511,20 +516,22 @@ const BelegDetail = () => {
             {entwurf && rechnung && (
               <Button variant="outline" size="sm" className="gap-1" onClick={regieLaden} disabled={busy !== null}><ClipboardList className="h-4 w-4" />Regieberichte holen</Button>
             )}
-            {!entwurf && istAngebot(b.typ) && b.status !== "angenommen" && (
+            {!entwurf && istAngebot(b.typ) && (
               <Button variant="outline" size="sm" className="gap-1" onClick={angebotBearbeiten} disabled={busy !== null}><Pencil className="h-4 w-4" />Bearbeiten</Button>
             )}
             {entwurf && <Button size="sm" className="gap-1" onClick={() => setFrage("festschreiben")} disabled={busy !== null}>
-              {busy === "fest" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}Festschreiben
+              {busy === "fest" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{TYP_LABEL[b.typ]} erstellen
             </Button>}
             {istAngebot(b.typ) && !entwurf && b.status !== "abgelehnt" && !folgeRechnung && (
-              <Button size="sm" className="gap-1" onClick={uebernahmeOeffnen} disabled={busy !== null}><ArrowRight className="h-4 w-4" />Rechnung erstellen</Button>
+              <Button size="sm" className="gap-1" onClick={uebernahmeOeffnen} disabled={busy !== null}><ArrowRight className="h-4 w-4" />Rechnung vorbereiten</Button>
             )}
             {rechnung && !entwurf && b.status !== "storniert" && (
               <Button variant="outline" size="sm" className="gap-1" onClick={() => setZahlungOpen(true)}><Euro className="h-4 w-4" />Zahlung</Button>
             )}
-            {rechnung && !entwurf && b.status !== "storniert" && !folgeGutschrift && (
-              <Button variant="outline" size="sm" className="gap-1 text-destructive" onClick={() => setFrage("storno")} disabled={busy !== null}><Ban className="h-4 w-4" />Stornieren</Button>
+            {rechnung && !entwurf && b.status !== "storniert" && (
+              folgeGutschrift
+                ? <Button variant="outline" size="sm" className="gap-1 text-destructive" onClick={() => navigate(`/belege/${folgeGutschrift.id}`)}><Ban className="h-4 w-4" />Storno fortsetzen</Button>
+                : <Button variant="outline" size="sm" className="gap-1 text-destructive" onClick={() => setFrage("storno")} disabled={busy !== null}><Ban className="h-4 w-4" />Stornieren</Button>
             )}
             {loeschbar && <Button variant="ghost" size="sm" className="gap-1 text-destructive" onClick={() => setFrage("loeschen")}><Trash2 className="h-4 w-4" />Löschen</Button>}
           </div>
@@ -536,13 +543,13 @@ const BelegDetail = () => {
             {b.vorgaenger_id && <Button variant="outline" size="sm" onClick={() => navigate(`/belege/${b.vorgaenger_id}`)}>{b.typ === "gutschrift" ? "Zur stornierten Rechnung" : "Zum Angebot"}</Button>}
             {nachfolger.map((n) => (
               <Button key={n.id} variant="outline" size="sm" className="gap-1" onClick={() => navigate(`/belege/${n.id}`)}>
-                <Receipt className="h-4 w-4" />{TYP_LABEL[n.typ]} {n.nummer ?? "(Entwurf)"}{n.typ === "gutschrift" && n.status === "entwurf" ? " — noch nicht festgeschrieben" : ""}
+                <Receipt className="h-4 w-4" />{TYP_LABEL[n.typ]} {n.nummer ?? "(Entwurf)"}{n.typ === "gutschrift" && n.status === "entwurf" ? " — noch nicht erstellt" : ""}
               </Button>
             ))}
           </div>
         )}
         {folgeGutschrift?.status === "entwurf" && b.status !== "storniert" && (
-          <p className="text-sm text-amber-700 dark:text-amber-400">Storno vorbereitet: Die Gutschrift muss noch festgeschrieben werden, erst dann gilt diese Rechnung als storniert.</p>
+          <p className="text-sm text-amber-700 dark:text-amber-400">Storno vorbereitet: Erst wenn du bei der Gutschrift „Gutschrift erstellen“ drückst, gilt diese Rechnung als storniert.</p>
         )}
         {!entwurf && istAngebot(b.typ) && (
           <div className="flex flex-wrap gap-2 text-sm items-center">
@@ -693,7 +700,7 @@ const BelegDetail = () => {
                               </div>
                               {p.quelle_typ !== "manuell" && (
                                 <div className="text-[11px] text-muted-foreground">
-                                  {p.quelle_typ === "stunden" ? `Aus der Zeiterfassung: ${p.quelle_ids.length} Zeitblöcke` : p.quelle_typ === "regiebericht" ? "Aus einem Regiebericht — beim Löschen wird er wieder frei" : abzug ? "Abzug einer festgeschriebenen Teilrechnung — Betrag ist fix" : p.quelle_typ}
+                                  {p.quelle_typ === "stunden" ? `Aus der Zeiterfassung: ${p.quelle_ids.length} Zeitblöcke` : p.quelle_typ === "regiebericht" ? "Aus einem Regiebericht — beim Löschen wird er wieder frei" : abzug ? "Abzug einer erstellten Teilrechnung — Betrag ist fix" : p.quelle_typ}
                                 </div>
                               )}
                             </>
@@ -857,7 +864,7 @@ const BelegDetail = () => {
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setUebernahmeOpen(false)}>Abbrechen</Button>
             <Button onClick={rechnungAusAngebot} disabled={busy !== null || uebernahme.ids.length === 0} className="gap-1">
-              {busy === "rechnung" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}{TYP_LABEL[uebernahme.typ]} erstellen
+              {busy === "rechnung" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}{TYP_LABEL[uebernahme.typ]} vorbereiten
             </Button>
           </div>
         </DialogContent>
@@ -897,16 +904,20 @@ const BelegDetail = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {zahlungLoeschenId ? "Zahlung löschen?" : frage === "festschreiben" ? (b.nummer ? "Erneut festschreiben?" : "Beleg festschreiben?") : frage === "storno" ? "Rechnung stornieren?" : "Entwurf löschen?"}
+              {zahlungLoeschenId ? "Zahlung löschen?" : frage === "festschreiben" ? `${TYP_LABEL[b.typ]} ${b.nummer ? "erneut " : ""}erstellen?` : frage === "storno" ? "Rechnung stornieren?" : "Entwurf löschen?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {zahlungLoeschenId && "Die Zahlung wird entfernt, der offene Betrag steigt entsprechend."}
               {!zahlungLoeschenId && frage === "festschreiben" && (b.nummer
-                ? `${belegTitel(b)} wird mit der bestehenden Nummer erneut festgeschrieben, das PDF im Projektordner wird ersetzt.`
-                : b.project_id
-                  ? "Die nächste Nummer wird vergeben. Rechnungen sind danach unveränderbar; das PDF wird im Projektordner „Anbote“ abgelegt und nach OneDrive übertragen."
-                  : "Die nächste Nummer wird vergeben. Rechnungen sind danach unveränderbar. Ohne Projekt bleibt das PDF nur in der App (kein OneDrive).")}
-              {!zahlungLoeschenId && frage === "storno" && "Es wird eine Gutschrift über den vollen Betrag vorbereitet (als Entwurf zum Prüfen). Erst wenn die Gutschrift festgeschrieben ist, gilt die Rechnung als storniert und Stunden wie Regieberichte werden wieder frei."}
+                ? `${belegTitel(b)} wird mit der bestehenden Nummer neu erstellt, das PDF im Projektordner wird ersetzt.`
+                : istAngebot(b.typ)
+                  ? `Die nächste Nummer wird vergeben und das PDF erzeugt.${b.project_id ? " Es wird im Projektordner „Anbote“ abgelegt und nach OneDrive übertragen." : ""} Ein Angebot kannst du danach jederzeit wieder bearbeiten.`
+                  : b.typ === "gutschrift"
+                    ? "Die Gutschrift bekommt die nächste Nummer. Damit gilt die zugehörige Rechnung als storniert, übernommene Stunden und Regieberichte werden wieder frei."
+                  : b.project_id
+                    ? "Die nächste Nummer wird vergeben. Rechnungen lassen sich danach nicht mehr ändern, nur stornieren; das PDF wird im Projektordner „Anbote“ abgelegt und nach OneDrive übertragen."
+                    : "Die nächste Nummer wird vergeben. Rechnungen lassen sich danach nicht mehr ändern, nur stornieren. Ohne Projekt bleibt das PDF nur in der App (kein OneDrive).")}
+              {!zahlungLoeschenId && frage === "storno" && "Es wird eine Gutschrift über den vollen Betrag vorbereitet (als Entwurf zum Prüfen). Erst wenn du dort „Gutschrift erstellen“ drückst, gilt die Rechnung als storniert und Stunden wie Regieberichte werden wieder frei."}
               {!zahlungLoeschenId && frage === "loeschen" && "Der Entwurf wird gelöscht, übernommene Stunden und Regieberichte werden wieder freigegeben."}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -916,7 +927,7 @@ const BelegDetail = () => {
               if (zahlungLoeschenId) { const id = zahlungLoeschenId; zahlungLoeschen(id); return; }
               const f = frage; setFrage(null); if (f === "festschreiben") festschreiben(); if (f === "storno") stornieren(); if (f === "loeschen") loeschen();
             }}>
-              {zahlungLoeschenId ? "Löschen" : frage === "festschreiben" ? "Festschreiben" : frage === "storno" ? "Gutschrift vorbereiten" : "Löschen"}
+              {zahlungLoeschenId ? "Löschen" : frage === "festschreiben" ? `${TYP_LABEL[b.typ]} erstellen` : frage === "storno" ? "Gutschrift vorbereiten" : "Löschen"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

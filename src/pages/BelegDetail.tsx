@@ -269,7 +269,7 @@ const BelegDetail = () => {
         beleg_id: b.id, pos: null, art: "position",
         text: `Monteurstunden${s.gruppe ? ` ${s.gruppe}` : ""} – ${s.mitarbeiter}`,
         beschreibung: `${datum(s.von)}${s.von !== s.bis ? ` – ${datum(s.bis)}` : ""}, ${s.bloecke} Einsätze`,
-        menge: Number(s.stunden), einheit: "h", einzelpreis: satz, quelle_typ: "stunden", quelle_ids: s.entry_ids,
+        menge: Number(s.stunden), einheit: "Std", einzelpreis: satz, quelle_typ: "stunden", quelle_ids: s.entry_ids,
       });
       if (error) {
         await supabase.rpc("faktura_stunden_markieren", { p_beleg: null, p_ids: s.entry_ids });
@@ -310,7 +310,7 @@ const BelegDetail = () => {
       const zeilen: Database["public"]["Tables"]["beleg_positionen"]["Insert"][] = [];
       const kopfText = `Regiearbeit ${datum(r.datum)} – ${r.mitarbeiter}`;
       if (Number(r.stunden) > 0) {
-        zeilen.push({ beleg_id: b.id, pos: null, art: "position", text: kopfText, beschreibung: r.beschreibung || null, menge: Number(r.stunden), einheit: "h", einzelpreis: parseZahl(r.satzWert)!, quelle_typ: "regiebericht", quelle_ids: [r.id] });
+        zeilen.push({ beleg_id: b.id, pos: null, art: "position", text: kopfText, beschreibung: r.beschreibung || null, menge: Number(r.stunden), einheit: "Std", einzelpreis: parseZahl(r.satzWert)!, quelle_typ: "regiebericht", quelle_ids: [r.id] });
       } else {
         zeilen.push({ beleg_id: b.id, pos: null, art: "text", text: `${kopfText}${r.beschreibung ? `: ${r.beschreibung}` : ""}`, menge: 1, einheit: "", einzelpreis: 0, quelle_typ: "regiebericht", quelle_ids: [r.id] });
       }

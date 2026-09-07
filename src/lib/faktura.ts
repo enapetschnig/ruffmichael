@@ -64,7 +64,9 @@ export const istRechnung = (typ: BelegTyp) =>
 
 export const istAngebot = (typ: BelegTyp) => typ === "angebot" || typ === "auftragsbestaetigung";
 
-export const EINHEITEN = ["Stk", "h", "m", "m²", "lfm", "psch", "Tag", "km", "kg", "l", "Set"];
+// Einheiten wie in Michaels bisherigen Belegen („Std“, „Liter“, „Tage“) plus
+// die üblichen Ergänzungen. Reihenfolge = Häufigkeit in seinen alten Angeboten.
+export const EINHEITEN = ["Stk", "Std", "lfm", "m", "m²", "m³", "Liter", "kg", "Tage", "psch", "km", "Set"];
 
 const eurFmt = new Intl.NumberFormat("de-AT", { style: "currency", currency: "EUR" });
 export const eur = (n: number | string | null | undefined): string => eurFmt.format(Number(n ?? 0));

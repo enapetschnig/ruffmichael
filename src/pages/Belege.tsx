@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Plus, Search, FileText, Receipt, AlertCircle, Check, ChevronsUpDown } from "lucide-react";
+import { Plus, Search, FileText, Receipt, AlertCircle, Check, ChevronsUpDown, Layers, FileCheck } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,7 +9,6 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
@@ -26,7 +25,13 @@ import {
 type KundeOpt = { id: string; kundennr: string | null; vorname: string | null; nachname: string; firma: string | null; strasse: string | null; ort: string | null; uid: string | null; ist_unternehmer: boolean; reverse_charge: boolean; zahlungsziel_tage: number | null; email: string | null };
 type ProjektOpt = { id: string; name: string; plz: string | null; adresse: string | null; customer_id: string | null; status: string; customers: { strasse: string | null; ort: string | null } | null };
 
-const NEU_TYPEN: BelegTyp[] = ["angebot", "rechnung", "teilrechnung", "schlussrechnung"];
+// Belegarten als Karten statt Aufklappliste — man sieht sofort, wofür jede da ist.
+const NEU_TYPEN: { typ: BelegTyp; icon: React.ReactNode; text: string }[] = [
+  { typ: "angebot", icon: <FileText className="h-5 w-5" />, text: "Preisvorschlag an den Kunden — wird später mit einem Klick zur Rechnung" },
+  { typ: "rechnung", icon: <Receipt className="h-5 w-5" />, text: "Abrechnung einer fertigen Leistung — Stunden und Regieberichte lassen sich holen" },
+  { typ: "teilrechnung", icon: <Layers className="h-5 w-5" />, text: "Abschlag nach Baufortschritt — der Rest kommt auf die Schlussrechnung" },
+  { typ: "schlussrechnung", icon: <FileCheck className="h-5 w-5" />, text: "Abschluss eines Projekts — zieht festgeschriebene Teilrechnungen automatisch ab" },
+];
 const kundeName = (k: KundeOpt) => k.firma?.trim() || customerDisplayName({ vorname: k.vorname ?? "", nachname: k.nachname });
 
 /** Auswahlfeld mit Suche — 116 Kunden ohne Suche sind am Handy nicht bedienbar. */
@@ -299,19 +304,38 @@ const Belege = () => {
       </main>
 
       <Dialog open={neuOpen} onOpenChange={setNeuOpen}>
-        <DialogContent className="max-w-sm sm:max-w-md max-h-[90dvh] overflow-y-auto">
+        <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-xl max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Neuer Beleg</DialogTitle>
             <DialogDescription>Kundendaten werden in den Beleg übernommen. Die Nummer wird erst beim Festschreiben vergeben.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label>Belegart</Label>
-              <Select value={neu.typ} onValueChange={(v) => setNeu({ ...neu, typ: v as BelegTyp })}>
-                <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
-                <SelectContent>{NEU_TYPEN.map((t) => <SelectItem key={t} value={t}>{TYP_LABEL[t]}</SelectItem>)}</SelectContent>
-              </Select>
-              {neu.typ === "schlussrechnung" && <p className="text-xs text-muted-foreground">Festgeschriebene Teilrechnungen des Projekts werden automatisch abgezogen.</p>}
+              <Label>Was soll es werden?</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2" role="radiogroup" aria-label="Belegart">
+                {NEU_TYPEN.map((t) => {
+                  const aktiv = neu.typ === t.typ;
+                  return (
+                    <button
+                      key={t.typ}
+                      type="button"
+                      role="radio"
+                      aria-checked={aktiv}
+                      onClick={() => setNeu({ ...neu, typ: t.typ })}
+                      className={cn(
+                        "rounded-lg border p-3 text-left transition-colors flex gap-3 items-start",
+                        aktiv ? "border-primary bg-primary/5 ring-1 ring-primary" : "hover:bg-accent/40",
+                      )}
+                    >
+                      <span className={cn("mt-0.5 h-9 w-9 rounded-md flex items-center justify-center shrink-0", aktiv ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>{t.icon}</span>
+                      <span className="min-w-0">
+                        <span className="block font-medium text-sm">{TYP_LABEL[t.typ]}</span>
+                        <span className="block text-xs text-muted-foreground leading-snug">{t.text}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
             <div className="space-y-1.5">
               <Label>Projekt (optional)</Label>

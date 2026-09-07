@@ -8,6 +8,7 @@ import { OnboardingProvider } from "./contexts/OnboardingContext";
 import { InstallPromptDialog } from "./components/InstallPromptDialog";
 import { OfflineBanner } from "./components/OfflineBanner";
 import { AenderungswunschKnopf } from "./components/aenderungswunsch/AenderungswunschKnopf";
+import { Seitenmenue, INHALT_ABSTAND } from "./components/Seitenmenue";
 import { useOnboarding } from "./contexts/OnboardingContext";
 import { supabase } from "@/integrations/supabase/client";
 import { startAutoSync } from "@/lib/offlineQueue";
@@ -117,9 +118,15 @@ function AppContent() {
     startAutoSync();
   }, []);
 
+  const ort = useLocation();
+  // Am PC (ab lg) steht links das Seitenmenü; der Inhalt rückt entsprechend nach rechts.
+  const mitMenue = ort.pathname !== "/auth";
+
   return (
     <>
       <OfflineBanner />
+      <Seitenmenue />
+      <div className={mitMenue ? INHALT_ABSTAND : undefined}>
       <Routes>
         <Route path="/" element={<NurAngemeldet><Index /></NurAngemeldet>} />
         <Route path="/auth" element={<Auth />} />
@@ -145,6 +152,7 @@ function AppContent() {
         <Route path="/belege/:belegId" element={<NurAngemeldet><BelegDetail /></NurAngemeldet>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
+      </div>
 
       {/* Melden auch auf Seiten ohne zentrale Kopfzeile */}
       <SchwebenderMeldeKnopf />

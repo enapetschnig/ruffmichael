@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -46,7 +47,7 @@ export function FakturaEinstellungen() {
   };
   useEffect(() => { laden(); }, []);
 
-  const set = (k: keyof Firmendaten, v: string | number | null) => setFirma((f) => (f ? { ...f, [k]: v } : f));
+  const set = (k: keyof Firmendaten, v: string | number | boolean | null) => setFirma((f) => (f ? { ...f, [k]: v } : f));
 
   // ── Firmendaten ──────────────────────────────────────────────────────────
   const speichernFirma = async () => {
@@ -155,6 +156,7 @@ export function FakturaEinstellungen() {
             {feld("strasse", "Straße")}
             {feld("plz_ort", "PLZ Ort")}
             {feld("telefon", "Telefon")}
+            {feld("fax", "Fax")}
             {feld("email", "E-Mail")}
             {feld("web", "Website")}
             {feld("uid", "UID (ATU…)")}
@@ -163,6 +165,7 @@ export function FakturaEinstellungen() {
             {feld("bank", "Bank")}
             {feld("iban", "IBAN")}
             {feld("bic", "BIC")}
+            {feld("bearbeiter", "Bearbeiter (steht auf jedem Beleg)")}
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             {zahlFeld("zahlungsziel_tage", "Zahlungsziel (Tage)")}
@@ -177,8 +180,28 @@ export function FakturaEinstellungen() {
             <div className="space-y-1.5"><Label>Rechnung – Einleitung</Label><Textarea rows={2} value={firma.rechnung_einleitung ?? ""} onChange={(e) => set("rechnung_einleitung", e.target.value)} /></div>
             <div className="space-y-1.5"><Label>Rechnung – Schlusstext</Label><Textarea rows={2} value={firma.rechnung_schluss ?? ""} onChange={(e) => set("rechnung_schluss", e.target.value)} /></div>
           </div>
-          <div className="space-y-1.5"><Label>Fußtext (auf jedem Beleg, z. B. Gerichtsstand, Eigentumsvorbehalt)</Label><Textarea rows={2} value={firma.fusstext ?? ""} onChange={(e) => set("fusstext", e.target.value)} /></div>
+          <div className="space-y-1.5"><Label>Fußzeile (auf jedem Beleg, z. B. Kammermitgliedschaft)</Label><Textarea rows={2} value={firma.fusstext ?? ""} onChange={(e) => set("fusstext", e.target.value)} /></div>
           <Button onClick={speichernFirma} disabled={saving} className="gap-2"><Save className="h-4 w-4" />Firmendaten speichern</Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Angebotstexte</CardTitle>
+          <CardDescription>Stehen wie bisher unter jedem Angebot: Auftragsbedingungen, Zahlungsweise und die Widerrufsbelehrung mit Unterschriftszeilen. Vorbelegt aus den bisherigen Angeboten.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-1.5"><Label>Auftragsbedingungen (Punkt für Punkt, eingerückte Zeilen mit „   - “)</Label><Textarea rows={14} className="font-mono text-xs" value={firma.angebot_bedingungen ?? ""} onChange={(e) => set("angebot_bedingungen", e.target.value)} /></div>
+          <div className="space-y-1.5"><Label>Zahlungsweise</Label><Textarea rows={2} value={firma.angebot_zahlung ?? ""} onChange={(e) => set("angebot_zahlung", e.target.value)} /></div>
+          <div className="flex items-center justify-between gap-3 rounded-md border p-3">
+            <div className="min-w-0">
+              <div className="text-sm font-medium">Widerrufsbelehrung (FAGG) auf Angebote drucken</div>
+              <div className="text-xs text-muted-foreground">Pflicht bei Verträgen mit Verbrauchern, die außerhalb der Geschäftsräume geschlossen werden — mit eigener Unterschriftszeile.</div>
+            </div>
+            <Switch checked={firma.angebot_widerruf_zeigen !== false} onCheckedChange={(v) => set("angebot_widerruf_zeigen", v)} />
+          </div>
+          <div className="space-y-1.5"><Label>Text der Widerrufsbelehrung</Label><Textarea rows={8} className="text-xs" value={firma.angebot_widerruf ?? ""} onChange={(e) => set("angebot_widerruf", e.target.value)} /></div>
+          <Button onClick={speichernFirma} disabled={saving} className="gap-2"><Save className="h-4 w-4" />Angebotstexte speichern</Button>
         </CardContent>
       </Card>
 

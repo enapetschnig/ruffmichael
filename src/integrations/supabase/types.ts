@@ -535,6 +535,7 @@ export type Database = {
       }
       disturbances: {
         Row: {
+          abgerechnet_in: string | null
           beschreibung: string
           created_at: string
           datum: string
@@ -557,6 +558,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          abgerechnet_in?: string | null
           beschreibung: string
           created_at?: string
           datum: string
@@ -579,6 +581,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          abgerechnet_in?: string | null
           beschreibung?: string
           created_at?: string
           datum?: string
@@ -600,7 +603,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "disturbances_abgerechnet_in_fkey"
+            columns: ["abgerechnet_in"]
+            isOneToOne: false
+            referencedRelation: "belege"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       documents: {
         Row: {
@@ -807,13 +818,19 @@ export type Database = {
       }
       faktura_firmendaten: {
         Row: {
+          angebot_bedingungen: string | null
           angebot_einleitung: string | null
           angebot_gueltig_tage: number
           angebot_schluss: string | null
+          angebot_widerruf: string | null
+          angebot_widerruf_zeigen: boolean
+          angebot_zahlung: string | null
           bank: string | null
+          bearbeiter: string | null
           bic: string | null
           einzig: boolean
           email: string | null
+          fax: string | null
           firma: string
           firmenbuch: string | null
           fusstext: string | null
@@ -834,13 +851,19 @@ export type Database = {
           zusatz: string | null
         }
         Insert: {
+          angebot_bedingungen?: string | null
           angebot_einleitung?: string | null
           angebot_gueltig_tage?: number
           angebot_schluss?: string | null
+          angebot_widerruf?: string | null
+          angebot_widerruf_zeigen?: boolean
+          angebot_zahlung?: string | null
           bank?: string | null
+          bearbeiter?: string | null
           bic?: string | null
           einzig?: boolean
           email?: string | null
+          fax?: string | null
           firma?: string
           firmenbuch?: string | null
           fusstext?: string | null
@@ -861,13 +884,19 @@ export type Database = {
           zusatz?: string | null
         }
         Update: {
+          angebot_bedingungen?: string | null
           angebot_einleitung?: string | null
           angebot_gueltig_tage?: number
           angebot_schluss?: string | null
+          angebot_widerruf?: string | null
+          angebot_widerruf_zeigen?: boolean
+          angebot_zahlung?: string | null
           bank?: string | null
+          bearbeiter?: string | null
           bic?: string | null
           einzig?: boolean
           email?: string | null
+          fax?: string | null
           firma?: string
           firmenbuch?: string | null
           fusstext?: string | null
@@ -1903,6 +1932,22 @@ export type Database = {
         Args: { p_datum: string; p_kreis: string; p_nummer: number }
         Returns: string
       }
+      faktura_offene_regieberichte: {
+        Args: never
+        Returns: {
+          beschreibung: string
+          datum: string
+          gruppe: string
+          id: string
+          kunde_name: string
+          materialien: Json
+          mitarbeiter: string
+          satz: number
+          stunden: number
+          unterschrieben: boolean
+          user_id: string
+        }[]
+      }
       faktura_offene_stunden: {
         Args: { p_projekt: string }
         Returns: {
@@ -1917,6 +1962,10 @@ export type Database = {
           user_id: string
           von: string
         }[]
+      }
+      faktura_regieberichte_markieren: {
+        Args: { p_beleg: string; p_ids: string[] }
+        Returns: number
       }
       faktura_stunden_markieren: {
         Args: { p_beleg: string; p_ids: string[] }

@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/PageHeader";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Zap, Plus, Calendar, Clock, User, Mail, Phone, MapPin, Filter, Search, ArrowLeft } from "lucide-react";
@@ -166,25 +167,16 @@ const Disturbances = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="kb-page min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="kb-page min-h-screen">
       {/* Header */}
-      <header className="border-b bg-card sticky top-0 z-50 shadow-sm">
-        <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-3">
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="flex-shrink-0">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <h1 className="text-base sm:text-lg font-semibold truncate">Regieberichte</h1>
-          </div>
-        </div>
-      </header>
+      <PageHeader title="Regieberichte" backPath="/" />
 
       <main className="container mx-auto px-3 sm:px-4 lg:px-6 py-6 max-w-4xl">
         {/* Header with action button */}

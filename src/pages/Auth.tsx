@@ -179,7 +179,7 @@ export default function Auth() {
 
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="min-h-screen flex items-center justify-center kb-page p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
            <img src="/ruff-logo.png" alt="Ruff Michael Logo" className="h-16 mx-auto mb-4" />

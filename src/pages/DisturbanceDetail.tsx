@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/PageHeader";
 import { useState, useEffect } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Zap, Calendar, Clock, User, Mail, Phone, MapPin, Edit, Trash2, Package, Plus, ArrowLeft, PenLine, Users, Lock } from "lucide-react";
@@ -299,7 +300,7 @@ const DisturbanceDetail = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="kb-page min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
@@ -307,17 +308,8 @@ const DisturbanceDetail = () => {
 
   if (!disturbance) {
     return (
-      <div className="min-h-screen bg-background">
-        <header className="border-b bg-card sticky top-0 z-50 shadow-sm">
-          <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-3">
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <Button variant="ghost" size="icon" onClick={() => navigate("/disturbances")} className="flex-shrink-0">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-              <h1 className="text-base sm:text-lg font-semibold truncate">Regiebericht nicht gefunden</h1>
-            </div>
-          </div>
-        </header>
+      <div className="kb-page min-h-screen">
+        <PageHeader title="Regiebericht nicht gefunden" backPath="/disturbances" />
         <main className="container mx-auto px-3 sm:px-4 lg:px-6 py-6 text-center">
           <p>Der angeforderte Regiebericht konnte nicht gefunden werden.</p>
           <Button onClick={() => navigate("/disturbances")} className="mt-4">
@@ -329,17 +321,8 @@ const DisturbanceDetail = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card sticky top-0 z-50 shadow-sm">
-        <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-3">
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/disturbances")} className="flex-shrink-0">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <h1 className="text-base sm:text-lg font-semibold truncate">Regiebericht Details</h1>
-          </div>
-        </div>
-      </header>
+    <div className="kb-page min-h-screen">
+      <PageHeader title="Regiebericht Details" backPath="/disturbances" />
 
       <main className="container mx-auto px-3 sm:px-4 lg:px-6 py-6 max-w-4xl space-y-6">
         {/* Header with status and actions */}

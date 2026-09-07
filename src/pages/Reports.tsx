@@ -254,7 +254,7 @@ const Reports = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="kb-page min-h-screen">
       <PageHeader title="Projektberichte & Dateien" />
       
       <main className="container mx-auto p-6">

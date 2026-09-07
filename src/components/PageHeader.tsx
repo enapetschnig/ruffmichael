@@ -1,52 +1,42 @@
-import { ArrowLeft } from "lucide-react";
+import * as React from "react";
 import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { AenderungswunschKnopf } from "@/components/aenderungswunsch/AenderungswunschKnopf";
+import { KBToolbar } from "@/components/kingbill";
 
 interface PageHeaderProps {
   title?: string;
   showBackButton?: boolean;
   backPath?: string;
+  /** Zusätzliche Aktionen rechts in der Leiste (vor dem Home-Button). */
+  rightActions?: React.ReactNode;
+  /** Aktions-Buttons in der Mitte der Leiste. */
+  children?: React.ReactNode;
 }
 
-export function PageHeader({ title, showBackButton = true, backPath }: PageHeaderProps) {
+export function PageHeader({
+  title,
+  showBackButton = true,
+  backPath,
+  rightActions,
+  children,
+}: PageHeaderProps) {
   const navigate = useNavigate();
 
+  // App-weite Regel (Kundenwunsch): Zurück führt IMMER auf die zuvor
+  // besuchte Seite (Browser-Verlauf). backPath ist nur noch der FALLBACK
+  // für den Direkteinstieg per URL (kein In-App-Verlauf vorhanden).
   const handleBack = () => {
-    if (backPath) {
-      navigate(backPath);
-    } else {
-      navigate(-1);
-    }
+    const idx = (typeof window !== "undefined" && (window.history.state as { idx?: number } | null)?.idx) ?? 0;
+    if (idx > 0) navigate(-1);
+    else navigate(backPath || "/");
   };
 
   return (
-    // data-seitenkopf: sagt dem schwebenden Melde-Knopf, dass es hier schon
-    // einen in der Kopfzeile gibt — sonst erschiene er doppelt.
-    <header className="border-b bg-card sticky top-0 z-50 shadow-sm" data-seitenkopf>
-      <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
-        <div className="flex items-center gap-2 sm:gap-4">
-          {showBackButton && (
-            <Button variant="ghost" size="sm" onClick={handleBack} data-bildschirmfoto="aus">
-              <ArrowLeft className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Zurück</span>
-            </Button>
-          )}
-          <img
-            src="/ruff-logo.png"
-            alt="Ruff Michael Logo"
-            className="h-8 w-8 sm:h-10 sm:w-10 cursor-pointer hover:opacity-80 transition-opacity object-contain shrink-0"
-            onClick={() => navigate("/")}
-            data-bildschirmfoto="aus"
-          />
-          {title && (
-            <h1 className="text-lg sm:text-2xl font-bold truncate min-w-0">{title}</h1>
-          )}
-          <div className="ml-auto shrink-0">
-            <AenderungswunschKnopf gestalt="kopf" />
-          </div>
-        </div>
-      </div>
-    </header>
+    <KBToolbar
+      title={title}
+      onBack={showBackButton ? handleBack : undefined}
+      rightActions={rightActions}
+    >
+      {children}
+    </KBToolbar>
   );
 }

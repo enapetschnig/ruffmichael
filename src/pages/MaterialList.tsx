@@ -265,7 +265,7 @@ const MaterialList = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="kb-page min-h-screen">
       <PageHeader title={`${projectName} – Materialliste`} backPath={`/projects/${projectId}`} />
 
       <main className="container mx-auto px-3 sm:px-4 lg:px-6 py-6 max-w-3xl">

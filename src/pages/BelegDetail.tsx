@@ -464,7 +464,7 @@ const BelegDetail = () => {
   };
 
   const rest = useMemo(() => (b ? offen(b) : 0), [b]);
-  if (!b) return <div className="min-h-screen bg-background"><PageHeader title="Beleg" backPath="/belege" /><p className="text-center text-muted-foreground py-10">Lade…</p></div>;
+  if (!b) return <div className="kb-page min-h-screen"><PageHeader title="Beleg" backPath="/belege" /><p className="text-center text-muted-foreground py-10">Lade…</p></div>;
 
   const sortiert = [...pos].sort((a, c) => a.pos - c.pos || a.created_at.localeCompare(c.created_at));
   const folgeRechnung = nachfolger.find((n) => istRechnung(n.typ) && n.status !== "storniert");
@@ -498,7 +498,7 @@ const BelegDetail = () => {
   );
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="kb-page min-h-screen">
       <PageHeader title={belegTitel(b)} backPath="/belege" />
       <main className="mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 space-y-4 max-w-[1700px]">
         {/* Status + Aktionen */}

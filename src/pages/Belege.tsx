@@ -87,10 +87,17 @@ function Auswahl<T extends { id: string }>({ wert, optionen, label, suchtext, pl
 const Belege = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const [belege, setBelege] = useState<Beleg[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"alle" | "angebote" | "rechnungen" | "offen" | "entwuerfe">("alle");
+  const tab = params.get("tab");
+  const filter = tab === "angebote" || tab === "rechnungen" || tab === "offen" || tab === "entwuerfe" ? tab : "alle";
+  const setFilter = (value: string) => {
+    const next = new URLSearchParams(params);
+    if (value === "alle") next.delete("tab");
+    else next.set("tab", value);
+    setParams(next, { replace: true });
+  };
   const [suche, setSuche] = useState("");
   const [neuOpen, setNeuOpen] = useState(false);
   const [kunden, setKunden] = useState<KundeOpt[]>([]);
@@ -263,7 +270,7 @@ const Belege = () => {
   const filterKunde = kundeFilter ? kunden.find((x) => x.id === kundeFilter) : null;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="kb-page min-h-screen">
       <PageHeader title="Angebote & Rechnungen" backPath="/" />
       <main className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 space-y-4">
         {firmaFehlt.length > 0 && (
@@ -304,12 +311,12 @@ const Belege = () => {
           </div>
         </div>
         <Tabs value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="alle" className="text-xs sm:text-sm px-1">Alle</TabsTrigger>
-            <TabsTrigger value="angebote" className="text-xs sm:text-sm px-1">Angebote</TabsTrigger>
-            <TabsTrigger value="rechnungen" className="text-xs sm:text-sm px-1">Rechnungen</TabsTrigger>
-            <TabsTrigger value="offen" className="text-xs sm:text-sm px-1">Offen</TabsTrigger>
-            <TabsTrigger value="entwuerfe" className="text-xs sm:text-sm px-1">Entwürfe</TabsTrigger>
+          <TabsList className="flex w-full flex-wrap justify-start">
+            <TabsTrigger value="alle" className="text-xs sm:text-sm px-2">Alle</TabsTrigger>
+            <TabsTrigger value="angebote" className="text-xs sm:text-sm px-2">Angebote</TabsTrigger>
+            <TabsTrigger value="rechnungen" className="text-xs sm:text-sm px-2">Rechnungen</TabsTrigger>
+            <TabsTrigger value="offen" className="text-xs sm:text-sm px-2">Offen</TabsTrigger>
+            <TabsTrigger value="entwuerfe" className="text-xs sm:text-sm px-2">Entwürfe</TabsTrigger>
           </TabsList>
         </Tabs>
 

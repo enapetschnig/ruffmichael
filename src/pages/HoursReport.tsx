@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/PageHeader";
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -550,14 +551,9 @@ export default function HoursReport() {
   };
 
   return (
-    <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
-      <div className="flex items-center gap-2 sm:gap-4">
-        <Button variant="ghost" size="icon" className="shrink-0 h-10 w-10" onClick={() => navigate(-1)}>
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
-        <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold min-w-0 truncate">Stundenauswertung</h1>
-      </div>
-
+    <div className="kb-page min-h-screen">
+      <PageHeader title="Stundenauswertung" backPath="/" />
+      <main className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
       <Tabs defaultValue="mitarbeiter" className="w-full">
         {/* Tab-Beschriftungen sind lang: am Handy kleinere Schrift + min-w-0/truncate,
             sonst schiebt der nowrap-Text die Leiste über den Bildschirmrand hinaus. */}
@@ -836,6 +832,7 @@ export default function HoursReport() {
           <ProjectHoursReport />
         </TabsContent>
       </Tabs>
+      </main>
     </div>
   );
 }

@@ -2,112 +2,131 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+
+/* Gemeinsames Oberflächendesign nach der Groismaier-Referenz. */
 
 @layer base {
   :root {
-    /* Clean, modern base colors */
-    --background: 0 0% 98%;
-    --foreground: 0 0% 12%;
+    /* KingBill-Look: helle blaue Arbeitsfläche statt weiß/grau.
+       Der echte Seitenhintergrund ist der Verlauf (body / .kb-page);
+       --background ist der flache Fallback im selben Farbton. */
+    --background: 211 58% 90%;
+    --foreground: 213 45% 14%;
 
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 12%;
+    --card-foreground: 213 45% 14%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 12%;
+    --popover-foreground: 213 45% 14%;
 
-    /* Ruff Michael GmbH Orange als Hauptfarbe */
-    --primary: 28 98% 47%;
+    /* KingBill-Blau (#1e6fd9-Bereich) als Hauptfarbe der Oberfläche */
+    --primary: 214 72% 44%;
     --primary-foreground: 0 0% 100%;
 
-    /* Neutral gray as secondary */
-    --secondary: 0 0% 92%;
-    --secondary-foreground: 0 0% 20%;
+    /* Helles Blaugrau als secondary */
+    --secondary: 213 40% 90%;
+    --secondary-foreground: 214 60% 22%;
 
-    --muted: 0 0% 94%;
-    --muted-foreground: 0 0% 45%;
+    --muted: 213 35% 89%;
+    --muted-foreground: 213 12% 40%;
 
-    /* Orange accent */
-    --accent: 28 90% 53%;
+    /* KingBill-Blau als accent */
+    --accent: 214 72% 48%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 88%;
-    --input: 0 0% 92%;
-    --ring: 28 98% 47%;
+    /* Grün für Success */
+    --success: 127 48% 38%;
+    --success-foreground: 0 0% 100%;
 
-    --radius: 0.75rem;
+    --border: 213 26% 80%;
+    --input: 213 24% 78%;
+    --ring: 214 72% 48%;
 
-    /* Custom design tokens */
-    --brand-orange: 28 98% 47%;
-    --brand-dark: 60 4% 10%;
-    --brand-light: 28 96% 58%;
-    --neutral-gray: 0 0% 50%;
-    
+    /* Boxig-leicht abgerundet wie KingBill (4-6px) */
+    --radius: 0.375rem;
+
+    /* ============ KingBill-Farbwelt (Vertrag für alle Masken) ============
+       Referenzwerte aus den Original-Screenshots:
+       Seitenverlauf  #E9F2FB → #C3D8EF (45%) → #6D9BD4
+       Toolbar-Blau   #2E79D9 → #1D5FB6
+       Button-Verlauf #FFFFFF → #DFE6EE, Rand #8FA3BC
+       Panel-Rand     #B3C3D6
+       Aktiver Tab    2px #E8A33D (gelb-orange)                            */
+    --kb-blue: 214 70% 46%;          /* Fenster-/Titelleisten-Blau (Mitte) */
+    --kb-blue-dark: 214 73% 41%;     /* #1D5FB6 */
+    --kb-blue-light: 214 69% 52%;    /* #2E79D9 */
+    --kb-page-top: 210 69% 95%;      /* #E9F2FB */
+    --kb-page-mid: 211 58% 85%;      /* #C3D8EF (bei 45%) */
+    --kb-page-bottom: 213 55% 63%;   /* #6D9BD4 */
+    --kb-green: 130 48% 32%;         /* Grün für Haken-/Plus-Icons */
+    --kb-green-light: 125 40% 46%;
+    --kb-green-dark: 130 48% 24%;
+    --kb-btn-face: 0 0% 100%;        /* Button-Verlauf oben (#FFFFFF) */
+    --kb-btn-face-bottom: 212 31% 90%; /* Button-Verlauf unten (#DFE6EE) */
+    --kb-btn-border: 213 25% 65%;    /* 1px Rand #8FA3BC */
+    --kb-btn-text: 213 40% 16%;
+    --kb-panel-border: 213 30% 77%;  /* Panel-Rand #B3C3D6 */
+    --kb-yellow: 36 79% 57%;         /* aktiver Wizard-Tab: #E8A33D */
+    --kb-badge: 0 72% 46%;           /* roter Zähler-Kreis */
+    --kb-icon-gray: 213 12% 51%;     /* große graue Bereichs-Icons */
+
     /* Shadows */
-    --shadow-soft: 0 2px 8px hsl(0 0% 15% / 0.08);
-    --shadow-medium: 0 4px 16px hsl(0 0% 15% / 0.12);
-    
+    --shadow-soft: 0 2px 8px hsl(202 100% 11% / 0.08);
+    --shadow-medium: 0 4px 16px hsl(202 100% 11% / 0.12);
+
     /* Transitions */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Sidebar: dezente KingBill-Blau-Welt */
+    --sidebar-background: 213 45% 95%;
+    --sidebar-foreground: 214 50% 20%;
+    --sidebar-primary: 214 72% 44%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 213 60% 88%;
+    --sidebar-accent-foreground: 214 75% 28%;
+    --sidebar-border: 213 26% 80%;
+    --sidebar-ring: 214 72% 48%;
   }
 
   .dark {
-    --background: 0 0% 10%;
-    --foreground: 0 0% 95%;
+    --background: 202 40% 8%;
+    --foreground: 200 15% 95%;
 
-    --card: 0 0% 14%;
-    --card-foreground: 0 0% 95%;
+    --card: 202 35% 12%;
+    --card-foreground: 200 15% 95%;
 
-    --popover: 0 0% 14%;
-    --popover-foreground: 0 0% 95%;
+    --popover: 202 35% 12%;
+    --popover-foreground: 200 15% 95%;
 
-    --primary: 28 96% 55%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 199 70% 55%;
+    --primary-foreground: 202 100% 8%;
 
-    --secondary: 0 0% 22%;
-    --secondary-foreground: 0 0% 95%;
+    --secondary: 202 18% 21%;
+    --secondary-foreground: 200 15% 95%;
 
-    --muted: 0 0% 18%;
-    --muted-foreground: 0 0% 60%;
+    --muted: 202 18% 17%;
+    --muted-foreground: 200 10% 63%;
 
-    --accent: 28 96% 55%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 199 70% 55%;
+    --accent-foreground: 202 100% 8%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 22%;
-    --input: 0 0% 22%;
-    --ring: 28 96% 55%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --border: 202 18% 21%;
+    --input: 202 18% 21%;
+    --ring: 199 70% 55%;
+    --sidebar-background: 202 40% 8%;
+    --sidebar-foreground: 200 15% 95%;
+    --sidebar-primary: 199 70% 55%;
+    --sidebar-primary-foreground: 202 100% 8%;
+    --sidebar-accent: 202 18% 15%;
+    --sidebar-accent-foreground: 200 15% 95%;
+    --sidebar-border: 202 18% 15%;
+    --sidebar-ring: 199 70% 55%;
   }
 }
 
@@ -117,6 +136,269 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    /* Ganze App sitzt auf dem KingBill-Blauverlauf */
+    background: linear-gradient(180deg, hsl(var(--kb-page-top)) 0%, hsl(var(--kb-page-mid)) 45%, hsl(var(--kb-page-bottom)) 100%);
+    background-attachment: fixed;
+    /* KingBill-Typografie: Verdana/Tahoma-Stack, ~13px Basis */
+    font-family: Verdana, Tahoma, "Segoe UI", -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+    font-size: 13px;
+  }
+
+  /* Überschriften im selben klassischen Windows-Stack (KingBill hat kein Montserrat) */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: Verdana, Tahoma, "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+    font-weight: 700;
+    letter-spacing: 0;
+  }
+}
+
+/* ============================================================
+   KingBill-Utilities — VERTRAG für alle Masken/Agenten.
+   Zusätzlich zu den shadcn-Tokens, zerstören nichts Bestehendes.
+
+   .kb-page               Seiten-Hintergrund mit hellblauem Verlauf
+   .kb-panel              weiße Box, grauer 1px-Rand, Schatten
+   .kb-toolbar            blaue Titel-/Werkzeugleiste (weiße Schrift)
+   .kb-btn                boxiger Verlaufs-Button (Icon links + Label)
+   .kb-btn-lg             große Toolbar-Variante (~44-48px hoch)
+   .kb-btn-primary-green  „Speichern & Schließen": heller Button mit Grünstich,
+                          grüner Haken als eingefärbtes Icon (NICHT vollflächig grün)
+   .kb-btn-blue           heller Button mit Blaustich (Text/Icon im Titelleisten-Blau)
+   .kb-tab / .kb-tab-active  Wizard-Tabs; aktiv = gelbe Umrandung
+   .kb-badge              roter Zähler-Kreis (z. B. Offene Posten)
+   .kb-input              weißes Eingabefeld im KingBill-Stil
+   .kb-section-title      grauer Bereichs-Titel („Dokumente", …)
+   ============================================================ */
+@layer components {
+  .kb-page {
+    background: linear-gradient(180deg, hsl(var(--kb-page-top)) 0%, hsl(var(--kb-page-mid)) 45%, hsl(var(--kb-page-bottom)) 100%);
+    background-attachment: fixed;
+    /* Windows-/KingBill-Schriftbild: Segoe UI bzw. Tahoma statt System-Sans —
+       gilt für alle KingBill-Masken (Feinschliff-Wunsch „gleiche Schriftart"). */
+    font-family: "Segoe UI", Tahoma, Verdana, system-ui, sans-serif;
+  }
+
+  .kb-panel {
+    background: #fff;
+    border: 1px solid hsl(var(--kb-panel-border));
+    border-radius: 7px;
+    box-shadow: 0 3px 10px hsl(214 55% 30% / 0.18);
+  }
+
+  .kb-toolbar {
+    display: flex;
+    align-items: center;
+    /* Wrappen statt Abschneiden, wenn Tabs + Aktionen nicht in eine Zeile passen */
+    flex-wrap: wrap;
+    row-gap: 0.375rem;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: linear-gradient(180deg, hsl(var(--kb-blue-light)) 0%, hsl(var(--kb-blue-dark)) 100%);
+    border-bottom: 1px solid hsl(var(--kb-blue-dark));
+    box-shadow: 0 2px 5px hsl(214 60% 25% / 0.35);
+    color: #fff;
+  }
+
+  /* Boxiger KingBill-Button: #FFFFFF → #DFE6EE, 1px #8FA3BC, innerer Top-Highlight */
+  .kb-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    min-height: 2.25rem;
+    border: 1px solid hsl(var(--kb-btn-border));
+    border-radius: 5px;
+    background: linear-gradient(180deg, hsl(var(--kb-btn-face)) 0%, hsl(var(--kb-btn-face-bottom)) 100%);
+    color: hsl(var(--kb-btn-text));
+    font-size: 0.8125rem; /* 13px */
+    font-weight: 600;
+    line-height: 1.2;
+    text-align: left;
+    box-shadow: 0 2px 3px hsl(214 45% 30% / 0.3), inset 0 1px 0 hsl(0 0% 100% / 0.95);
+    cursor: pointer;
+    user-select: none;
+    transition: filter 0.12s ease, box-shadow 0.12s ease, transform 0.05s ease;
+  }
+  .kb-btn:hover {
+    /* KingBill-Hover: die Umrandung leuchtet GELB-ORANGE auf (wie im
+       Original, siehe Screenshot „+ Neu" mit gelber Umrandung). */
+    background: linear-gradient(180deg, hsl(210 40% 97%) 0%, hsl(212 30% 86%) 100%);
+    border-color: hsl(var(--kb-yellow));
+    outline: 2px solid hsl(var(--kb-yellow));
+    outline-offset: -1px;
+  }
+  .kb-btn:active {
+    transform: translateY(1px);
+    box-shadow: inset 0 2px 4px hsl(214 45% 30% / 0.3);
+    background: linear-gradient(180deg, hsl(var(--kb-btn-face-bottom)) 0%, hsl(var(--kb-btn-face)) 100%);
+  }
+  .kb-btn:focus-visible { outline: 2px solid hsl(var(--kb-blue)); outline-offset: 1px; }
+  .kb-btn:disabled { opacity: 0.55; cursor: not-allowed; filter: grayscale(0.4); }
+
+  .kb-btn-lg {
+    min-height: 2.875rem; /* ~46px Toolbar-Variante */
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    border-radius: 6px;
+  }
+
+  /* „Speichern & Schließen": heller Button mit leichtem Grünstich —
+     der grüne Haken kommt als eingefärbtes Icon (text-kb-green), NICHT vollflächig grün */
+  .kb-btn-primary-green {
+    border-color: hsl(125 22% 52%);
+    background: linear-gradient(180deg, hsl(120 45% 97%) 0%, hsl(120 26% 86%) 100%);
+    color: hsl(var(--kb-green-dark));
+  }
+  .kb-btn-primary-green:hover {
+    background: linear-gradient(180deg, hsl(120 40% 94%) 0%, hsl(120 24% 82%) 100%);
+    border-color: hsl(125 26% 44%);
+  }
+  .kb-btn-primary-green:active {
+    background: linear-gradient(180deg, hsl(120 26% 84%) 0%, hsl(120 40% 94%) 100%);
+    box-shadow: inset 0 2px 4px hsl(130 30% 30% / 0.3);
+  }
+
+  /* Blaue Variante: heller Button mit Blaustich (Titelleisten-Blau als Text/Icon) */
+  .kb-btn-blue {
+    border-color: hsl(214 40% 56%);
+    background: linear-gradient(180deg, hsl(212 60% 97%) 0%, hsl(212 42% 86%) 100%);
+    color: hsl(var(--kb-blue-dark));
+  }
+  .kb-btn-blue:hover {
+    background: linear-gradient(180deg, hsl(212 55% 94%) 0%, hsl(212 40% 82%) 100%);
+    border-color: hsl(214 45% 48%);
+  }
+  .kb-btn-blue:active {
+    background: linear-gradient(180deg, hsl(212 42% 84%) 0%, hsl(212 55% 94%) 100%);
+    box-shadow: inset 0 2px 4px hsl(214 45% 28% / 0.3);
+  }
+
+  /* Wizard-Tabs („A 1. Allgemein" / „2. Kunde" / „3. Artikel") */
+  .kb-tab,
+  .kb-tab-active {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.875rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid hsl(var(--kb-btn-border));
+    border-radius: 6px;
+    background: linear-gradient(180deg, hsl(var(--kb-btn-face)) 0%, hsl(var(--kb-btn-face-bottom)) 100%);
+    color: hsl(var(--kb-btn-text));
+    font-size: 0.875rem;
+    font-weight: 600;
+    box-shadow: 0 2px 3px hsl(214 45% 30% / 0.3), inset 0 1px 0 hsl(0 0% 100% / 0.95);
+    cursor: pointer;
+  }
+  /* Aktiver Tab: 2px gelb-orange Umrandung #E8A33D — exakt wie KingBill */
+  .kb-tab-active {
+    border-color: hsl(var(--kb-yellow));
+    outline: 2px solid hsl(var(--kb-yellow));
+    outline-offset: -1px;
+  }
+  /* Hover auf inaktiven Tabs: gleiches gelbes Aufleuchten wie bei Buttons. */
+  .kb-tab:hover {
+    border-color: hsl(var(--kb-yellow));
+    outline: 2px solid hsl(var(--kb-yellow));
+    outline-offset: -1px;
+  }
+
+
+  .kb-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    padding: 0 0.25rem;
+    border-radius: 9999px;
+    background: hsl(var(--kb-badge));
+    border: 1px solid hsl(0 0% 100% / 0.85);
+    color: #fff;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    line-height: 1;
+    box-shadow: 0 1px 3px hsl(0 60% 25% / 0.5);
+  }
+
+  .kb-input {
+    display: block;
+    width: 100%;
+    min-height: 2.25rem;
+    padding: 0.375rem 0.625rem;
+    border: 1px solid hsl(var(--kb-btn-border));
+    border-radius: 5px;
+    background: #fff;
+    color: hsl(var(--kb-btn-text));
+    font-size: 0.8125rem; /* 13px */
+    box-shadow: inset 0 1px 3px hsl(213 30% 60% / 0.35);
+  }
+  .kb-input:focus-visible { outline: 2px solid hsl(var(--kb-blue)); outline-offset: 0; }
+  .kb-input::placeholder { color: hsl(var(--kb-icon-gray)); }
+
+  /* Sidebar: dezenter vertikaler KingBill-Verlauf über dem hellblauen Grundton */
+  [data-sidebar="sidebar"] {
+    background-image: linear-gradient(180deg, hsl(210 60% 97% / 0.9) 0%, hsl(212 50% 88% / 0.65) 100%);
+  }
+
+  /* Großer grauer Bereichs-Titel der Startmaske („Dokumente", „Kunden", …) */
+  .kb-section-title {
+    color: hsl(var(--kb-icon-gray));
+    font-family: Verdana, Tahoma, "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: 0;
+  }
+
+  .kb-tab-trigger[data-state="active"] {
+    border-color: hsl(var(--kb-yellow));
+    outline: 2px solid hsl(var(--kb-yellow));
+    outline-offset: -1px;
+  }
+
+  .kb-table-header {
+    background: linear-gradient(180deg, hsl(var(--kb-btn-face)), hsl(var(--kb-btn-face-bottom)));
+  }
+
+  .kb-dialog-header {
+    padding: 0.75rem 2rem 0.75rem 0.75rem;
+    border-radius: 5px;
+    background: linear-gradient(180deg, hsl(var(--kb-blue-light)), hsl(var(--kb-blue-dark)));
+    color: white;
+  }
+
+  .kb-dialog-header p {
+    color: hsl(0 0% 100% / 0.85);
+  }
+
+  /* Unterseiten und Dialoge verwenden die gleichen kompakten Bedienelemente. */
+  .kb-btn .lucide-plus,
+  .kb-btn .lucide-check,
+  .kb-btn .lucide-save {
+    color: hsl(var(--kb-green));
+  }
+
+  @media (max-width: 639px) {
+    .kb-toolbar {
+      column-gap: 0.375rem;
+      padding-inline: 0.5rem;
+    }
+
+    .kb-toolbar .kb-btn {
+      min-height: 2.5rem;
+      padding-inline: 0.5rem;
+    }
+
+    .kb-input {
+      font-size: 1rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .kb-btn { transition: none; }
+    .kb-btn:active { transform: none; }
   }
 }

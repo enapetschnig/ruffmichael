@@ -548,7 +548,7 @@ const ProjectFiles = () => {
   const isEmpty = folders.length === 0 && files.length === 0;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="kb-page min-h-screen">
       <PageHeader
         title={projectName || "Projektordner"}
         backPath={`/projects/${projectId}`}

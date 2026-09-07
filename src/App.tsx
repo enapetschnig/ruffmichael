@@ -8,7 +8,6 @@ import { OnboardingProvider } from "./contexts/OnboardingContext";
 import { InstallPromptDialog } from "./components/InstallPromptDialog";
 import { OfflineBanner } from "./components/OfflineBanner";
 import { AenderungswunschKnopf } from "./components/aenderungswunsch/AenderungswunschKnopf";
-import { Seitenmenue, INHALT_ABSTAND } from "./components/Seitenmenue";
 import { useOnboarding } from "./contexts/OnboardingContext";
 import { supabase } from "@/integrations/supabase/client";
 import { startAutoSync } from "@/lib/offlineQueue";
@@ -119,14 +118,12 @@ function AppContent() {
   }, []);
 
   const ort = useLocation();
-  // Am PC (ab lg) steht links das Seitenmenü; der Inhalt rückt entsprechend nach rechts.
-  const mitMenue = ort.pathname !== "/auth";
+  const istAnmeldung = ort.pathname === "/auth";
 
   return (
     <>
       <OfflineBanner />
-      <Seitenmenue />
-      <div className={mitMenue ? INHALT_ABSTAND : undefined}>
+      <div className={istAnmeldung ? undefined : "kb-page min-h-screen"}>
       <Routes>
         <Route path="/" element={<NurAngemeldet><Index /></NurAngemeldet>} />
         <Route path="/auth" element={<Auth />} />

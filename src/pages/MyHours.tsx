@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/PageHeader";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Clock, Building2, Hammer, Pencil, Trash2, Lock } from "lucide-react";
@@ -328,22 +329,8 @@ const MyHours = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card sticky top-0 z-50 shadow-sm">
-        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
-              <ArrowLeft className="h-4 w-4 mr-2" />Zurück
-            </Button>
-            <img 
-              src="/ruff-logo.png"
-              alt="Ruff Michael Logo"
-              className="h-8 w-8 sm:h-10 sm:w-10 cursor-pointer hover:opacity-80 transition-opacity object-contain" 
-              onClick={() => navigate("/")}
-            />
-          </div>
-        </div>
-      </header>
+    <div className="kb-page min-h-screen">
+      <PageHeader title="Meine Stunden" backPath="/" />
 
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-7xl">
         <Card>

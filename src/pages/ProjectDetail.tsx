@@ -294,7 +294,7 @@ const ProjectDetail = () => {
     (["photos", "plans", "reports"].includes(type) && hiddenCategories.includes(type));
   if (blocked) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="kb-page min-h-screen">
         <PageHeader
           title={project ? `${projectLabel(project)} – ${titleMap[type]}` : titleMap[type]}
           backPath={`/projects/${projectId}`}
@@ -313,7 +313,7 @@ const ProjectDetail = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="kb-page min-h-screen">
       <PageHeader
         title={project ? `${projectLabel(project)} – ${titleMap[type]}` : titleMap[type]}
         backPath={`/projects/${projectId}`}

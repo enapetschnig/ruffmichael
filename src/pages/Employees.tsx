@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/PageHeader";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -151,17 +152,8 @@ export default function Employees() {
   }
 
   return (
-    <div className="container mx-auto p-3 sm:p-4">
-      {/* Am Handy untereinander – Titel + zwei lange Buttons passen sonst nicht in eine Zeile */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6">
-        <div className="flex items-center gap-2 min-w-0">
-          <Button variant="ghost" size="icon" className="shrink-0" onClick={() => navigate(-1)}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold break-words min-w-0">Mitarbeiterverwaltung</h1>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
+    <div className="kb-page min-h-screen">
+      <PageHeader title="Mitarbeiterverwaltung" backPath="/">
           <Button variant="outline" className="w-full sm:w-auto" onClick={() => setShowSizesDialog(true)}>
             <Shirt className="w-4 h-4 mr-2" />
             Arbeitskleidung/Schuhe Größen
@@ -170,9 +162,8 @@ export default function Employees() {
             <Plus className="w-4 h-4 mr-2" />
             Neuer Mitarbeiter
           </Button>
-        </div>
-      </div>
-
+      </PageHeader>
+      <main className="mx-auto w-full max-w-[1400px] p-3 sm:p-4 lg:p-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {employees.map((emp) => (
           <Card
@@ -642,6 +633,7 @@ export default function Employees() {
           </ScrollArea>
         </DialogContent>
       </Dialog>
+      </main>
     </div>
   );
 }

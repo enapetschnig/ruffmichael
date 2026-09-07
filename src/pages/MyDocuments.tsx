@@ -157,7 +157,7 @@ export default function MyDocuments() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="kb-page min-h-screen">
       <PageHeader title="Meine Dokumente" />
 
       <div className="container mx-auto p-4 max-w-4xl">

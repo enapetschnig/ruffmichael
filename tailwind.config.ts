@@ -47,6 +47,21 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // KingBill-Farbwelt (Vertrag: siehe src/index.css)
+        kb: {
+          blue: "hsl(var(--kb-blue))",
+          "blue-dark": "hsl(var(--kb-blue-dark))",
+          "blue-light": "hsl(var(--kb-blue-light))",
+          green: "hsl(var(--kb-green))",
+          "green-dark": "hsl(var(--kb-green-dark))",
+          yellow: "hsl(var(--kb-yellow))",
+          badge: "hsl(var(--kb-badge))",
+          "icon-gray": "hsl(var(--kb-icon-gray))",
+        },
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",

@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/PageHeader";
 import { useEffect, useState, useRef } from "react";
 import { ArrowLeft, FolderOpen, Plus, FileText, Image, Package, Lock, Search, Upload, Camera, Trash2, ChevronDown, Home, Settings, Save, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -834,23 +835,9 @@ const Projects = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card sticky top-0 z-50 shadow-sm">
-        <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
-                <Home className="h-5 w-5" />
-              </Button>
-              <img 
-                src="/ruff-logo.png"
-                alt="Ruff Michael Logo"
-                className="h-8 w-8 sm:h-10 sm:w-10 cursor-pointer hover:opacity-80 transition-opacity object-contain" 
-                onClick={() => navigate("/")}
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              {isAdmin && (
+    <div className="kb-page min-h-screen">
+      <PageHeader title="Projekte" backPath="/">
+            {isAdmin && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -993,10 +980,7 @@ const Projects = () => {
                 </div>
               </DialogContent>
               </Dialog>
-            </div>
-          </div>
-        </div>
-      </header>
+      </PageHeader>
 
       <main className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 max-w-6xl">
         <div className="mb-4 sm:mb-6">

@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/PageHeader";
 import { useEffect, useState, FormEvent, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -585,27 +586,9 @@ export default function Admin() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="kb-page min-h-screen">
       {/* Header */}
-      <header className="border-b bg-card sticky top-0 z-50 shadow-sm">
-        <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Zurück</span>
-            </Button>
-            <img 
-              src="/ruff-logo.png"
-              alt="Ruff Michael Logo" 
-              className="h-8 w-8 sm:h-10 sm:w-10 cursor-pointer hover:opacity-80 transition-opacity object-contain" 
-              onClick={() => navigate("/")}
-            />
-            <div className="flex-1 min-w-0">
-              <h1 className="text-xl sm:text-2xl font-bold truncate">Admin-Bereich</h1>
-            </div>
-          </div>
-        </div>
-      </header>
+      <PageHeader title="Admin-Bereich" backPath="/" />
 
       <main className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 lg:py-8 space-y-8">
         {/* ===== WARTENDE AKTIVIERUNGEN ===== */}

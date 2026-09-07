@@ -32,17 +32,12 @@ export function AenderungswunschKnopf({
 
   useEffect(() => {
     if (gestalt !== "schwebend") return;
-    // Die Kopfzeile erscheint auf manchen Seiten erst NACH dem Laden der
-    // Daten — deshalb eine Weile lang immer wieder nachsehen, statt einmal
-    // zu früh zu urteilen.
-    setKopfDa(!!document.querySelector("[data-seitenkopf]"));
-    let versuche = 0;
-    const uhr = setInterval(() => {
-      const da = !!document.querySelector("[data-seitenkopf]");
-      setKopfDa(da);
-      if (da || ++versuche > 12) clearInterval(uhr);   // längstens ~4 s
-    }, 300);
-    return () => clearInterval(uhr);
+    // Auch bei langsam geladenen Masken erscheint die Rückmeldung nur einmal.
+    const aktualisieren = () => setKopfDa(!!document.querySelector("[data-seitenkopf]"));
+    aktualisieren();
+    const observer = new MutationObserver(aktualisieren);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
   }, [gestalt, ort.pathname]);
 
   const starten = async () => {
@@ -74,7 +69,7 @@ export function AenderungswunschKnopf({
         data-bildschirmfoto="aus"
         className={
           gestalt === "kopf"
-            ? "gap-2 print:hidden"
+            ? "gap-2 text-kb-blue-dark print:hidden"
             // Über dem Menü-Knopf (der sitzt bottom-4 right-4), damit sich
             // beide nicht überdecken.
             : "fixed bottom-20 right-4 z-40 h-11 w-11 rounded-full shadow-md bg-background/90 backdrop-blur hover:bg-accent print:hidden"

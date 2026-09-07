@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, FolderKanban, Users, BarChart3, LogOut, FileText, ArrowRight, Info, User as UserIcon, Zap, Contact, Package, FilePlus2, ClipboardList, FileCheck, Paintbrush, Receipt, Camera } from "lucide-react";
+import { Clock, FolderKanban, Users, BarChart3, LogOut, FileText, Download, User as UserIcon, Package, FilePlus2, ClipboardList, FileCheck, Paintbrush, Receipt, Camera, Shield, BookUser, Banknote, HardHat, LayoutGrid, type LucideIcon } from "lucide-react";
+import { KBButton, KBSectionHeader } from "@/components/kingbill";
 import { ErstaufnahmeDialog, type ErstaufnahmePrefill } from "@/components/ErstaufnahmeDialog";
 import { DashboardVoiceAssistant } from "@/components/DashboardVoiceAssistant";
 import { DrawingEditor } from "@/components/DrawingEditor";
@@ -25,6 +26,10 @@ import ChangePasswordDialog from "@/components/ChangePasswordDialog";
 import { AenderungswunschKnopf } from "@/components/aenderungswunsch/AenderungswunschKnopf";
 import { ErledigteWuensche } from "@/components/aenderungswunsch/ErledigteWuensche";
 import { NeuerungenBanner } from "@/components/neuerungen/NeuerungenBanner";
+
+function Bereich({ icon, title, children }: { icon: LucideIcon; title: string; children: React.ReactNode }) {
+  return <section className="flex flex-col gap-2"><KBSectionHeader icon={icon} title={title} />{children}</section>;
+}
 
 type Project = {
   id: string;
@@ -261,7 +266,7 @@ export default function Index() {
   // Gesperrte (deaktivierte) Benutzer erhalten keinen Zugriff auf das Dashboard.
   if (isActivated === false) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="min-h-screen flex items-center justify-center kb-page p-4">
         <Card className="max-w-md w-full">
           <CardHeader>
             <CardTitle>Zugang deaktiviert</CardTitle>
@@ -281,474 +286,123 @@ export default function Index() {
   }
 
   const isAdmin = userRole === "administrator";
+  const laeuftAlsApp = window.matchMedia("(display-mode: standalone)").matches ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true;
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      {/* data-seitenkopf: diese Seite baut ihre Kopfzeile selbst und trägt den
-          Melde-Knopf direkt hier — der schwebende Knopf blendet sich dadurch aus. */}
-      <header className="border-b bg-card sticky top-0 z-50 shadow-sm" data-seitenkopf>
-        <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
-          <div className="flex justify-between items-center gap-3">
-            {/* min-w-0 + truncate: lange Namen dürfen die Kopfzeile nicht breiter machen */}
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <img src="/ruff-logo.png" alt="Ruff Michael Logo" className="h-8 sm:h-10 w-auto shrink-0" />
-              <div className="hidden sm:block h-8 w-px bg-border shrink-0" />
-              <div className="flex flex-col min-w-0">
-                <span className="text-xs sm:text-sm text-muted-foreground">Hallo</span>
-                <span className="text-sm sm:text-base font-semibold truncate">{userName || "Benutzer"}</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-            <AenderungswunschKnopf gestalt="kopf" />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="shrink-0 h-10 sm:h-9" data-bildschirmfoto="aus">
-                  <UserIcon className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">Menü</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>Mein Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                
-                <DropdownMenuItem onClick={handleRestartInstallGuide}>
-                  <Info className="mr-2 h-4 w-4" />
-                  <span>App installieren (Handy & PC)</span>
-                </DropdownMenuItem>
-                
-                <DropdownMenuSeparator />
-
-                <ChangePasswordDialog />
-                
-                <DropdownMenuSeparator />
-                
-                <DropdownMenuItem onClick={handleLogout}>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Abmelden</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            </div>
+    <div className="kb-page min-h-screen">
+      <header data-seitenkopf className="kb-toolbar sticky top-0 z-40">
+        <button type="button" className="kb-btn hidden shrink-0 sm:inline-flex" onClick={handleLogout} title="Abmelden">
+          <LogOut className="h-4 w-4 text-kb-blue-dark" />
+          <span className="hidden md:inline">Beenden</span>
+        </button>
+        {isAdmin && (
+          <button type="button" className="kb-btn hidden shrink-0 sm:inline-flex" onClick={() => navigate("/admin")} title="Einstellungen ändern">
+            <Shield className="h-4 w-4 text-kb-blue-dark" />
+            <span className="hidden md:inline">Einstellungen ändern</span>
+          </button>
+        )}
+        <span className="shrink-0" data-bildschirmfoto="aus"><AenderungswunschKnopf gestalt="kopf" /></span>
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 sm:flex-none sm:mx-auto">
+          <div className="shrink-0 rounded bg-white/95 px-1.5 py-1 shadow-sm">
+            <img src="/ruff-logo.png" alt="Ruff Michael" className="h-8 sm:h-9 w-auto" />
           </div>
+          <div className="flex flex-col min-w-0">
+            <h1 className="text-sm sm:text-base font-bold leading-tight truncate text-white [text-shadow:0_1px_2px_rgba(0,40,90,0.55)]">Ruff Michael</h1>
+            <span className="text-xs sm:text-sm text-white/85 truncate">Hallo {userName || "Benutzer"}</span>
+          </div>
+        </div>
+        <div className="ml-auto shrink-0 flex items-center gap-1 sm:gap-2">
+          {!laeuftAlsApp && (
+            <button type="button" className="kb-btn shrink-0" onClick={handleRestartInstallGuide} title="App auf diesem Gerät installieren" aria-label="App installieren">
+              <Download className="h-4 w-4 text-kb-blue-dark" />
+              <span className="hidden md:inline">App installieren</span>
+            </button>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" className="kb-btn" aria-label="Mein Account">
+                <UserIcon className="h-4 w-4 text-kb-blue-dark" />
+                <span className="hidden sm:inline">Menü</span>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Mein Account</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleRestartInstallGuide}><Download className="mr-2 h-4 w-4" />App installieren</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <ChangePasswordDialog />
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout}><LogOut className="mr-2 h-4 w-4" />Abmelden</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 lg:py-8">
-        {/* Rückmeldung auf eigene Meldungen: sieht JEDER für seine eigenen Wünsche. */}
+      <main className="mx-auto w-full max-w-[1600px] px-3 sm:px-4 lg:px-6 py-4 sm:py-6">
         <ErledigteWuensche />
-
-        {/* "Das ist neu": bewusst nur für Administratoren (Kundenentscheid 28.08.2026). */}
         {user && isAdmin && <NeuerungenBanner userId={user.id} />}
 
-        <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-2">
-            {isAdmin ? "Admin Dashboard" : "Mein Dashboard"}
-          </h1>
-          <p className="text-sm sm:text-base text-muted-foreground">
-            {isAdmin
-              ? "Verwaltung aller Projekte und Mitarbeiter"
-              : "Zeiterfassung und Projektdokumentation"}
-          </p>
+        <div className="mb-4 grid grid-cols-3 gap-2 sm:hidden">
+          <KBButton className="w-full min-h-[72px] flex-col gap-1.5 py-3 text-sm" icon={Clock} label="Zeit buchen" onClick={() => navigate("/time-tracking")} />
+          <KBButton className="w-full min-h-[72px] flex-col gap-1.5 py-3 text-sm" icon={Camera} label="Foto" onClick={() => setShowFotos(true)} />
+          <KBButton className="w-full min-h-[72px] flex-col gap-1.5 py-3 text-sm" icon={FileText} label="Regiebericht" onClick={() => navigate("/disturbances")} />
         </div>
 
-        {/* Schnellaktionen ganz oben: Erstaufnahme + Zeichnung + Sprachassistent */}
-        <div className="mb-6 sm:mb-8 space-y-3">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Button
-              size="lg"
-              className="w-full sm:w-auto gap-2 text-base h-12 px-6"
-              onClick={() => { setErstaufnahmePrefill(undefined); setShowErstaufnahme(true); }}
-            >
-              <ClipboardList className="h-5 w-5" />
-              Erstaufnahme erstellen
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              className="w-full sm:w-auto gap-2 text-base h-12 px-6"
-              onClick={() => setShowDrawing(true)}
-            >
-              <Paintbrush className="h-5 w-5" />
-              Zeichnung erstellen
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              className="w-full sm:w-auto gap-2 text-base h-12 px-6"
-              onClick={() => setShowFotos(true)}
-            >
-              <Camera className="h-5 w-5" />
-              Fotos aufnehmen
-            </Button>
-          </div>
-          <DashboardVoiceAssistant
-            onErstaufnahme={(prefill) => {
-              setErstaufnahmePrefill(prefill);
-              setShowErstaufnahme(true);
-            }}
-          />
+        <nav aria-label="Hauptmenü" className="columns-1 md:columns-2 xl:columns-4 gap-3 sm:gap-4 [&>*]:mb-3 sm:[&>*]:mb-4 [&>*]:break-inside-avoid [&_.kb-btn]:min-h-[52px] sm:[&_.kb-btn]:min-h-[2.25rem]">
+          <Bereich icon={FileText} title="Dokumente">
+            {isAdmin && <>
+              <KBButton className="w-full" icon={FileText} label="Angebote" onClick={() => navigate("/belege?tab=angebote")} />
+              <KBButton className="w-full" icon={Receipt} label="Rechnungen" onClick={() => navigate("/belege?tab=rechnungen")} />
+              <KBButton className="w-full" icon={LayoutGrid} label="Dokumentenliste" onClick={() => navigate("/belege")} />
+            </>}
+            <KBButton className="w-full" icon={FilePlus2} label="Nachträge" onClick={() => navigate("/nachtraege")} />
+            <KBButton className="w-full" icon={FileCheck} label="Übernahmebestätigungen" onClick={() => navigate("/uebernahmen")} />
+            <KBButton className="w-full" icon={FileText} label="Projektberichte & Dateien" onClick={() => navigate("/reports")} />
+          </Bereich>
+          <Bereich icon={BookUser} title="Kunden">
+            <KBButton className="w-full" icon={BookUser} label="Kunden" onClick={() => navigate("/customers")} />
+          </Bereich>
+          <Bereich icon={Package} title="Artikel">
+            <KBButton className="w-full" icon={Package} label="Artikel" onClick={() => navigate("/materialien")} />
+          </Bereich>
+          {isAdmin && <Bereich icon={Banknote} title="Finanzen">
+            <KBButton className="w-full" icon={Receipt} label="Offene Posten" onClick={() => navigate("/belege?tab=offen")} />
+          </Bereich>}
+          {isAdmin && <Bereich icon={BarChart3} title="Auswertung">
+            <KBButton className="w-full" icon={BarChart3} label="Stundenauswertung" onClick={() => navigate("/hours-report")} />
+          </Bereich>}
+          <Bereich icon={HardHat} title="Betrieb">
+            <KBButton className="w-full" icon={Clock} label="Zeiterfassung" onClick={() => navigate("/time-tracking")} />
+            <KBButton className="w-full" icon={FileText} label="Regieberichte" onClick={() => navigate("/disturbances")} />
+            <KBButton className="w-full" icon={FolderKanban} label="Projekte" onClick={() => navigate("/projects")} />
+            <KBButton className="w-full" icon={BarChart3} label="Meine Stunden" onClick={() => navigate("/my-hours")} />
+            <KBButton className="w-full" icon={FileText} label="Meine Dokumente" onClick={() => navigate("/my-documents")} />
+            <KBButton className="w-full" icon={ClipboardList} iconClassName="text-kb-green" label="Erstaufnahme erstellen" onClick={() => { setErstaufnahmePrefill(undefined); setShowErstaufnahme(true); }} />
+            <KBButton className="w-full" icon={Paintbrush} label="Zeichnung erstellen" onClick={() => setShowDrawing(true)} />
+            <KBButton className="w-full" icon={Camera} label="Fotos aufnehmen" onClick={() => setShowFotos(true)} />
+          </Bereich>
+          {isAdmin && <Bereich icon={Shield} title="Verwaltung">
+            <KBButton className="w-full" icon={Shield} label="Admin-Bereich" onClick={() => navigate("/admin")} />
+            <KBButton className="w-full" icon={HardHat} label="Mitarbeiter" onClick={() => navigate("/employees")} />
+          </Bereich>}
+        </nav>
+
+        <div className="mt-4">
+          <DashboardVoiceAssistant onErstaufnahme={(prefill) => { setErstaufnahmePrefill(prefill); setShowErstaufnahme(true); }} />
         </div>
-
-        <ErstaufnahmeDialog
-          open={showErstaufnahme}
-          onOpenChange={setShowErstaufnahme}
-          prefill={erstaufnahmePrefill}
-          onFinished={(projectId) => navigate(`/projects/${projectId}`)}
-        />
-
-        {/* Zeichnungs-Editor: speichert als PNG im Fotos-Ordner des gewählten Projekts */}
-        <DrawingEditor open={showDrawing} onOpenChange={setShowDrawing} />
-
-        {/* Kamera-Serienaufnahme: ein oder mehrere Fotos, danach Projekt wählen → Fotos-Ordner */}
-        <FotoAufnahme open={showFotos} onOpenChange={setShowFotos} />
-
-        {/* Main Actions Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
-          {/* Zeiterfassung - Für alle */}
-          <Card 
-            className="cursor-pointer hover:shadow-lg transition-all hover:border-primary/50" 
-            onClick={() => navigate("/time-tracking")}
-          >
-            <CardHeader className="space-y-2 pb-3">
-              <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Clock className="h-6 w-6 text-primary" />
-              </div>
-              <CardTitle className="text-lg sm:text-xl">Zeiterfassung</CardTitle>
-              <CardDescription className="text-sm">
-                Stunden auf Projekte buchen
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full" size="sm">Stunden erfassen</Button>
-            </CardContent>
-          </Card>
-
-          {/* Projekte - Für alle */}
-          <Card 
-            className="cursor-pointer hover:shadow-lg transition-all hover:border-primary/50" 
-            onClick={() => navigate("/projects")}
-          >
-            <CardHeader className="space-y-2 pb-3">
-              <div className="h-12 w-12 rounded-lg bg-accent/10 flex items-center justify-center">
-                <FolderKanban className="h-6 w-6 text-accent" />
-              </div>
-              <CardTitle className="text-lg sm:text-xl">Projekte</CardTitle>
-              <CardDescription className="text-sm">
-                {isAdmin ? "Bauvorhaben & Dokumentation" : "Pläne, Bilder, Berichte, etc. hochladen"}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full" size="sm" variant="secondary">Projekte öffnen</Button>
-            </CardContent>
-          </Card>
-
-          {/* Meine Stunden - Für alle */}
-          <Card 
-            className="cursor-pointer hover:shadow-lg transition-all hover:border-primary/50" 
-            onClick={() => navigate("/my-hours")}
-          >
-            <CardHeader className="space-y-2 pb-3">
-              <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                <BarChart3 className="h-6 w-6 text-primary" />
-              </div>
-              <CardTitle className="text-lg sm:text-xl">Meine Stunden</CardTitle>
-              <CardDescription className="text-sm">
-                {isAdmin ? "Eigene gebuchte Zeiten anzeigen & bearbeiten" : "Übersicht gebuchter Zeiten"}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full" size="sm" variant="outline">Anzeigen</Button>
-            </CardContent>
-          </Card>
-
-          {/* Regieberichte - Für alle */}
-          <Card 
-            className="cursor-pointer hover:shadow-lg transition-all hover:border-primary/50" 
-            onClick={() => navigate("/disturbances")}
-          >
-            <CardHeader className="space-y-2 pb-3">
-              <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Zap className="h-6 w-6 text-primary" />
-              </div>
-              <CardTitle className="text-lg sm:text-xl">Regiearbeiten</CardTitle>
-              <CardDescription className="text-sm">
-                Service-Einsätze dokumentieren
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full" size="sm" variant="outline">Regiearbeiten öffnen</Button>
-            </CardContent>
-          </Card>
-
-          {/* Nachträge - Für alle */}
-          <Card
-            className="cursor-pointer hover:shadow-lg transition-all hover:border-primary/50"
-            onClick={() => navigate("/nachtraege")}
-          >
-            <CardHeader className="space-y-2 pb-3">
-              <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                <FilePlus2 className="h-6 w-6 text-primary" />
-              </div>
-              <CardTitle className="text-lg sm:text-xl">Nachträge</CardTitle>
-              <CardDescription className="text-sm">
-                Projektbezogene Nachträge mit Kundenunterschrift
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full" size="sm" variant="outline">Nachträge öffnen</Button>
-            </CardContent>
-          </Card>
-
-          {/* Übernahmebestätigungen - Für alle */}
-          <Card
-            className="cursor-pointer hover:shadow-lg transition-all hover:border-primary/50"
-            onClick={() => navigate("/uebernahmen")}
-          >
-            <CardHeader className="space-y-2 pb-3">
-              <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                <FileCheck className="h-6 w-6 text-primary" />
-              </div>
-              <CardTitle className="text-lg sm:text-xl">Übernahmebestätigungen</CardTitle>
-              <CardDescription className="text-sm">
-                Abnahme unterschreiben lassen — PDF im Projektordner
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full" size="sm" variant="outline">Übernahmen öffnen</Button>
-            </CardContent>
-          </Card>
-
-          {/* Angebote & Rechnungen — nur Admin (Preise!) */}
-          {isAdmin && (
-            <Card
-              className="cursor-pointer hover:shadow-lg transition-all hover:border-primary/50"
-              onClick={() => navigate("/belege")}
-            >
-              <CardHeader className="space-y-2 pb-3">
-                <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Receipt className="h-6 w-6 text-primary" />
-                </div>
-                <CardTitle className="text-lg sm:text-xl">Angebote &amp; Rechnungen</CardTitle>
-                <CardDescription className="text-sm">
-                  Belege schreiben, Stunden verrechnen, offene Posten
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button className="w-full" size="sm" variant="outline">Belege öffnen</Button>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Materialdatenbank - Für alle (Preise nur Admin) */}
-          <Card
-            className="cursor-pointer hover:shadow-lg transition-all hover:border-primary/50"
-            onClick={() => navigate("/materialien")}
-          >
-            <CardHeader className="space-y-2 pb-3">
-              <div className="h-12 w-12 rounded-lg bg-accent/10 flex items-center justify-center">
-                <Package className="h-6 w-6 text-accent" />
-              </div>
-              <CardTitle className="text-lg sm:text-xl">Materialkatalog</CardTitle>
-              <CardDescription className="text-sm">
-                Materialdatenbank durchsuchen
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full" size="sm" variant="outline">Material öffnen</Button>
-            </CardContent>
-          </Card>
-
-          {/* Kundenverwaltung - Für alle */}
-          <Card
-            className="cursor-pointer hover:shadow-lg transition-all hover:border-primary/50"
-            onClick={() => navigate("/customers")}
-          >
-            <CardHeader className="space-y-2 pb-3">
-              <div className="h-12 w-12 rounded-lg bg-accent/10 flex items-center justify-center">
-                <Contact className="h-6 w-6 text-accent" />
-              </div>
-              <CardTitle className="text-lg sm:text-xl">Kundenverwaltung</CardTitle>
-              <CardDescription className="text-sm">
-                Kunden anlegen & verwalten
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full" size="sm" variant="outline">Kunden öffnen</Button>
-            </CardContent>
-          </Card>
-
-
-          {/* Meine Dokumente - Für Mitarbeiter */}
-          {!isAdmin && (
-            <Card 
-              className="cursor-pointer hover:shadow-lg transition-all hover:border-primary/50" 
-              onClick={() => navigate("/my-documents")}
-            >
-              <CardHeader className="space-y-2 pb-3">
-                <div className="h-12 w-12 rounded-lg bg-accent/10 flex items-center justify-center">
-                  <FileText className="h-6 w-6 text-accent" />
-                </div>
-                <CardTitle className="text-lg sm:text-xl">Meine Dokumente</CardTitle>
-                <CardDescription className="text-sm">
-                  Lohnzettel & Krankmeldungen
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button className="w-full" size="sm" variant="outline">Dokumente öffnen</Button>
-              </CardContent>
-            </Card>
-          )}
-
-
-          {/* Admin: Stundenauswertung */}
-          {isAdmin && (
-            <Card 
-              className="cursor-pointer hover:shadow-lg transition-all hover:border-primary/50" 
-              onClick={() => navigate("/hours-report")}
-            >
-              <CardHeader className="space-y-2 pb-3">
-                <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <BarChart3 className="h-6 w-6 text-primary" />
-                </div>
-                <CardTitle className="text-lg sm:text-xl">Stundenauswertung</CardTitle>
-                <CardDescription className="text-sm">
-                  Auswertung der Projektstunden
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button className="w-full" size="sm">Auswerten</Button>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Admin: Mitarbeiter */}
-          {isAdmin && (
-            <Card 
-              className="cursor-pointer hover:shadow-lg transition-all hover:border-primary/50" 
-              onClick={() => navigate("/admin")}
-            >
-              <CardHeader className="space-y-2 pb-3">
-                <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Users className="h-6 w-6 text-primary" />
-                </div>
-                <CardTitle className="text-lg sm:text-xl">Admin-Bereich</CardTitle>
-                <CardDescription className="text-sm">
-                  Benutzerverwaltung, Stunden & Verwaltung
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button className="w-full" size="sm" variant="outline">Verwalten</Button>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        {/* Recent Time Entries */}
-        {recentEntries.length > 0 && (
-          <div className="mt-6">
-            <h2 className="text-xl sm:text-2xl font-bold mb-4">
-              {isAdmin ? 'Letzte Projektbuchungen (Alle Mitarbeiter)' : 'Meine letzten Buchungen'}
-            </h2>
-            <div className="space-y-2">
-              {recentEntries.map((entry) => (
-                <Card 
-                  key={entry.id} 
-                  className="hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => {
-                    // Nur Admins dürfen Regieberichte anderer öffnen (RLS). Mitarbeiter
-                    // würden auf einer leeren/fehlerhaften Seite landen -> zu "Meine Stunden".
-                    if (isAdmin && entry.disturbance_id) {
-                      navigate(`/disturbances/${entry.disturbance_id}`);
-                    } else {
-                      navigate("/my-hours");
-                    }
-                  }}
-                >
-                  <CardContent className="p-3">
-                    <div className="flex justify-between items-center gap-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm truncate">
-                          {entry.projects?.name || (entry.disturbance_id ? "Regiebericht" : "Unbekanntes Projekt")}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">{entry.taetigkeit}</p>
-                      </div>
-                      <div className="text-right ml-3 shrink-0">
-                        <p className="font-bold">{entry.stunden} h</p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(entry.datum).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}
-                        </p>
-                      </div>
-                      <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-            <Button 
-              variant="outline" 
-              className="w-full mt-3" 
-              onClick={() => navigate("/my-hours")}
-            >
-              Alle Stunden anzeigen
-            </Button>
-          </div>
-        )}
-
-        {!isAdmin && (
-          <Card className="mt-6 bg-primary/5 border-primary/20">
-            <CardHeader>
-              <CardTitle className="text-lg">Schnellhilfe</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <p>✓ <strong>Zeiterfassung:</strong> Täglich Stunden auf Projekte buchen</p>
-              <p>✓ <strong>Projekte:</strong> Fotos, Regieberichte & Dokumente hochladen</p>
-              <p>✓ <strong>Meine Stunden:</strong> Übersicht aller gebuchten Zeiten</p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Projects Overview */}
         {projects.length > 0 && (
-          <div className="mt-6 sm:mt-8">
-            <div className="flex items-center justify-between gap-2 mb-4">
-              <h2 className="text-xl sm:text-2xl font-bold min-w-0">Aktive Projekte</h2>
-              <Button variant="ghost" size="sm" className="shrink-0" onClick={() => navigate("/projects")}>
-                Alle anzeigen
-                <ArrowRight className="h-4 w-4 ml-1" />
-              </Button>
+          <section className="mt-6 max-w-3xl">
+            <KBSectionHeader icon={FolderKanban} title="Aktive Projekte" />
+            <div className="mt-2 flex flex-col gap-2">
+              {projects.map((project) => <KBButton key={project.id} className="w-full min-h-[44px]" icon={FolderKanban} label={project.name} onClick={() => navigate(`/projects/${project.id}`)} />)}
             </div>
-            
-            <div className="grid grid-cols-1 gap-3 sm:gap-4">
-              {projects.map((project) => (
-                <Card 
-                  key={project.id} 
-                  className="hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => navigate("/projects")}
-                >
-                  <CardContent className="p-3 sm:p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                          <FolderKanban className="h-5 w-5 text-primary" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm sm:text-base truncate">{project.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Aktualisiert: {new Date(project.updated_at).toLocaleDateString("de-DE")}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
+          </section>
         )}
       </main>
-
+      <ErstaufnahmeDialog open={showErstaufnahme} onOpenChange={setShowErstaufnahme} prefill={erstaufnahmePrefill} onFinished={(projectId) => navigate(`/projects/${projectId}`)} />
+      <DrawingEditor open={showDrawing} onOpenChange={setShowDrawing} />
+      <FotoAufnahme open={showFotos} onOpenChange={setShowFotos} />
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/PageHeader";
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, FileText, FileCheck, FolderOpen, Package, Camera, ImagePlus, Lock, FileSignature, Plus, CheckCircle2, Pencil, Settings, Receipt } from "lucide-react";
@@ -242,25 +243,9 @@ const ProjectOverview = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card sticky top-0 z-50 shadow-sm">
-        <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <Button variant="ghost" size="sm" onClick={() => navigate("/projects")}>
-                {/* Am Handy nur das Pfeil-Symbol, daher Abstand erst ab sm */}
-                <ArrowLeft className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Zurück</span>
-              </Button>
-              <img
-                src="/ruff-logo.png"
-                alt="Ruff Michael Logo"
-                className="h-8 w-8 sm:h-10 sm:w-10 cursor-pointer hover:opacity-80 transition-opacity object-contain"
-                onClick={() => navigate("/projects")}
-              />
-            </div>
-            <div className="flex items-center gap-1 shrink-0">
-              {/* Projekt bearbeiten: wie in der Projektliste für alle sichtbar. */}
+    <div className="kb-page min-h-screen">
+      <PageHeader title={projectName || "Projekt"} backPath="/projects">
+            {/* Projekt bearbeiten: wie in der Projektliste für alle sichtbar. */}
               <Button variant="outline" size="sm" className="gap-1" onClick={() => setEditOpen(true)}>
                 <Pencil className="h-4 w-4" />
                 <span className="hidden sm:inline">Bearbeiten</span>
@@ -279,10 +264,7 @@ const ProjectOverview = () => {
                   <span className="hidden sm:inline">Ordner</span>
                 </Button>
               )}
-            </div>
-          </div>
-        </div>
-      </header>
+      </PageHeader>
 
       {/* pb-24: Platz, damit der runde Foto-Knopf unten die letzte Kachel nicht verdeckt */}
       <main className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 pb-24 max-w-4xl">

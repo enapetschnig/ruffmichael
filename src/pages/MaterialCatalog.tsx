@@ -35,10 +35,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { isOffline, newId, saveInsert } from "@/lib/offlineData";
 import { cachedSelect } from "@/lib/offlineStore";
+import { artikelkatalogVergessen } from "@/components/ArtikelVorschlag";
 
 interface Material {
   id: string;
   name: string;
+  artikelnummer: string | null;
   einheit: string | null;
   kategorie: string;
 }
@@ -54,6 +56,7 @@ const DEFAULT_CATEGORIES = ["Material", "Stunden & Leistungen"];
 
 const emptyForm = {
   name: "",
+  artikelnummer: "",
   einheit: "",
   kategorie: "Material",
   kategorieNeu: "",
@@ -128,12 +131,13 @@ const MaterialCatalog = () => {
 
   const fetchMaterials = async (admin: boolean) => {
     setLoading(true);
+    artikelkatalogVergessen();
     // Offline-fähig (gleicher Schlüssel wie der MaterialPicker). Preise werden
     // BEWUSST NICHT lokal abgelegt (nur Admin darf sie sehen).
     const { data, error } = await cachedSelect<Material[]>("materials:aktiv", () =>
       supabase
         .from("materials")
-        .select("id, name, einheit, kategorie")
+        .select("id, name, artikelnummer, einheit, kategorie")
         .eq("is_active", true)
         .order("kategorie")
         .order("name") as unknown as PromiseLike<{ data: Material[] | null; error: { message: string } | null }>,
@@ -171,7 +175,7 @@ const MaterialCatalog = () => {
     const q = search.trim().toLowerCase();
     if (!q) return materials;
     return materials.filter((m) =>
-      [m.name, m.kategorie, m.einheit]
+      [m.name, m.artikelnummer, m.kategorie, m.einheit]
         .filter(Boolean)
         .some((v) => (v as string).toLowerCase().includes(q))
     );
@@ -199,6 +203,7 @@ const MaterialCatalog = () => {
     setEditing(m);
     setForm({
       name: m.name,
+      artikelnummer: m.artikelnummer ?? "",
       einheit: m.einheit ?? "",
       kategorie: categories.includes(m.kategorie) ? m.kategorie : NEW_CATEGORY,
       kategorieNeu: categories.includes(m.kategorie) ? "" : m.kategorie,
@@ -234,6 +239,7 @@ const MaterialCatalog = () => {
     setSaving(true);
     const row = {
       name,
+      artikelnummer: form.artikelnummer.trim() || null,
       einheit: form.einheit.trim() || null,
       kategorie,
     };
@@ -384,7 +390,16 @@ const MaterialCatalog = () => {
                       onChange={(e) => setForm({ ...form, name: e.target.value })}
                     />
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="material-nr">Art.-Nr.</Label>
+                      <Input
+                        id="material-nr"
+                        placeholder="z. B. 0021"
+                        value={form.artikelnummer}
+                        onChange={(e) => setForm({ ...form, artikelnummer: e.target.value })}
+                      />
+                    </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="material-einheit">Einheit</Label>
                       <Input
@@ -463,7 +478,7 @@ const MaterialCatalog = () => {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Suchen (Name, Kategorie, Einheit...)"
+            placeholder="Suchen (Name, Art.-Nr., Kategorie, Einheit...)"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -501,7 +516,7 @@ const MaterialCatalog = () => {
                           className="flex items-center gap-3 px-3 sm:px-4 py-2.5"
                         >
                           <div className="min-w-0 flex-1">
-                            <div className="font-medium truncate">{m.name}</div>
+                            <div className="font-medium truncate">{m.name}{m.artikelnummer && <span className="ml-2 text-xs font-normal text-muted-foreground">Nr. {m.artikelnummer}</span>}</div>
                             {isAdmin && (
                               <div className="text-xs text-muted-foreground tabular-nums sm:hidden">
                                 EK {formatPrice(price?.einkaufspreis)} · VK{" "}

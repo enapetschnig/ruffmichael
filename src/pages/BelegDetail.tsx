@@ -22,6 +22,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { BelegVorschau } from "@/components/BelegVorschau";
 import { BelegBlatt } from "@/components/BelegBlatt";
+import { ArtikelVorschlag } from "@/components/ArtikelVorschlag";
 import { cn } from "@/lib/utils";
 import {
   TYP_LABEL, TYP_DATEINAME, STATUS_LABEL, STATUS_VARIANT, EINHEITEN, eur, zahl, datum, heuteISO, plusTage, parseZahl,
@@ -653,9 +654,27 @@ const BelegDetail = () => {
                       <div className="flex items-start gap-2">
                         <div className="w-8 shrink-0 text-sm text-muted-foreground pt-2 tabular-nums">{p.art === "position" ? nr : ""}</div>
                         <div className="flex-1 min-w-0 space-y-2">
-                          <Input className={p.art === "ueberschrift" ? "font-semibold" : ""} placeholder={p.art === "position" ? "Bezeichnung" : p.art === "ueberschrift" ? "Überschrift" : "Hinweistext"} value={p.text} disabled={!entwurf || abzug}
-                            onChange={(e) => setPos((l) => l.map((x) => (x.id === p.id ? { ...x, text: e.target.value } : x)))}
-                            onBlur={(e) => posSpeichern(p.id, { text: e.target.value })} />
+                          {p.art === "position" ? (
+                            // Bezeichnung mit Vorschlägen aus dem Artikelkatalog (Name oder Art.-Nr.)
+                            <ArtikelVorschlag
+                              value={p.text}
+                              placeholder="Bezeichnung — tippen für Artikelvorschläge"
+                              disabled={!entwurf || abzug}
+                              onChange={(t) => setPos((l) => l.map((x) => (x.id === p.id ? { ...x, text: t } : x)))}
+                              onBlur={(t) => { if (t !== p.text || true) posSpeichern(p.id, { text: t }); }}
+                              onSelect={(a) => {
+                                const patch: Partial<BelegPosition> = { text: a.name };
+                                if (a.einheit && EINHEITEN.includes(a.einheit)) patch.einheit = a.einheit;
+                                if (a.verkaufspreis != null && Number(p.einzelpreis) === 0) patch.einzelpreis = a.verkaufspreis;
+                                if (a.artikelnummer && !p.beschreibung) patch.beschreibung = `Art.-Nr.: ${a.artikelnummer}`;
+                                posSpeichern(p.id, patch);
+                              }}
+                            />
+                          ) : (
+                            <Input className={p.art === "ueberschrift" ? "font-semibold" : ""} placeholder={p.art === "ueberschrift" ? "Überschrift" : "Hinweistext"} value={p.text} disabled={!entwurf}
+                              onChange={(e) => setPos((l) => l.map((x) => (x.id === p.id ? { ...x, text: e.target.value } : x)))}
+                              onBlur={(e) => posSpeichern(p.id, { text: e.target.value })} />
+                          )}
                           {p.art === "position" && (
                             <>
                               {!abzug && <Textarea rows={1} placeholder="Beschreibung (optional)" value={p.beschreibung ?? ""} disabled={!entwurf}

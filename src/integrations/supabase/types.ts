@@ -1149,30 +1149,36 @@ export type Database = {
       }
       materials: {
         Row: {
+          artikelnummer: string | null
           created_at: string
           einheit: string | null
           id: string
           is_active: boolean
           kategorie: string
           name: string
+          quelle: string | null
           updated_at: string
         }
         Insert: {
+          artikelnummer?: string | null
           created_at?: string
           einheit?: string | null
           id?: string
           is_active?: boolean
           kategorie?: string
           name: string
+          quelle?: string | null
           updated_at?: string
         }
         Update: {
+          artikelnummer?: string | null
           created_at?: string
           einheit?: string | null
           id?: string
           is_active?: boolean
           kategorie?: string
           name?: string
+          quelle?: string | null
           updated_at?: string
         }
         Relationships: []

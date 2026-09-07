@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Plus, Search, FileText, Receipt, AlertCircle, Check, ChevronsUpDown, Layers, FileCheck } from "lucide-react";
+import { Plus, Search, FileText, Receipt, AlertCircle, Check, ChevronsUpDown, Layers, FileCheck, UserPlus, Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,7 +14,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { getSessionUser } from "@/lib/auth";
-import { customerDisplayName } from "@/pages/Customers";
+import { customerDisplayName, CustomerFormFields, customerFormToRow, emptyCustomerForm } from "@/pages/Customers";
 import { projectLabel } from "@/lib/projectLabel";
 import { cn } from "@/lib/utils";
 import {
@@ -35,10 +35,13 @@ const NEU_TYPEN: { typ: BelegTyp; icon: React.ReactNode; text: string }[] = [
 const kundeName = (k: KundeOpt) => k.firma?.trim() || customerDisplayName({ vorname: k.vorname ?? "", nachname: k.nachname });
 
 /** Auswahlfeld mit Suche — 116 Kunden ohne Suche sind am Handy nicht bedienbar. */
-function Auswahl<T extends { id: string }>({ wert, optionen, label, suchtext, platzhalter, leer, onChange }: {
+function Auswahl<T extends { id: string }>({ wert, optionen, label, suchtext, platzhalter, leer, onChange, onNeu }: {
   wert: string; optionen: T[]; label: (o: T) => string; suchtext: (o: T) => string; platzhalter: string; leer?: string; onChange: (id: string) => void;
+  /** Wird angeboten, wenn die Suche nichts findet — z. B. „… als neuen Kunden anlegen“ */
+  onNeu?: (suche: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [suche, setSuche] = useState("");
   const gewaehlt = optionen.find((o) => o.id === wert);
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -50,9 +53,15 @@ function Auswahl<T extends { id: string }>({ wert, optionen, label, suchtext, pl
       </PopoverTrigger>
       <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
         <Command filter={(value, search) => (value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0)}>
-          <CommandInput placeholder="Tippen zum Suchen…" />
+          <CommandInput placeholder="Tippen zum Suchen…" value={suche} onValueChange={setSuche} />
           <CommandList className="max-h-64">
-            <CommandEmpty>Nichts gefunden.</CommandEmpty>
+            <CommandEmpty>
+              {onNeu ? (
+                <button type="button" className="w-full text-left px-2 py-1.5 text-sm rounded-md hover:bg-accent flex items-center gap-2" onClick={() => { onNeu(suche.trim()); setOpen(false); }}>
+                  <UserPlus className="h-4 w-4 shrink-0" />{suche.trim() ? `„${suche.trim()}“ als neuen Kunden anlegen` : "Neuen Kunden anlegen"}
+                </button>
+              ) : "Nichts gefunden."}
+            </CommandEmpty>
             <CommandGroup>
               {leer && (
                 <CommandItem value="__leer__" onSelect={() => { onChange(""); setOpen(false); }}>
@@ -87,6 +96,10 @@ const Belege = () => {
   const [projekte, setProjekte] = useState<ProjektOpt[]>([]);
   const [neu, setNeu] = useState<{ typ: BelegTyp; kunde: string; projekt: string }>({ typ: "angebot", kunde: params.get("kunde") ?? "", projekt: params.get("projekt") ?? "" });
   const [anlegen, setAnlegen] = useState(false);
+  // Neuen Kunden direkt aus dem Beleg-Dialog anlegen (wenn er noch nicht existiert)
+  const [neuerKundeOpen, setNeuerKundeOpen] = useState(false);
+  const [kundeForm, setKundeForm] = useState({ ...emptyCustomerForm });
+  const [kundeSpeichert, setKundeSpeichert] = useState(false);
   // Aus der Projektübersicht / Kundenliste kommend: nur die passenden Belege
   const projektFilter = params.get("projekt");
   const kundeFilter = params.get("kunde");
@@ -213,6 +226,29 @@ const Belege = () => {
     setAnlegen(false);
     setNeuOpen(false);
     navigate(`/belege/${data.id}`);
+  };
+
+  const neuerKundeStarten = (suche = "") => {
+    // Suchbegriff sinnvoll vorbelegen: „Müller GmbH“ → Firma, sonst Nachname
+    const f = { ...emptyCustomerForm };
+    if (/gmbh|og|kg|ag|e\.u\.|gesmbh|ges\.m\.b\.h/i.test(suche)) { f.firma = suche; f.ist_unternehmer = true; } else { f.nachname = suche; }
+    setKundeForm(f);
+    setNeuerKundeOpen(true);
+  };
+  const kundeAnlegen = async () => {
+    if (!kundeForm.nachname.trim()) return toast({ variant: "destructive", title: "Nachname fehlt", description: "Bitte Nachname bzw. Ansprechperson eingeben — bei Firmen zusätzlich die Firma." });
+    if (kundeSpeichert) return;
+    setKundeSpeichert(true);
+    const user = await getSessionUser();
+    const row = customerFormToRow(kundeForm);
+    const { data, error } = await supabase.from("customers").insert({ ...row, created_by: user?.id ?? null }).select("id, kundennr, vorname, nachname, firma, strasse, ort, uid, ist_unternehmer, reverse_charge, zahlungsziel_tage, email").single();
+    setKundeSpeichert(false);
+    if (error || !data) return toast({ variant: "destructive", title: "Kunde nicht angelegt", description: error?.message });
+    const k = data as KundeOpt;
+    setKunden((l) => [...l, k].sort((a, b) => a.nachname.localeCompare(b.nachname)));
+    setNeu((n) => ({ ...n, kunde: k.id }));
+    setNeuerKundeOpen(false);
+    toast({ title: "Kunde angelegt", description: `${kundeName(k)} ist gespeichert und für diesen Beleg gewählt.` });
   };
 
   const filterKunde = kundeFilter ? kunden.find((x) => x.id === kundeFilter) : null;
@@ -343,8 +379,11 @@ const Belege = () => {
               {!neu.projekt && <p className="text-xs text-muted-foreground">Ohne Projekt bleibt das PDF nur in der App (kein OneDrive-Ordner, keine Stunden zum Holen).</p>}
             </div>
             <div className="space-y-1.5">
-              <Label>Kunde *</Label>
-              <Auswahl wert={neu.kunde} optionen={kunden} label={(k) => `${k.kundennr ? `${k.kundennr} · ` : ""}${kundeName(k)}${k.ort ? ` (${k.ort})` : ""}`} suchtext={(k) => `${k.kundennr ?? ""} ${k.firma ?? ""} ${k.vorname ?? ""} ${k.nachname} ${k.ort ?? ""} ${k.strasse ?? ""}`} platzhalter="Kunde wählen — tippen zum Suchen" onChange={(id) => setNeu({ ...neu, kunde: id })} />
+              <div className="flex items-center justify-between gap-2">
+                <Label>Kunde *</Label>
+                <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 text-primary" onClick={() => neuerKundeStarten()}><UserPlus className="h-4 w-4" />Neuer Kunde</Button>
+              </div>
+              <Auswahl wert={neu.kunde} optionen={kunden} label={(k) => `${k.kundennr ? `${k.kundennr} · ` : ""}${kundeName(k)}${k.ort ? ` (${k.ort})` : ""}`} suchtext={(k) => `${k.kundennr ?? ""} ${k.firma ?? ""} ${k.vorname ?? ""} ${k.nachname} ${k.ort ?? ""} ${k.strasse ?? ""}`} platzhalter="Kunde wählen — tippen zum Suchen" onChange={(id) => setNeu({ ...neu, kunde: id })} onNeu={neuerKundeStarten} />
               {projektKundeWeicht && <p className="text-xs text-amber-700 dark:text-amber-400">Achtung: Das Projekt gehört einem anderen Kunden.</p>}
               {neu.kunde && kunden.find((k) => k.id === neu.kunde)?.reverse_charge && <p className="text-xs text-muted-foreground">Reverse Charge ist bei diesem Kunden hinterlegt — der Beleg wird ohne USt erstellt.</p>}
             </div>
@@ -352,6 +391,21 @@ const Belege = () => {
               <Button variant="outline" onClick={() => setNeuOpen(false)}>Abbrechen</Button>
               <Button onClick={belegAnlegen} disabled={anlegen || !neu.kunde}>Anlegen</Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Neuer Kunde — direkt aus dem Beleg heraus, damit man nicht erst in die Kundenverwaltung muss */}
+      <Dialog open={neuerKundeOpen} onOpenChange={(o) => { if (!kundeSpeichert) setNeuerKundeOpen(o); }}>
+        <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-xl max-h-[90dvh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Neuen Kunden anlegen</DialogTitle>
+            <DialogDescription>Wird in der Kundenverwaltung gespeichert und gleich für diesen Beleg gewählt.</DialogDescription>
+          </DialogHeader>
+          <CustomerFormFields form={kundeForm} setForm={setKundeForm} zeigeRechnungsdaten />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setNeuerKundeOpen(false)} disabled={kundeSpeichert}>Abbrechen</Button>
+            <Button onClick={kundeAnlegen} disabled={kundeSpeichert} className="gap-1">{kundeSpeichert ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}Kunde anlegen</Button>
           </div>
         </DialogContent>
       </Dialog>

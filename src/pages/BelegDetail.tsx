@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Plus, Trash2, Lock, FileDown, Clock, ArrowRight, Ban, Euro, ChevronUp, ChevronDown, Loader2, Pencil, Receipt,
-  ClipboardList, RefreshCw, Share2, AlertTriangle, FileText,
+  ClipboardList, AlertTriangle, FileText,
 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -21,11 +21,12 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { BelegVorschau } from "@/components/BelegVorschau";
+import { BelegBlatt } from "@/components/BelegBlatt";
 import { cn } from "@/lib/utils";
 import {
   TYP_LABEL, TYP_DATEINAME, STATUS_LABEL, STATUS_VARIANT, EINHEITEN, eur, zahl, datum, heuteISO, plusTage, parseZahl,
   istRechnung, istAngebot, offen, belegTitel, belegPdf, ladeFirmendaten,
-  type Beleg, type BelegPosition, type Zahlung,
+  type Beleg, type BelegPosition, type Zahlung, type Firmendaten,
 } from "@/lib/faktura";
 
 type OffeneStunden = Database["public"]["Functions"]["faktura_offene_stunden"]["Returns"][number];
@@ -84,11 +85,9 @@ const BelegDetail = () => {
   const [ansicht, setAnsicht] = useState<"bearbeiten" | "vorschau">("bearbeiten");
   const [vorschau, setVorschau] = useState<{ open: boolean; url: string | null; blob: Blob | null; entwurf: boolean }>({ open: false, url: null, blob: null, entwurf: true });
   const vorschauToken = useRef(0);
-  // Live-Vorschau: wird nach jeder gespeicherten Änderung neu erzeugt
-  const [live, setLive] = useState<{ url: string | null; blob: Blob | null; laedt: boolean; fehler: string | null }>({ url: null, blob: null, laedt: false, fehler: null });
-  const [version, setVersion] = useState(0);
-  const liveToken = useRef(0);
-  const liveVersion = useRef(-1);
+  // Blatt-Vorschau: rendert den Beleg aus dem lokalen Zustand — synchron zu jeder Eingabe
+  const [firma, setFirma] = useState<Firmendaten | null>(null);
+  const [blattInfo, setBlattInfo] = useState<{ kundennr: string | null; projektName: string | null; vorgaengerNr: string | null }>({ kundennr: null, projektName: null, vorgaengerNr: null });
   const [stundenOpen, setStundenOpen] = useState(false);
   const [stunden, setStunden] = useState<(OffeneStunden & { gewaehlt: boolean; satzWert: string })[]>([]);
   const [regieOpen, setRegieOpen] = useState(false);
@@ -106,7 +105,6 @@ const BelegDetail = () => {
 
   const entwurf = b?.status === "entwurf";
   const rechnung = b ? istRechnung(b.typ) : false;
-  const bumpen = () => setVersion((v) => v + 1);
 
   const laden = async () => {
     if (!belegId) return;
@@ -120,7 +118,13 @@ const BelegDetail = () => {
     if (belegFehler) { toast({ title: "Keine Verbindung", description: "Der Beleg konnte nicht geladen werden — bitte Internet prüfen." }); return navigate("/"); }
     if (!beleg) { toast({ variant: "destructive", title: "Beleg nicht gefunden" }); return navigate("/belege"); }
     setB(beleg); setPos(p ?? []); setZahlungen(z ?? []); setNachfolger((nf as Nachfolger[]) ?? []);
-    bumpen();
+    // Daten, die nur das Blatt braucht (Firmendaten, Kundennummer, Projektname, Bezugsnummer)
+    const f = await ladeFirmendaten();
+    const k: { kundennr: string | null } | null = beleg.customer_id ? (await supabase.from("customers").select("kundennr").eq("id", beleg.customer_id).maybeSingle()).data : null;
+    const pr: { name: string } | null = beleg.project_id ? (await supabase.from("projects").select("name").eq("id", beleg.project_id).maybeSingle()).data : null;
+    const vg: { nummer: string | null } | null = beleg.vorgaenger_id ? (await supabase.from("belege").select("nummer").eq("id", beleg.vorgaenger_id).maybeSingle()).data : null;
+    setFirma(f);
+    setBlattInfo({ kundennr: k?.kundennr ?? null, projektName: pr?.name ?? null, vorgaengerNr: vg?.nummer ?? null });
   };
   useEffect(() => { laden(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [belegId]);
 
@@ -128,33 +132,6 @@ const BelegDetail = () => {
     let n = 0;
     while (pending.current > 0 && n++ < 50) await new Promise((r) => setTimeout(r, 100));
   };
-
-  // ── Live-Vorschau ──────────────────────────────────────────────────────
-  const vorschauSichtbar = breit || ansicht === "vorschau";
-  useEffect(() => {
-    if (!b || !vorschauSichtbar || liveVersion.current === version) return;
-    const t = window.setTimeout(async () => {
-      const token = ++liveToken.current;
-      const ziel = version;
-      setLive((l) => ({ ...l, laedt: true }));
-      await wartenBisGespeichert();
-      const r = await belegPdf(b.id);
-      if (token !== liveToken.current) return;
-      liveVersion.current = ziel;
-      if (r.error) { setLive((l) => ({ ...l, laedt: false, fehler: r.error ?? "Fehler" })); return; }
-      if (r.base64) {
-        const bytes = Uint8Array.from(atob(r.base64), (c) => c.charCodeAt(0));
-        const blob = new Blob([bytes], { type: "application/pdf" });
-        const url = URL.createObjectURL(blob);
-        setLive((l) => { if (l.url?.startsWith("blob:")) URL.revokeObjectURL(l.url); return { url, blob, laedt: false, fehler: null }; });
-      } else if (r.url) {
-        setLive({ url: r.url, blob: null, laedt: false, fehler: null });
-      }
-    }, liveVersion.current < 0 ? 50 : 900);
-    return () => window.clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [version, vorschauSichtbar, b?.id]);
-  useEffect(() => () => { if (live.url?.startsWith("blob:")) URL.revokeObjectURL(live.url); }, [live.url]);
 
   // ── Kopf speichern (nur Entwurf; die DB lehnt alles andere ab) ───────────
   const kopf = async (patch: Partial<Beleg>) => {
@@ -164,7 +141,7 @@ const BelegDetail = () => {
     try {
       const { error } = await supabase.from("belege").update(patch).eq("id", b.id);
       if (error) toast({ variant: "destructive", title: "Nicht gespeichert", description: error.message });
-      else { if ("reverse_charge" in patch || "ust_satz" in patch) await summenNeu(); bumpen(); }
+      else if ("reverse_charge" in patch || "ust_satz" in patch) await summenNeu();
     } finally { pending.current--; }
   };
   const kopfLokal = (patch: Partial<Beleg>) => setB((x) => (x ? { ...x, ...patch } : x));
@@ -186,7 +163,6 @@ const BelegDetail = () => {
     const { data: p } = await supabase.from("beleg_positionen").select("*").eq("beleg_id", b.id).order("pos").order("created_at");
     if (p) setPos(p);
     await summenNeu();
-    bumpen();
   };
   const posSpeichern = async (id: string, patch: Partial<BelegPosition>) => {
     setPos((l) => l.map((p) => (p.id === id ? { ...p, ...patch } : p)));
@@ -194,7 +170,7 @@ const BelegDetail = () => {
     try {
       const { error } = await supabase.from("beleg_positionen").update(patch).eq("id", id);
       if (error) toast({ variant: "destructive", title: "Nicht gespeichert", description: error.message });
-      else { await summenNeu(); bumpen(); }
+      else await summenNeu();
     } finally { pending.current--; }
   };
   const posNeu = async (art: "position" | "ueberschrift" | "text" = "position") => {
@@ -385,11 +361,6 @@ const BelegDetail = () => {
   };
   const pdfAnzeigen = async () => {
     if (!b) return;
-    // Aktuelle Live-Vorschau vorhanden → sofort öffnen (Teilen/Drucken/Download)
-    if (live.url && !live.laedt && liveVersion.current === version) {
-      setVorschau({ open: true, url: live.url, blob: live.blob, entwurf });
-      return;
-    }
     const token = ++vorschauToken.current;
     setBusy("pdf");
     setVorschau({ open: true, url: null, blob: null, entwurf });
@@ -496,30 +467,26 @@ const BelegDetail = () => {
   const preisFehlt = sortiert.filter((p) => p.art === "position" && p.quelle_typ === "regiebericht" && Number(p.einzelpreis) === 0).length;
 
   // ── Vorschau-Kasten (rechts bzw. Reiter „Vorschau“) ───────────────────
+  // Das Blatt zeigt auch, was gerade noch getippt wird (tipp) — synchron.
+  const posBlatt = sortiert.map((p) => ({
+    ...p,
+    menge: tipp[`${p.id}.menge`] !== undefined ? (parseZahl(tipp[`${p.id}.menge`]) ?? Number(p.menge)) : Number(p.menge),
+    einzelpreis: tipp[`${p.id}.einzelpreis`] !== undefined ? (parseZahl(tipp[`${p.id}.einzelpreis`]) ?? Number(p.einzelpreis)) : Number(p.einzelpreis),
+    rabatt_prozent: tipp[`${p.id}.rabatt_prozent`] !== undefined ? (parseZahl(tipp[`${p.id}.rabatt_prozent`]) ?? Number(p.rabatt_prozent)) : Number(p.rabatt_prozent),
+  }));
+  const belegBlatt = { ...b, ust_satz: tipp["ust"] !== undefined ? (parseZahl(tipp["ust"]) ?? Number(b.ust_satz)) : Number(b.ust_satz) };
   const vorschauKasten = (
     <div className="rounded-lg border bg-card overflow-hidden flex flex-col" style={{ height: breit ? "calc(100dvh - 7.5rem)" : "75dvh" }}>
       <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0">
         <FileText className="h-4 w-4 text-muted-foreground" />
         <span className="text-sm font-medium">Vorschau</span>
-        <span className="text-xs text-muted-foreground truncate flex-1 min-w-0">
-          {live.laedt ? "wird aktualisiert…" : live.fehler ? live.fehler : liveVersion.current === version ? (entwurf ? "aktuell — noch ohne Nummer" : "festgeschriebenes PDF") : "Änderungen werden übernommen…"}
-        </span>
-        <Button variant="ghost" size="icon" className="h-8 w-8" title="Neu erzeugen" aria-label="Vorschau neu erzeugen" onClick={() => { liveVersion.current = -1; bumpen(); }} disabled={live.laedt}>
-          <RefreshCw className={cn("h-4 w-4", live.laedt && "animate-spin")} />
-        </Button>
+        <span className="text-xs text-muted-foreground truncate flex-1 min-w-0">{entwurf ? "zeigt jede Eingabe sofort — noch ohne Nummer" : "festgeschrieben"}</span>
         <Button variant="outline" size="sm" className="gap-1 h-8" onClick={pdfAnzeigen} disabled={busy !== null}>
-          <Share2 className="h-4 w-4" /><span className="hidden sm:inline">Teilen / Drucken</span>
+          {busy === "pdf" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}<span className="hidden sm:inline">PDF · Teilen · Drucken</span><span className="sm:hidden">PDF</span>
         </Button>
       </div>
-      <div className="flex-1 min-h-0 bg-muted/40 relative">
-        {live.url ? (
-          <iframe src={live.url} title="Vorschau" className="w-full h-full border-0 bg-white" />
-        ) : (
-          <div className="h-full flex items-center justify-center text-sm text-muted-foreground gap-2">
-            {live.fehler ? <><AlertTriangle className="h-4 w-4 text-amber-600" />{live.fehler}</> : <><Loader2 className="h-4 w-4 animate-spin" />Vorschau wird erzeugt…</>}
-          </div>
-        )}
-        {live.laedt && live.url && <div className="absolute top-2 right-2 rounded-full bg-background/90 border px-2 py-1 text-xs flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />aktualisiert…</div>}
+      <div className="flex-1 min-h-0 overflow-auto bg-muted/50 p-2 sm:p-3">
+        <BelegBlatt beleg={belegBlatt} positionen={posBlatt} firma={firma} kundennr={blattInfo.kundennr} projektName={blattInfo.projektName} vorgaengerNr={blattInfo.vorgaengerNr} />
       </div>
     </div>
   );

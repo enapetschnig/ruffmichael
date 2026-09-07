@@ -15,6 +15,8 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Registrierung übernimmt src/lib/pwaUpdate.ts (mit regelmäßiger Update-Prüfung)
+      injectRegister: null,
       includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
       manifest: {
         name: 'Ruff Michael Installateur',

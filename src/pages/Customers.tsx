@@ -56,15 +56,27 @@ export const customerDisplayName = (c: Pick<Customer, "vorname" | "nachname">) =
 export const customerAddress = (c: Pick<Customer, "strasse" | "ort">) =>
   [c.strasse, c.ort].filter(Boolean).join(", ").trim();
 
+// PLZ und Ort werden getrennt eingegeben, in der Datenbank aber wie bisher als
+// ein Feld „2700 Wiener Neustadt“ gespeichert (ort) — so bleiben alle 116
+// importierten Kunden, Belege, Projektbezeichnungen und die Suche unverändert.
+export const ortTrennen = (ort: string | null | undefined): { plz: string; ort: string } => {
+  const m = String(ort ?? "").trim().match(/^(\d{4,5})\s+(.*)$/);
+  return m ? { plz: m[1], ort: m[2] } : { plz: "", ort: String(ort ?? "").trim() };
+};
+export const ortZusammen = (plz: string | undefined, ort: string | undefined) =>
+  [String(plz ?? "").trim(), String(ort ?? "").trim()].filter(Boolean).join(" ") || null;
+
 const emptyForm = {
   vorname: "",
   nachname: "",
   strasse: "",
+  plz: "",
   ort: "",
   telefon: "",
   mobil: "",
   email: "",
   liefer_strasse: "",
+  liefer_plz: "",
   liefer_ort: "",
   // Rechnungsdaten (für Angebote & Rechnungen)
   firma: "",
@@ -120,13 +132,26 @@ export const CustomerFormFields = ({
           onChange={(e) => setForm({ ...form, strasse: e.target.value })}
         />
       </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="kunde-ort">Ort</Label>
-        <Input
-          id="kunde-ort"
-          value={form.ort}
-          onChange={(e) => setForm({ ...form, ort: e.target.value })}
-        />
+      <div className="grid grid-cols-[6.5rem_1fr] gap-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="kunde-plz">PLZ</Label>
+          <Input
+            id="kunde-plz"
+            inputMode="numeric"
+            maxLength={5}
+            placeholder="2700"
+            value={form.plz ?? ""}
+            onChange={(e) => setForm({ ...form, plz: e.target.value.replace(/\D/g, "") })}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="kunde-ort">Ort</Label>
+          <Input
+            id="kunde-ort"
+            value={form.ort}
+            onChange={(e) => setForm({ ...form, ort: e.target.value })}
+          />
+        </div>
       </div>
     </div>
 
@@ -205,13 +230,25 @@ export const CustomerFormFields = ({
             onChange={(e) => setForm({ ...form, liefer_strasse: e.target.value })}
           />
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="kunde-liefer-ort">Ort</Label>
-          <Input
-            id="kunde-liefer-ort"
-            value={form.liefer_ort}
-            onChange={(e) => setForm({ ...form, liefer_ort: e.target.value })}
-          />
+        <div className="grid grid-cols-[6.5rem_1fr] gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="kunde-liefer-plz">PLZ</Label>
+            <Input
+              id="kunde-liefer-plz"
+              inputMode="numeric"
+              maxLength={5}
+              value={form.liefer_plz ?? ""}
+              onChange={(e) => setForm({ ...form, liefer_plz: e.target.value.replace(/\D/g, "") })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="kunde-liefer-ort">Ort</Label>
+            <Input
+              id="kunde-liefer-ort"
+              value={form.liefer_ort}
+              onChange={(e) => setForm({ ...form, liefer_ort: e.target.value })}
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -222,12 +259,12 @@ export const customerFormToRow = (form: CustomerForm) => ({
   vorname: form.vorname.trim(),
   nachname: form.nachname.trim(),
   strasse: form.strasse.trim() || null,
-  ort: form.ort.trim() || null,
+  ort: ortZusammen(form.plz, form.ort),
   telefon: form.telefon.trim() || null,
   mobil: form.mobil.trim() || null,
   email: form.email.trim() || null,
   liefer_strasse: form.liefer_strasse.trim() || null,
-  liefer_ort: form.liefer_ort.trim() || null,
+  liefer_ort: ortZusammen(form.liefer_plz, form.liefer_ort),
   // Rechnungsdaten defensiv: ältere Aufrufer ohne diese Felder dürfen nie abstürzen
   firma: (form.firma ?? "").trim() || null,
   uid: (form.uid ?? "").trim() || null,
@@ -309,12 +346,14 @@ const Customers = () => {
       vorname: c.vorname ?? "",
       nachname: c.nachname ?? "",
       strasse: c.strasse ?? "",
-      ort: c.ort ?? "",
+      plz: ortTrennen(c.ort).plz,
+      ort: ortTrennen(c.ort).ort,
       telefon: c.telefon ?? "",
       mobil: c.mobil ?? "",
       email: c.email ?? "",
       liefer_strasse: c.liefer_strasse ?? "",
-      liefer_ort: c.liefer_ort ?? "",
+      liefer_plz: ortTrennen(c.liefer_ort).plz,
+      liefer_ort: ortTrennen(c.liefer_ort).ort,
       firma: c.firma ?? "",
       uid: c.uid ?? "",
       ist_unternehmer: !!c.ist_unternehmer,

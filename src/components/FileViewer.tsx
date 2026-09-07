@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Download, X, ZoomIn, ZoomOut, Loader2 } from "lucide-react";
+import { Download, X, ZoomIn, ZoomOut, Loader2, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
@@ -12,15 +12,18 @@ interface FileViewerProps {
   filePath: string;
   bucketName: string;
   fileType?: "image" | "pdf" | "other";
+  /** Bilder: öffnet den Skizzen-Editor (Knopf erscheint nur, wenn gesetzt). */
+  onSkizze?: () => void;
 }
 
-export function FileViewer({ 
-  open, 
-  onClose, 
-  fileName, 
-  filePath, 
+export function FileViewer({
+  open,
+  onClose,
+  fileName,
+  filePath,
   bucketName,
-  fileType = "other"
+  fileType = "other",
+  onSkizze,
 }: FileViewerProps) {
   const [zoom, setZoom] = useState(100);
   const [loading, setLoading] = useState(false);
@@ -118,6 +121,12 @@ export function FileViewer({
           <div className="flex items-center justify-between">
             <DialogTitle className="text-lg truncate pr-4">{fileName}</DialogTitle>
             <div className="flex gap-2">
+              {actualFileType === "image" && onSkizze && (
+                <Button variant="outline" onClick={onSkizze} className="gap-2" title="Auf dem Foto zeichnen">
+                  <Pencil className="w-4 h-4" />
+                  <span className="hidden sm:inline">Skizze</span>
+                </Button>
+              )}
               {actualFileType === "image" && (
                 <>
                   <Button

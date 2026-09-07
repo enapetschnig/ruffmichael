@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Upload, FileText, Trash2, Eye, Download } from "lucide-react";
+import { Upload, FileText, Trash2, Eye, Camera, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,8 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/PageHeader";
 import { FileViewer } from "@/components/FileViewer";
+import { FotoAufnahme } from "@/components/FotoAufnahme";
+import { DrawingEditor } from "@/components/DrawingEditor";
 import { saveUpload } from "@/lib/offlineData";
 import { projectLabel, type ProjectLike } from "@/lib/projectLabel";
 import { cachedSelect } from "@/lib/offlineStore";
@@ -49,6 +51,9 @@ const toStorageKey = (name: string) =>
     .replace(/ß/g, "ss")
     .replace(/[^a-zA-Z0-9._ ()-]/g, "_");
 
+// Nur echte Bilder lassen sich mit einer Skizze bearbeiten (kein PDF).
+const istBild = (name: string) => /\.(jpg|jpeg|png|webp|gif)$/i.test(name);
+
 const ProjectDetail = () => {
   const { projectId, type } = useParams<{ projectId: string; type: DocumentType }>();
   const { toast } = useToast();
@@ -66,6 +71,9 @@ const ProjectDetail = () => {
 
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
   const [urlsLoading, setUrlsLoading] = useState(false);
+  // Fotos-Ordner: Kamera-Serienaufnahme und Skizze auf einem Foto
+  const [fotoOffen, setFotoOffen] = useState(false);
+  const [skizzeDatei, setSkizzeDatei] = useState<StorageFile | null>(null);
 
   useEffect(() => {
     if (projectId && type) {
@@ -321,6 +329,17 @@ const ProjectDetail = () => {
           </CardHeader>
 
           <CardContent className="p-4 sm:p-6">
+            {/* Fotos: Kamera für alle – Monteure fotografieren auf der Baustelle
+                (die Speicherregel erlaubt jedem Angemeldeten das Hochladen). */}
+            {type === "photos" && (
+              <div className="mb-4">
+                <Button className="gap-2 w-full sm:w-auto h-11 text-base" onClick={() => setFotoOffen(true)}>
+                  <Camera className="h-5 w-5" />
+                  Fotos aufnehmen
+                </Button>
+              </div>
+            )}
+
             {/* Upload section - Admin only */}
             {isAdmin && (
               <div className="mb-6">
@@ -350,9 +369,9 @@ const ProjectDetail = () => {
             {files.length === 0 ? (
               <div className="text-center py-12">
                 <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-lg font-semibold mb-2">Keine Dateien</p>
+                <p className="text-lg font-semibold mb-2">{type === "photos" ? "Noch keine Fotos" : "Keine Dateien"}</p>
                 <p className="text-sm text-muted-foreground">
-                  Lade die erste Datei hoch
+                  {type === "photos" ? "Nimm oben das erste Foto auf" : "Lade die erste Datei hoch"}
                 </p>
               </div>
             ) : (
@@ -394,6 +413,18 @@ const ProjectDetail = () => {
                         <Eye className="w-4 h-4 sm:mr-2" />
                         <span className="hidden sm:inline">Ansehen</span>
                       </Button>
+                      {type === "photos" && istBild(file.name) && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-10 w-10 p-0 sm:h-9 sm:w-auto sm:px-3"
+                          onClick={() => setSkizzeDatei(file)}
+                          title="Auf dem Foto zeichnen"
+                        >
+                          <Pencil className="w-4 h-4 sm:mr-2" />
+                          <span className="hidden sm:inline">Skizze</span>
+                        </Button>
+                      )}
                       {isAdmin && (
                         <Button
                           variant="destructive"
@@ -419,7 +450,40 @@ const ProjectDetail = () => {
         fileName={viewerState.fileName}
         filePath={viewerState.filePath}
         bucketName={bucketMap[type]}
+        onSkizze={
+          type === "photos" && istBild(viewerState.fileName)
+            ? () => {
+                const datei = files.find((f) => f.name === viewerState.fileName);
+                setViewerState({ open: false, fileName: "", filePath: "" });
+                if (datei) setSkizzeDatei(datei);
+              }
+            : undefined
+        }
       />
+
+      {type === "photos" && projectId && (
+        <>
+          {/* Serienaufnahme direkt in diesen Fotos-Ordner (Projekt steht fest) */}
+          <FotoAufnahme
+            open={fotoOffen}
+            onOpenChange={setFotoOffen}
+            defaultProjectId={projectId}
+            projektName={project ? projectLabel(project) : undefined}
+            onSaved={() => fetchFiles()}
+          />
+          {/* Skizze auf einem vorhandenen Foto – wird als neue Datei daneben abgelegt */}
+          <DrawingEditor
+            open={!!skizzeDatei}
+            onOpenChange={(o) => { if (!o) setSkizzeDatei(null); }}
+            defaultProjectId={projectId}
+            projektFest
+            projektName={project ? projectLabel(project) : undefined}
+            hintergrund={skizzeDatei ? { bucket: bucketMap.photos, path: `${projectId}/${skizzeDatei.name}`, name: skizzeDatei.name } : undefined}
+            vorhandeneNamen={files.map((f) => f.name)}
+            onSaved={() => fetchFiles()}
+          />
+        </>
+      )}
     </div>
   );
 };

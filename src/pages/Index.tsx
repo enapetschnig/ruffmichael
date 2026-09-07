@@ -4,10 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, FolderKanban, Users, BarChart3, LogOut, FileText, ArrowRight, Info, User as UserIcon, Zap, Contact, Package, FilePlus2, ClipboardList, FileCheck, Paintbrush, Receipt } from "lucide-react";
+import { Clock, FolderKanban, Users, BarChart3, LogOut, FileText, ArrowRight, Info, User as UserIcon, Zap, Contact, Package, FilePlus2, ClipboardList, FileCheck, Paintbrush, Receipt, Camera } from "lucide-react";
 import { ErstaufnahmeDialog, type ErstaufnahmePrefill } from "@/components/ErstaufnahmeDialog";
 import { DashboardVoiceAssistant } from "@/components/DashboardVoiceAssistant";
 import { DrawingEditor } from "@/components/DrawingEditor";
+import { FotoAufnahme } from "@/components/FotoAufnahme";
 import { cachedSelect } from "@/lib/offlineStore";
 import { warmOfflineCache } from "@/lib/cachedQueries";
 import { useToast } from "@/hooks/use-toast";
@@ -51,6 +52,7 @@ export default function Index() {
   const [session, setSession] = useState<Session | null>(null);
   const [showErstaufnahme, setShowErstaufnahme] = useState(false);
   const [showDrawing, setShowDrawing] = useState(false);
+  const [showFotos, setShowFotos] = useState(false);
   const [erstaufnahmePrefill, setErstaufnahmePrefill] = useState<ErstaufnahmePrefill | undefined>(undefined);
   const [user, setUser] = useState<User | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
@@ -371,6 +373,15 @@ export default function Index() {
               <Paintbrush className="h-5 w-5" />
               Zeichnung erstellen
             </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="w-full sm:w-auto gap-2 text-base h-12 px-6"
+              onClick={() => setShowFotos(true)}
+            >
+              <Camera className="h-5 w-5" />
+              Fotos aufnehmen
+            </Button>
           </div>
           <DashboardVoiceAssistant
             onErstaufnahme={(prefill) => {
@@ -389,6 +400,9 @@ export default function Index() {
 
         {/* Zeichnungs-Editor: speichert als PNG im Fotos-Ordner des gewählten Projekts */}
         <DrawingEditor open={showDrawing} onOpenChange={setShowDrawing} />
+
+        {/* Kamera-Serienaufnahme: ein oder mehrere Fotos, danach Projekt wählen → Fotos-Ordner */}
+        <FotoAufnahme open={showFotos} onOpenChange={setShowFotos} />
 
         {/* Main Actions Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">

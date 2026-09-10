@@ -950,6 +950,7 @@ const BelegDetail = () => {
         blob={vorschau.blob}
         dateiname={`${TYP_DATEINAME[b.typ]} ${b.nummer ?? "Entwurf"}.pdf`}
         entwurf={vorschau.entwurf && !b.nummer}
+        onMail={entwurf ? undefined : () => { vorschauSchliessen(); perMailSenden(); }}
       />
 
       {/* Beleg per Mail an den Kunden (über das Firmenpostfach) */}

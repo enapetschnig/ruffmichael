@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Download, Printer, ExternalLink, Share2 } from "lucide-react";
+import { Download, Printer, ExternalLink, Share2, Send } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
  * (Dateien, Mail, WhatsApp, Drucken).
  */
 export function BelegVorschau({
-  open, onClose, titel, url, blob, dateiname, entwurf,
+  open, onClose, titel, url, blob, dateiname, entwurf, onMail,
 }: {
   open: boolean;
   onClose: () => void;
@@ -21,6 +21,8 @@ export function BelegVorschau({
   blob?: Blob | null;        // Bytes, wenn lokal erzeugt — fürs Teilen
   dateiname: string;
   entwurf?: boolean;
+  /** Beleg per Mail verschicken — nur bei fertigen Belegen angeboten. */
+  onMail?: () => void;
 }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const ios = typeof navigator !== "undefined" && (/iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
@@ -60,6 +62,9 @@ export function BelegVorschau({
           </DialogTitle>
           {url && (
             <>
+              {onMail && !entwurf && (
+                <Button size="sm" className="gap-1" onClick={onMail}><Send className="h-4 w-4" /><span className="hidden sm:inline">Per Mail</span></Button>
+              )}
               {kannTeilen && (
                 <Button variant={ios ? "default" : "outline"} size="sm" className="gap-1" onClick={teilen}><Share2 className="h-4 w-4" /><span className="hidden sm:inline">Teilen</span></Button>
               )}

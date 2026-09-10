@@ -160,6 +160,10 @@ async function kiEinordnen(stoff: string): Promise<Record<string, unknown> | nul
               "Ordne die Nachricht genau einer Kategorie zu. „eingangsrechnung“ nur, wenn der Betrieb selbst zahlen muss",
               "(Lieferant, Großhändler, Dienstleister, Versicherung, Leasing). Eine Rechnung, die der Betrieb selbst",
               "an einen Kunden geschickt hat, ist KEINE Eingangsrechnung — das ist „sonstiges“.",
+              "Schreibt ein KUNDE (Privatperson, Bauherr) — etwa weil er auf eine Rechnung wartet, eine Zahlung",
+              "reklamiert, sich beschwert oder einen Mangel meldet —, dann ist das IMMER „kundenanfrage“,",
+              "auch wenn „Mahnung“ oder „Rechnung“ im Betreff steht und Beträge genannt werden.",
+              "„mahnung“ ist nur die Zahlungserinnerung eines Lieferanten AN den Betrieb.",
               "Bei einer Eingangsrechnung oder Mahnung: Beträge, Nummern und Daten wörtlich aus dem Text übernehmen,",
               "nichts schätzen. Fehlt ein Wert, gib null. Daten als JJJJ-MM-TT. Beträge als Zahl mit Punkt als",
               "Dezimaltrennzeichen (österreichisch „1.234,56“ bedeutet 1234.56). sicherheit ist 0 bis 1.",
@@ -428,13 +432,34 @@ Deno.serve(async (req) => {
           }).eq("id", mailId);
 
           // ── Eingangsrechnung anlegen ─────────────────────────────────────
-          if (kategorie === "eingangsrechnung" || kategorie === "mahnung") {
+          // Zurückhaltend: Nur was wirklich eine eigene Verbindlichkeit ist.
+          // - Mahnungen legen nichts an: sie gehören meist zu einer schon
+          //   erfassten Rechnung (sonst Doppel) und „Mahnung“ im Betreff
+          //   schreibt auch ein Kunde, der auf SEINE Rechnung wartet.
+          // - Kommt die Mail von einem eingetragenen Kunden, ist es keine
+          //   Lieferantenrechnung. Über „Ist eine Rechnung“ geht es von Hand.
+          const eigeneSchuld = kategorie === "eingangsrechnung" && !satz.kunde_id;
+          if (eigeneSchuld) {
             const lieferant = String(ki?.lieferant ?? von.name ?? vonAdresse ?? "Unbekannt").slice(0, 200);
+            // Dieselbe Rechnung kommt oft zweimal (Original + Weiterleitung).
+            // Gleiche Rechnungsnummer beim selben Lieferanten heißt: schon da.
+            const nummer = ki?.nummer ? String(ki.nummer).slice(0, 60) : null;
+            if (nummer) {
+              const { data: schonDa } = await admin.from("eingangsrechnungen")
+                .select("id, pdf_pfad").eq("nummer", nummer).ilike("lieferant", lieferant.slice(0, 40) + "%").limit(1);
+              if (schonDa && schonDa.length) {
+                // Fehlt dort noch das PDF, reichen wir es nach
+                if (!schonDa[0].pdf_pfad && ersterBeleg) {
+                  await admin.from("eingangsrechnungen").update({ pdf_pfad: ersterBeleg.pfad, anhang_id: ersterBeleg.id }).eq("id", schonDa[0].id);
+                }
+                continue;
+              }
+            }
             const { error: e } = await admin.from("eingangsrechnungen").insert({
               mail_id: mailId,
               anhang_id: ersterBeleg?.id ?? null,
               lieferant,
-              nummer: ki?.nummer ? String(ki.nummer).slice(0, 60) : null,
+              nummer,
               datum: datumWert(ki?.datum) ?? (satz.empfangen_am as string).slice(0, 10),
               faellig_am: datumWert(ki?.faellig_am),
               netto: zahl(ki?.netto), ust: zahl(ki?.ust), brutto: zahl(ki?.brutto),
@@ -453,6 +478,41 @@ Deno.serve(async (req) => {
         }
       }
 
+      // ── Aufräumen in beide Richtungen ─────────────────────────────────
+      // Was Michael in Outlook in den Papierkorb oder in Junk legt, soll auch
+      // in der App verschwinden — sonst sammelt sie an, was er längst weg hat.
+      // Gelöscht wird nur bei UNS; in Outlook rührt die Funktion nichts an.
+      let entfernt = 0;
+      if (!offen && bekannt.size > 0) {
+        try {
+          const wegIds = new Set<string>();
+          const seitAb = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 19) + "Z";
+          for (const korb of ["deleteditems", "junkemail"]) {
+            let next: string | null = `${GRAPH}/users/${mb}/mailFolders/${korb}/messages?$select=id&$top=500&$filter=receivedDateTime ge ${seitAb}`;
+            let seiten = 0;
+            while (next && seiten++ < 8 && Date.now() - start < budget) {
+              const seite: { value: { id: string }[]; "@odata.nextLink"?: string } = await graph(tok, next);
+              for (const x of seite.value) wegIds.add(x.id);
+              next = seite["@odata.nextLink"] ?? null;
+            }
+          }
+          const treffer = [...bekannt.entries()].filter(([gid]) => wegIds.has(gid));
+          if (treffer.length) {
+            const ids = treffer.map(([, v]) => v.id);
+            // Anhänge im Speicher mitnehmen — außer sie hängen an einer
+            // Eingangsrechnung, die weiter bestehen bleibt.
+            const { data: dateien } = await admin.from("mail_anhaenge").select("pfad").in("mail_id", ids).not("pfad", "is", null);
+            const { data: belegt } = await admin.from("eingangsrechnungen").select("pdf_pfad").in("mail_id", ids).not("pdf_pfad", "is", null);
+            const geschuetzt = new Set((belegt ?? []).map((b) => b.pdf_pfad as string));
+            const loeschbar = (dateien ?? []).map((d) => d.pfad as string).filter((p) => !geschuetzt.has(p));
+            if (loeschbar.length) await admin.storage.from(BUCKET).remove(loeschbar);
+            const { error: e } = await admin.from("mails").delete().in("id", ids);
+            if (e) fehler.push(`Aufräumen: ${e.message}`);
+            else { entfernt = ids.length; for (const [gid] of treffer) bekannt.delete(gid); }
+          }
+        } catch (e) { fehler.push(`Papierkorb-Abgleich: ${e instanceof Error ? e.message : e}`); }
+      }
+
       await admin.from("mail_sync_state").update({
         letzter_lauf: new Date().toISOString(),
         letzter_fehler: fehler.length ? fehler.slice(0, 5).join(" | ").slice(0, 1000) : null,
@@ -460,7 +520,7 @@ Deno.serve(async (req) => {
         updated_at: new Date().toISOString(),
       }).eq("id", "postfach");
 
-      return json({ ok: true, gesehen, neu, aktualisiert, rechnungen, anhaenge, offen, fehler: fehler.slice(0, 5) });
+      return json({ ok: true, gesehen, neu, aktualisiert, entfernt, rechnungen, anhaenge, offen, fehler: fehler.slice(0, 5) });
     }
 
     // ── Anhänge nachholen ─────────────────────────────────────────────────

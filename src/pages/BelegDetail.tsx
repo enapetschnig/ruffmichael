@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Plus, Trash2, Lock, FileDown, Clock, ArrowRight, Ban, Euro, ChevronUp, ChevronDown, Loader2, Pencil, Receipt, Check,
-  ClipboardList, AlertTriangle, FileText,
+  ClipboardList, AlertTriangle, FileText, Send,
 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { BelegVorschau } from "@/components/BelegVorschau";
 import { BelegBlatt } from "@/components/BelegBlatt";
 import { ArtikelVorschlag } from "@/components/ArtikelVorschlag";
+import { MailSenden, type MailEntwurf } from "@/components/MailSenden";
 import { cn } from "@/lib/utils";
 import {
   TYP_LABEL, TYP_DATEINAME, STATUS_LABEL, STATUS_VARIANT, EINHEITEN, eur, zahl, datum, heuteISO, plusTage, parseZahl,
@@ -85,6 +86,7 @@ const BelegDetail = () => {
   const [busy, setBusy] = useState<string | null>(null);
   const [ansicht, setAnsicht] = useState<"bearbeiten" | "vorschau">("bearbeiten");
   const [vorschau, setVorschau] = useState<{ open: boolean; url: string | null; blob: Blob | null; entwurf: boolean }>({ open: false, url: null, blob: null, entwurf: true });
+  const [mailEntwurf, setMailEntwurf] = useState<MailEntwurf | null>(null);
   const vorschauToken = useRef(0);
   // Blatt-Vorschau: rendert den Beleg aus dem lokalen Zustand — synchron zu jeder Eingabe
   const [firma, setFirma] = useState<Firmendaten | null>(null);
@@ -385,6 +387,52 @@ const BelegDetail = () => {
   };
   const vorschauSchliessen = () => { vorschauToken.current++; setVorschau({ open: false, url: null, blob: null, entwurf }); };
 
+  /**
+   * Beleg per Mail an den Kunden — über das Firmenpostfach in Outlook.
+   * Das abgelegte PDF wird angehängt; fehlt es noch, wird es vorher erzeugt.
+   */
+  const perMailSenden = async () => {
+    if (!b) return;
+    setBusy("mail");
+    let pfad = b.pdf_pfad;
+    if (!pfad) {
+      const r = await belegPdf(b.id);
+      if (r.error) { setBusy(null); return toast({ variant: "destructive", title: "PDF fehlt", description: r.error }); }
+      const { data } = await supabase.from("belege").select("pdf_pfad").eq("id", b.id).single();
+      pfad = data?.pdf_pfad ?? null;
+    }
+    setBusy(null);
+    if (!pfad) return toast({ variant: "destructive", title: "PDF nicht abgelegt", description: "Der Beleg konnte nicht als Datei gespeichert werden — bitte über „PDF“ prüfen." });
+
+    const art = TYP_LABEL[b.typ];
+    const datei = `${TYP_DATEINAME[b.typ]} ${b.nummer ?? ""}.pdf`.replace(/\s+/g, " ");
+    const anrede = b.kunde_name?.trim() ? `Sehr geehrte Damen und Herren,` : "Guten Tag,";
+    const zeilen = [
+      anrede,
+      "",
+      istRechnung(b.typ)
+        ? `anbei erhalten Sie unsere ${art} Nr. ${b.nummer} über ${eur(Number(b.brutto))}${b.faellig_am ? `, zahlbar bis ${datum(b.faellig_am)}` : ""}.`
+        : b.typ === "gutschrift"
+          ? `anbei erhalten Sie unsere ${art} Nr. ${b.nummer} über ${eur(Number(b.brutto))}.`
+          : `anbei erhalten Sie unser ${art} Nr. ${b.nummer}${b.gueltig_bis ? `, gültig bis ${datum(b.gueltig_bis)}` : ""}.`,
+      "",
+      istAngebot(b.typ) ? "Über eine Beauftragung würden wir uns freuen. Für Rückfragen stehen wir gerne zur Verfügung." : "Für Rückfragen stehen wir gerne zur Verfügung.",
+      "",
+      "Mit freundlichen Grüßen",
+      firma?.bearbeiter || "",
+      firma?.firma || "",
+      [firma?.strasse, firma?.plz_ort].filter(Boolean).join(", "),
+      [firma?.telefon && `Tel. ${firma.telefon}`, firma?.email].filter(Boolean).join(" · "),
+    ];
+    setMailEntwurf({
+      an: b.kunde_email ?? "",
+      betreff: `${art} ${b.nummer ?? ""}${b.betreff ? ` — ${b.betreff}` : ""}`.trim(),
+      text: zeilen.join("\n"),
+      dateien: [{ bucket: "project-files", pfad, name: datei }],
+      belegId: b.id,
+    });
+  };
+
   const angebotBearbeiten = async () => {
     if (!b) return;
     const { error } = await supabase.from("belege").update({ status: "entwurf" }).eq("id", b.id);
@@ -518,6 +566,11 @@ const BelegDetail = () => {
             )}
             {!entwurf && istAngebot(b.typ) && (
               <Button variant="outline" size="sm" className="gap-1" onClick={angebotBearbeiten} disabled={busy !== null}><Pencil className="h-4 w-4" />Bearbeiten</Button>
+            )}
+            {!entwurf && (
+              <Button variant="outline" size="sm" className="gap-1" onClick={perMailSenden} disabled={busy !== null}>
+                {busy === "mail" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}Per Mail
+              </Button>
             )}
             {entwurf && <Button size="sm" className="gap-1" onClick={() => setFrage("festschreiben")} disabled={busy !== null}>
               {busy === "fest" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{TYP_LABEL[b.typ]} erstellen
@@ -897,6 +950,14 @@ const BelegDetail = () => {
         blob={vorschau.blob}
         dateiname={`${TYP_DATEINAME[b.typ]} ${b.nummer ?? "Entwurf"}.pdf`}
         entwurf={vorschau.entwurf && !b.nummer}
+      />
+
+      {/* Beleg per Mail an den Kunden (über das Firmenpostfach) */}
+      <MailSenden
+        open={!!mailEntwurf}
+        onOpenChange={(o) => !o && setMailEntwurf(null)}
+        entwurf={mailEntwurf ?? {}}
+        onGesendet={laden}
       />
 
       {/* Sicherheitsabfragen */}

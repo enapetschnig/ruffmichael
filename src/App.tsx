@@ -33,6 +33,9 @@ import Nachtraege from "./pages/Nachtraege";
 import Uebernahmen from "./pages/Uebernahmen";
 import Belege from "./pages/Belege";
 import BelegDetail from "./pages/BelegDetail";
+import Postfach from "./pages/Postfach";
+import Eingangsrechnungen from "./pages/Eingangsrechnungen";
+import Kalender from "./pages/Kalender";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -147,6 +150,9 @@ function AppContent() {
         <Route path="/uebernahmen" element={<NurAngemeldet><Uebernahmen /></NurAngemeldet>} />
         <Route path="/belege" element={<NurAngemeldet><Belege /></NurAngemeldet>} />
         <Route path="/belege/:belegId" element={<NurAngemeldet><BelegDetail /></NurAngemeldet>} />
+        <Route path="/postfach" element={<NurAngemeldet><Postfach /></NurAngemeldet>} />
+        <Route path="/eingangsrechnungen" element={<NurAngemeldet><Eingangsrechnungen /></NurAngemeldet>} />
+        <Route path="/kalender" element={<NurAngemeldet><Kalender /></NurAngemeldet>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       </div>

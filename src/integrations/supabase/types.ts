@@ -654,6 +654,118 @@ export type Database = {
           },
         ]
       }
+      eingangsrechnungen: {
+        Row: {
+          anhang_id: string | null
+          bezahlt_am: string | null
+          brutto: number | null
+          created_at: string
+          created_by: string | null
+          datum: string | null
+          erkannt_von: string | null
+          faellig_am: string | null
+          iban: string | null
+          id: string
+          lieferant: string
+          lieferant_uid: string | null
+          mail_id: string | null
+          netto: number | null
+          notiz: string | null
+          nummer: string | null
+          pdf_pfad: string | null
+          project_id: string | null
+          quelle: string
+          sicherheit: number | null
+          skonto_bis: string | null
+          skonto_prozent: number | null
+          status: string
+          updated_at: string
+          ust: number | null
+          verwendungszweck: string | null
+          waehrung: string
+        }
+        Insert: {
+          anhang_id?: string | null
+          bezahlt_am?: string | null
+          brutto?: number | null
+          created_at?: string
+          created_by?: string | null
+          datum?: string | null
+          erkannt_von?: string | null
+          faellig_am?: string | null
+          iban?: string | null
+          id?: string
+          lieferant: string
+          lieferant_uid?: string | null
+          mail_id?: string | null
+          netto?: number | null
+          notiz?: string | null
+          nummer?: string | null
+          pdf_pfad?: string | null
+          project_id?: string | null
+          quelle?: string
+          sicherheit?: number | null
+          skonto_bis?: string | null
+          skonto_prozent?: number | null
+          status?: string
+          updated_at?: string
+          ust?: number | null
+          verwendungszweck?: string | null
+          waehrung?: string
+        }
+        Update: {
+          anhang_id?: string | null
+          bezahlt_am?: string | null
+          brutto?: number | null
+          created_at?: string
+          created_by?: string | null
+          datum?: string | null
+          erkannt_von?: string | null
+          faellig_am?: string | null
+          iban?: string | null
+          id?: string
+          lieferant?: string
+          lieferant_uid?: string | null
+          mail_id?: string | null
+          netto?: number | null
+          notiz?: string | null
+          nummer?: string | null
+          pdf_pfad?: string | null
+          project_id?: string | null
+          quelle?: string
+          sicherheit?: number | null
+          skonto_bis?: string | null
+          skonto_prozent?: number | null
+          status?: string
+          updated_at?: string
+          ust?: number | null
+          verwendungszweck?: string | null
+          waehrung?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eingangsrechnungen_anhang_id_fkey"
+            columns: ["anhang_id"]
+            isOneToOne: false
+            referencedRelation: "mail_anhaenge"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eingangsrechnungen_mail_id_fkey"
+            columns: ["mail_id"]
+            isOneToOne: false
+            referencedRelation: "mails"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eingangsrechnungen_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employees: {
         Row: {
           adresse: string | null
@@ -1076,6 +1188,188 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      mail_anhaenge: {
+        Row: {
+          created_at: string
+          graph_id: string | null
+          groesse: number | null
+          id: string
+          ist_beleg: boolean
+          mail_id: string
+          mime: string | null
+          name: string
+          pfad: string | null
+        }
+        Insert: {
+          created_at?: string
+          graph_id?: string | null
+          groesse?: number | null
+          id?: string
+          ist_beleg?: boolean
+          mail_id: string
+          mime?: string | null
+          name: string
+          pfad?: string | null
+        }
+        Update: {
+          created_at?: string
+          graph_id?: string | null
+          groesse?: number | null
+          id?: string
+          ist_beleg?: boolean
+          mail_id?: string
+          mime?: string | null
+          name?: string
+          pfad?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mail_anhaenge_mail_id_fkey"
+            columns: ["mail_id"]
+            isOneToOne: false
+            referencedRelation: "mails"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mail_sync_state: {
+        Row: {
+          anzahl_gesamt: number
+          delta_link: string | null
+          id: string
+          letzter_fehler: string | null
+          letzter_lauf: string | null
+          updated_at: string
+        }
+        Insert: {
+          anzahl_gesamt?: number
+          delta_link?: string | null
+          id?: string
+          letzter_fehler?: string | null
+          letzter_lauf?: string | null
+          updated_at?: string
+        }
+        Update: {
+          anzahl_gesamt?: number
+          delta_link?: string | null
+          id?: string
+          letzter_fehler?: string | null
+          letzter_lauf?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      mails: {
+        Row: {
+          an_adressen: Json
+          betreff: string | null
+          cc_adressen: Json
+          created_at: string
+          empfangen_am: string
+          erledigt: boolean
+          geholt_am: string
+          gelesen: boolean
+          graph_id: string
+          hat_anhang: boolean
+          id: string
+          internet_message_id: string | null
+          kategorie: string
+          kategorie_grund: string | null
+          kategorie_quelle: string | null
+          kategorie_sicherheit: number | null
+          koerper_text: string | null
+          konversation_id: string | null
+          kunde_id: string | null
+          notiz: string | null
+          ordner: string
+          project_id: string | null
+          richtung: string
+          updated_at: string
+          von_adresse: string | null
+          von_name: string | null
+          vorschau: string | null
+          web_link: string | null
+          wichtig: boolean
+        }
+        Insert: {
+          an_adressen?: Json
+          betreff?: string | null
+          cc_adressen?: Json
+          created_at?: string
+          empfangen_am: string
+          erledigt?: boolean
+          geholt_am?: string
+          gelesen?: boolean
+          graph_id: string
+          hat_anhang?: boolean
+          id?: string
+          internet_message_id?: string | null
+          kategorie?: string
+          kategorie_grund?: string | null
+          kategorie_quelle?: string | null
+          kategorie_sicherheit?: number | null
+          koerper_text?: string | null
+          konversation_id?: string | null
+          kunde_id?: string | null
+          notiz?: string | null
+          ordner?: string
+          project_id?: string | null
+          richtung?: string
+          updated_at?: string
+          von_adresse?: string | null
+          von_name?: string | null
+          vorschau?: string | null
+          web_link?: string | null
+          wichtig?: boolean
+        }
+        Update: {
+          an_adressen?: Json
+          betreff?: string | null
+          cc_adressen?: Json
+          created_at?: string
+          empfangen_am?: string
+          erledigt?: boolean
+          geholt_am?: string
+          gelesen?: boolean
+          graph_id?: string
+          hat_anhang?: boolean
+          id?: string
+          internet_message_id?: string | null
+          kategorie?: string
+          kategorie_grund?: string | null
+          kategorie_quelle?: string | null
+          kategorie_sicherheit?: number | null
+          koerper_text?: string | null
+          konversation_id?: string | null
+          kunde_id?: string | null
+          notiz?: string | null
+          ordner?: string
+          project_id?: string | null
+          richtung?: string
+          updated_at?: string
+          von_adresse?: string | null
+          von_name?: string | null
+          vorschau?: string | null
+          web_link?: string | null
+          wichtig?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mails_kunde_id_fkey"
+            columns: ["kunde_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mails_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       material_entries: {
         Row: {
@@ -1924,6 +2218,18 @@ export type Database = {
       }
       beleg_stornieren: { Args: { p_beleg: string }; Returns: string }
       beleg_summen_neu: { Args: { p_beleg: string }; Returns: undefined }
+      eingangsrechnungen_summen: {
+        Args: never
+        Returns: {
+          faellig_anzahl: number
+          faellig_brutto: number
+          monat_brutto: number
+          neue_rechnungen: number
+          offen_anzahl: number
+          offen_brutto: number
+          ungelesen_mails: number
+        }[]
+      }
       ensure_user_profile: { Args: never; Returns: Json }
       faktura_kunden_summen: {
         Args: never

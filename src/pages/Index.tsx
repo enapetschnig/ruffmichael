@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, FolderKanban, Users, BarChart3, LogOut, FileText, Download, User as UserIcon, Package, FilePlus2, ClipboardList, FileCheck, Paintbrush, Receipt, Camera, Shield, BookUser, Banknote, HardHat, LayoutGrid, type LucideIcon } from "lucide-react";
+import { Clock, FolderKanban, Users, BarChart3, LogOut, FileText, Download, User as UserIcon, Package, FilePlus2, ClipboardList, FileCheck, Paintbrush, Receipt, Camera, Shield, BookUser, Banknote, HardHat, LayoutGrid, Mail, CalendarDays, Inbox, type LucideIcon } from "lucide-react";
 import { KBButton, KBSectionHeader } from "@/components/kingbill";
 import { ErstaufnahmeDialog, type ErstaufnahmePrefill } from "@/components/ErstaufnahmeDialog";
 import { DashboardVoiceAssistant } from "@/components/DashboardVoiceAssistant";
@@ -66,6 +66,8 @@ export default function Index() {
   const [recentEntries, setRecentEntries] = useState<RecentTimeEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [isActivated, setIsActivated] = useState<boolean | null>(null);
+  // Zähler an den Menüknöpfen: ungelesene Mails und ungeprüfte Eingangsrechnungen
+  const [postfach, setPostfach] = useState({ ungelesen: 0, zuPruefen: 0 });
   const { handleRestartInstallGuide } = useOnboarding();
 
   const fetchProjects = async () => {
@@ -211,6 +213,22 @@ export default function Index() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
+
+  // Zahlen für die Menüknöpfe „Posteingang" und „Eingangsrechnungen".
+  // Nur für Administratoren — Mitarbeiter sehen das Firmenpostfach nicht.
+  useEffect(() => {
+    if (userRole !== "administrator") { setPostfach({ ungelesen: 0, zuPruefen: 0 }); return; }
+    let aktiv = true;
+    const zaehlen = async () => {
+      const [mails, rechnungen] = await Promise.all([
+        supabase.from("mails").select("id", { count: "exact", head: true }).eq("gelesen", false).eq("erledigt", false).eq("richtung", "eingang"),
+        supabase.from("eingangsrechnungen").select("id", { count: "exact", head: true }).eq("status", "offen"),
+      ]);
+      if (aktiv) setPostfach({ ungelesen: mails.count ?? 0, zuPruefen: rechnungen.count ?? 0 });
+    };
+    zaehlen();
+    return () => { aktiv = false; };
+  }, [userRole]);
 
   // Realtime subscription for time entries – separater Effekt, damit die tatsächliche
   // (authentifizierte) User-ID verwendet und bei Wechsel neu abonniert wird.
@@ -360,6 +378,13 @@ export default function Index() {
             <KBButton className="w-full" icon={FileCheck} label="Übernahmebestätigungen" onClick={() => navigate("/uebernahmen")} />
             <KBButton className="w-full" icon={FileText} label="Projektberichte & Dateien" onClick={() => navigate("/reports")} />
           </Bereich>
+          {isAdmin && <Bereich icon={Mail} title="E-Mail">
+            <KBButton className="w-full relative" icon={Inbox} label="Posteingang" badge={postfach.ungelesen} onClick={() => navigate("/postfach")} />
+            <KBButton className="w-full relative" icon={Receipt} label="Eingangsrechnungen" badge={postfach.zuPruefen} onClick={() => navigate("/eingangsrechnungen")} />
+          </Bereich>}
+          {isAdmin && <Bereich icon={CalendarDays} title="Kalender">
+            <KBButton className="w-full" icon={CalendarDays} label="Termine (Outlook)" onClick={() => navigate("/kalender")} />
+          </Bereich>}
           <Bereich icon={BookUser} title="Kunden">
             <KBButton className="w-full" icon={BookUser} label="Kunden" onClick={() => navigate("/customers")} />
           </Bereich>

@@ -1,7 +1,7 @@
 import { PageHeader } from "@/components/PageHeader";
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, FileText, FileCheck, FolderOpen, Package, Camera, ImagePlus, Lock, FileSignature, Plus, CheckCircle2, Pencil, Settings, Receipt } from "lucide-react";
+import { ArrowLeft, FileText, FileCheck, FolderOpen, Package, Camera, ImagePlus, Lock, FileSignature, Plus, CheckCircle2, Pencil, Settings, Receipt, Mail } from "lucide-react";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -59,6 +59,8 @@ const ProjectOverview = () => {
   const [counts, setCounts] = useState<Partial<Record<FolderCategory, number>>>({});
   const [customFolders, setCustomFolders] = useState<CustomFolder[]>([]);
   const [nachtraege, setNachtraege] = useState<ProjectNachtrag[]>([]);
+  // Anzahl der Mails, die diesem Projekt zugeordnet sind
+  const [schriftverkehr, setSchriftverkehr] = useState(0);
 
   const [uebernahmeOpen, setUebernahmeOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -84,6 +86,14 @@ const ProjectOverview = () => {
       fetchCounts();
     }
   }, [projectId, isAdmin, hiddenCategories]);
+
+  useEffect(() => {
+    if (!projectId || !isAdmin) { setSchriftverkehr(0); return; }
+    let aktiv = true;
+    supabase.from("mails").select("id", { count: "exact", head: true }).eq("project_id", projectId)
+      .then(({ count }) => { if (aktiv) setSchriftverkehr(count ?? 0); });
+    return () => { aktiv = false; };
+  }, [projectId, isAdmin]);
 
   const checkAdminStatus = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -285,6 +295,13 @@ const ProjectOverview = () => {
             <FolderOpen className="h-4 w-4" />
             Ordner verwalten
           </Button>
+          {/* Mails, die diesem Projekt zugeordnet wurden — nur in der App, nicht in OneDrive */}
+          {isAdmin && (
+            <Button variant="outline" className="gap-2" onClick={() => navigate(`/postfach?projekt=${projectId}`)}>
+              <Mail className="h-4 w-4" />
+              Schriftverkehr{schriftverkehr > 0 ? ` (${schriftverkehr})` : ""}
+            </Button>
+          )}
         </div>
 
         {/* Nachträge - nur anzeigen, wenn das Projekt Nachträge hat */}

@@ -86,11 +86,27 @@ export const heuteISO = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
-/** „12,5" oder „12.5" → 12.5; leer/ungültig → null. Handys tippen Komma. */
+/**
+ * „12,5“, „12.5“, „1.800,00“, „1 800,00“ → Zahl; leer/ungültig → null.
+ *
+ * Handys tippen Komma, die Anzeige liefert Tausenderpunkte zurück ins Feld —
+ * beides muss wieder hereinkommen. Kommen Punkt und Komma gemeinsam vor,
+ * ist das hintere das Dezimaltrennzeichen (deutsch 1.800,00 / englisch 1,800.00).
+ */
 export const parseZahl = (s: string | number | null | undefined): number | null => {
   if (s === null || s === undefined) return null;
-  const t = String(s).trim().replace(/\s/g, "").replace(",", ".");
+  if (typeof s === "number") return Number.isFinite(s) ? s : null;
+  let t = s.trim().replace(/[\s '’€]/g, "");
   if (t === "") return null;
+  const komma = t.lastIndexOf(","), punkt = t.lastIndexOf(".");
+  if (komma >= 0 && punkt >= 0) {
+    t = komma > punkt ? t.replace(/\./g, "").replace(",", ".") : t.replace(/,/g, "");
+  } else if (komma >= 0) {
+    // Mehrere Kommas können nur Tausendertrenner sein (englische Schreibweise)
+    t = t.split(",").length > 2 ? t.replace(/,/g, "") : t.replace(",", ".");
+  } else if (punkt >= 0 && /^-?\d{1,3}(\.\d{3})+$/.test(t)) {
+    t = t.replace(/\./g, "");
+  }
   const n = Number(t);
   return Number.isFinite(n) ? n : null;
 };

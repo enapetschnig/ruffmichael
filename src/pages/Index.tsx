@@ -10,6 +10,7 @@ import { ErstaufnahmeDialog, type ErstaufnahmePrefill } from "@/components/Ersta
 import { DashboardVoiceAssistant } from "@/components/DashboardVoiceAssistant";
 import { DrawingEditor } from "@/components/DrawingEditor";
 import { FotoAufnahme } from "@/components/FotoAufnahme";
+import { TermineHeute } from "@/components/TermineHeute";
 import { cachedSelect } from "@/lib/offlineStore";
 import { warmOfflineCache } from "@/lib/cachedQueries";
 import { useToast } from "@/hooks/use-toast";
@@ -360,6 +361,8 @@ export default function Index() {
       <main className="mx-auto w-full max-w-[1600px] px-3 sm:px-4 lg:px-6 py-4 sm:py-6">
         <ErledigteWuensche />
         {user && isAdmin && <NeuerungenBanner userId={user.id} />}
+        {/* Was heute ansteht — direkt aus Michaels Outlook-Kalender */}
+        {isAdmin && <TermineHeute />}
 
         <div className="mb-4 grid grid-cols-3 gap-2 sm:hidden">
           <KBButton className="w-full min-h-[72px] flex-col gap-1.5 py-3 text-sm" icon={Clock} label="Zeit buchen" onClick={() => navigate("/time-tracking")} />

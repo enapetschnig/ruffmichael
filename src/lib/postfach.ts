@@ -23,6 +23,7 @@ export type Mail = {
   betreff: string | null;
   vorschau: string | null;
   koerper_text: string | null;
+  koerper_html: string | null;
   empfangen_am: string;
   gelesen: boolean;
   wichtig: boolean;

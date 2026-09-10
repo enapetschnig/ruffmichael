@@ -210,6 +210,21 @@ const UMLAUT: Record<string, string> = { "ä": "ae", "Ä": "Ae", "ö": "oe", "Ö
  * „Würth-AB Kolo.PDF“ scheitert sonst mit „Invalid key“. Angezeigt wird
  * weiterhin der Originalname aus der Mail, nur der Pfad wird entschärft.
  */
+/** HTML-Mail zu lesbarem Text — für Suche, Vorschau und die Einordnung. */
+function htmlZuText(html: string): string {
+  return html
+    .replace(/<(script|style|head)[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<\/(p|div|tr|li|h[1-6])>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">").replace(/&quot;/gi, '"').replace(/&#39;/gi, "'")
+    .replace(/&[a-z]+;/gi, " ")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n\s*\n\s*\n+/g, "\n\n")
+    .trim();
+}
+
 const sauber = (s: string) => (
   s.replace(/[äÄöÖüÜß]/g, (c) => UMLAUT[c] ?? c)
     .normalize("NFKD").replace(/[̀-ͯ]/g, "")
@@ -316,8 +331,9 @@ Deno.serve(async (req) => {
 
       while (next) {
         if (Date.now() - start > budget) { offen = true; break; }
-        const seite: { value: GraphMail[]; "@odata.nextLink"?: string } =
-          await graph(tok, next, { prefer: 'outlook.body-content-type="text"' });
+        // Ohne Prefer-Header liefert Graph den Rumpf als HTML — so sieht die
+        // Mail in der App aus wie in Outlook. Den Text leiten wir daraus ab.
+        const seite: { value: GraphMail[]; "@odata.nextLink"?: string } = await graph(tok, next);
         next = seite["@odata.nextLink"] ?? null;
 
         for (const m of seite.value) {
@@ -329,7 +345,8 @@ Deno.serve(async (req) => {
           const von = m.from?.emailAddress ?? m.sender?.emailAddress ?? {};
           const vonAdresse = (von.address ?? "").toLowerCase();
           const betreff = m.subject ?? "(kein Betreff)";
-          const text = (m.body?.contentType === "text" ? m.body?.content : m.bodyPreview) ?? "";
+          const html = m.body?.contentType === "html" ? (m.body?.content ?? "") : "";
+          const text = html ? htmlZuText(html) : (m.body?.content ?? m.bodyPreview ?? "");
 
           const schon = bekannt.get(m.id);
           if (schon) {
@@ -355,6 +372,7 @@ Deno.serve(async (req) => {
             betreff,
             vorschau: (m.bodyPreview ?? "").slice(0, 500),
             koerper_text: text.slice(0, KOERPER_MAX),
+            koerper_html: html ? html.slice(0, 400_000) : null,
             empfangen_am: m.receivedDateTime ?? m.sentDateTime ?? new Date().toISOString(),
             gelesen: !!m.isRead,
             wichtig: m.importance === "high",
@@ -521,6 +539,31 @@ Deno.serve(async (req) => {
       }).eq("id", "postfach");
 
       return json({ ok: true, gesehen, neu, aktualisiert, entfernt, rechnungen, anhaenge, offen, fehler: fehler.slice(0, 5) });
+    }
+
+    // ── HTML nachholen ────────────────────────────────────────────────────
+    // Für Mails, die vor der HTML-Anzeige geholt wurden (nur Text gespeichert).
+    if (aktion === "html_nachholen") {
+      const start = Date.now();
+      const budget = Number(body.zeit ?? 90) * 1000;
+      const { data: ohne } = await admin.from("mails").select("id, graph_id").is("koerper_html", null).order("empfangen_am", { ascending: false }).limit(400);
+      let geholt = 0;
+      const fehler: string[] = [];
+      for (const m of ohne ?? []) {
+        if (Date.now() - start > budget) break;
+        try {
+          const voll = await graph<GraphMail>(tok, `/users/${mb}/messages/${m.graph_id}?$select=body,bodyPreview`);
+          const html = voll.body?.contentType === "html" ? (voll.body?.content ?? "") : "";
+          const text = html ? htmlZuText(html) : (voll.body?.content ?? voll.bodyPreview ?? "");
+          await admin.from("mails").update({
+            koerper_html: html ? html.slice(0, 400_000) : "",
+            koerper_text: text.slice(0, KOERPER_MAX),
+          }).eq("id", m.id);
+          geholt++;
+        } catch (e) { fehler.push(`${m.graph_id.slice(0, 12)}: ${e instanceof Error ? e.message : e}`); }
+      }
+      const { count } = await admin.from("mails").select("id", { count: "exact", head: true }).is("koerper_html", null);
+      return json({ ok: true, geholt, offen: count ?? 0, fehler: fehler.slice(0, 3) });
     }
 
     // ── Anhänge nachholen ─────────────────────────────────────────────────

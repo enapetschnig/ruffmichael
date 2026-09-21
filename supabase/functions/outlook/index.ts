@@ -245,7 +245,21 @@ Deno.serve(async (req) => {
   try {
     // ── Wer darf? Administrator oder der Zeitplan (Service-Schlüssel) ──────
     const authKopf = req.headers.get("Authorization") ?? "";
-    const istCron = authKopf === `Bearer ${dienst}`;
+    // Der Zeitplan (pg_cron) schickt den Service-Schlüssel. Ein reiner
+    // Zeichenvergleich mit SUPABASE_SERVICE_ROLE_KEY scheiterte (der Schlüssel im
+    // Cron-Job ist nicht zeichengleich mit dem der Edge-Laufzeit) → elf Tage 401.
+    // Deshalb: Rolle aus dem Token lesen UND das Token von PostgREST prüfen
+    // lassen — nur ein echt signierter Service-Schlüssel kommt an RLS vorbei.
+    const tokenRoh = authKopf.replace(/^Bearer\s+/i, "");
+    const rolleImToken = (() => {
+      try { const teil = tokenRoh.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"); return JSON.parse(atob(teil.padEnd(teil.length + (4 - teil.length % 4) % 4, "="))).role; } catch { return null; }
+    })();
+    let istCron = false;
+    if (rolleImToken === "service_role") {
+      const probe = createClient(supaUrl, tokenRoh, { global: { headers: { Authorization: authKopf } } });
+      const { data: zeile, error: probeFehler } = await probe.from("mail_sync_state").select("id").eq("id", "postfach");
+      istCron = !probeFehler && (zeile?.length ?? 0) === 1;
+    }
     let benutzerId: string | null = null;
     if (!istCron) {
       const { data: { user } } = await createClient(supaUrl, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authKopf } } }).auth.getUser();

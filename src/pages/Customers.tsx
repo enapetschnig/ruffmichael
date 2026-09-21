@@ -364,6 +364,9 @@ const Customers = () => {
   };
 
   const handleSave = async () => {
+    // Doppelklick auf „Kunde anlegen“ legte zwei Kunden an (Test 21.09.2026):
+    // der zweite Klick kam vor dem Re-Render mit deaktiviertem Knopf.
+    if (saving) return;
     if (!form.nachname.trim()) {
       toast({ variant: "destructive", title: "Fehler", description: "Bitte Nachname eingeben" });
       return;

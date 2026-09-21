@@ -214,6 +214,7 @@ const MaterialCatalog = () => {
   };
 
   const handleSave = async () => {
+    if (saving) return; // Doppelklick-Schutz (gleiches Muster wie bei den Kunden)
     const name = form.name.trim();
     if (!name) {
       toast({ variant: "destructive", title: "Fehler", description: "Bitte Namen eingeben" });

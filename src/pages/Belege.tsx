@@ -17,6 +17,7 @@ import { getSessionUser } from "@/lib/auth";
 import { customerDisplayName, CustomerFormFields, customerFormToRow, emptyCustomerForm } from "@/pages/Customers";
 import { BelegExport } from "@/components/BelegExport";
 import { projectLabel } from "@/lib/projectLabel";
+import { alleZeilen } from "@/lib/alleZeilen";
 import { cn } from "@/lib/utils";
 import {
   TYP_LABEL, STATUS_LABEL, STATUS_VARIANT, eur, datum, heuteISO, plusTage, istRechnung, istAngebot, offen,
@@ -128,7 +129,7 @@ const Belege = () => {
       if (!rolle) { toast({ variant: "destructive", title: "Kein Zugriff", description: "Angebote und Rechnungen sind nur für Administratoren." }); return navigate("/"); }
       await laden();
       const [k, p] = await Promise.all([
-        supabase.from("customers").select("id, kundennr, vorname, nachname, firma, strasse, ort, uid, ist_unternehmer, reverse_charge, zahlungsziel_tage, email").order("nachname"),
+        alleZeilen<KundeOpt>((von, bis) => supabase.from("customers").select("id, kundennr, vorname, nachname, firma, strasse, ort, uid, ist_unternehmer, reverse_charge, zahlungsziel_tage, email").order("nachname").order("id").range(von, bis)),
         supabase.from("projects").select("id, name, plz, adresse, customer_id, status, customers(strasse, ort)").order("name"),
       ]);
       setKunden((k.data as KundeOpt[]) ?? []);
@@ -149,9 +150,13 @@ const Belege = () => {
     // Seitenweise laden — PostgREST liefert höchstens 1000 Zeilen je Anfrage, und Michael hat viele Belege
     const alle: Beleg[] = [];
     for (let von = 0; ; von += 1000) {
-      const { data, error } = await supabase.from("belege").select("*").order("created_at", { ascending: false }).range(von, von + 999);
+      // Ohne id als zweites Kriterium überlappen sich die Seiten bei gleichem Zeitstempel (KingBill-Import) → doppelte Zeilen.
+      // Die langen Texte (Einleitung, Schlusstext, Notizen) braucht die Liste nicht — spart bei 6.600 Belegen Sekunden.
+      const { data, error } = await supabase.from("belege")
+        .select("id, typ, status, nummer, jahr, laufnummer, project_id, customer_id, vorgaenger_id, kunde_name, kunde_zusatz, kunde_strasse, kunde_plz_ort, kunde_uid, kunde_email, datum, leistung_von, leistung_bis, faellig_am, gueltig_bis, betreff, reverse_charge, ust_satz, skonto_prozent, skonto_tage, netto, ust, brutto, bezahlt, pdf_pfad, festgeschrieben_am, gesendet_am, storniert_durch, created_by, created_at, updated_at, kreis")
+        .order("datum", { ascending: false }).order("created_at", { ascending: false }).order("id").range(von, von + 999);
       if (error) { toast({ variant: "destructive", title: "Belege nicht geladen", description: error.message }); break; }
-      alle.push(...(data ?? []));
+      alle.push(...((data ?? []) as unknown as Beleg[]));
       if (!data || data.length < 1000) break;
     }
     setBelege(alle);

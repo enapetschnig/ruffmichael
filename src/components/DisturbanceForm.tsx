@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
+import { alleZeilen } from "@/lib/alleZeilen";
 import { newId, isOffline, saveInsert, saveInvoke } from "@/lib/offlineData";
 import { getSessionUser } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -117,9 +118,8 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
     (async () => {
       const [empRes, kundenRes, custRes, matRes, catalogRes] = await Promise.all([
         supabase.from("profiles").select("id, vorname, nachname").eq("is_active", true),
-        supabase.from("customers")
-          .select("vorname, nachname, email, strasse, ort, telefon, mobil")
-          .order("nachname"),
+        alleZeilen<{ vorname: string | null; nachname: string; email: string | null; strasse: string | null; ort: string | null; telefon: string | null; mobil: string | null }>((von, bis) =>
+          supabase.from("customers").select("vorname, nachname, email, strasse, ort, telefon, mobil").order("nachname").order("id").range(von, bis)),
         supabase.from("disturbances")
           .select("kunde_name, kunde_email, kunde_adresse, kunde_telefon")
           .order("datum", { ascending: false })

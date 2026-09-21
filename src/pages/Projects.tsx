@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { alleZeilen } from "@/lib/alleZeilen";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { QuickUploadDialog } from "@/components/QuickUploadDialog";
@@ -157,11 +158,8 @@ const Projects = () => {
   };
 
   const fetchCustomers = async () => {
-    const { data } = await supabase
-      .from("customers")
-      .select("id, vorname, nachname, strasse, ort")
-      .order("nachname")
-      .order("vorname");
+    const { data } = await alleZeilen<{ id: string; vorname: string | null; nachname: string; strasse: string | null; ort: string | null }>((von, bis) =>
+      supabase.from("customers").select("id, vorname, nachname, strasse, ort").order("nachname").order("vorname").order("id").range(von, bis));
     if (data) {
       setCustomers(data);
       return;

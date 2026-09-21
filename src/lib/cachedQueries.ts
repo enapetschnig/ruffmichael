@@ -6,6 +6,7 @@
 // noch nie geöffnet wurden (z.B. Projektauswahl in der Zeiterfassung).
 
 import { supabase } from "@/integrations/supabase/client";
+import { alleZeilen } from "@/lib/alleZeilen";
 import { cachedSelect, type CachedResult } from "@/lib/offlineStore";
 
 export type CachedProject = {
@@ -56,11 +57,9 @@ export const fetchAllProjectsCached = (): Promise<CachedResult<CachedProject[]>>
 // Kundenliste
 export const fetchCustomersCached = (): Promise<CachedResult<CachedCustomer[]>> =>
   cachedSelect("customers:alle", () =>
-    supabase
-      .from("customers")
-      .select("*")
-      .order("nachname")
-      .order("vorname") as unknown as PromiseLike<{ data: CachedCustomer[] | null; error: { message: string } | null }>,
+    alleZeilen<CachedCustomer>((von, bis) =>
+      supabase.from("customers").select("*").order("nachname").order("vorname").order("id").range(von, bis) as unknown as PromiseLike<{ data: CachedCustomer[] | null; error: { message: string } | null }>,
+    ),
   );
 
 // Ampel-Status

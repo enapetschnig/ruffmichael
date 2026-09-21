@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { alleZeilen } from "@/lib/alleZeilen";
 import { toast as sonnerToast } from "sonner";
 import { 
   getNormalWorkingHours, 
@@ -355,10 +356,8 @@ const TimeTracking = () => {
 
   // Kunden für den "Neues Projekt"-Dialog laden (gleiche Auswahl wie Projects.tsx)
   const fetchNewProjectCustomers = async () => {
-    const { data } = await supabase
-      .from("customers")
-      .select("id, vorname, nachname, strasse, ort")
-      .order("nachname");
+    const { data } = await alleZeilen<{ id: string; vorname: string | null; nachname: string; strasse: string | null; ort: string | null }>((von, bis) =>
+      supabase.from("customers").select("id, vorname, nachname, strasse, ort").order("nachname").order("id").range(von, bis));
     setNewProjectCustomers(data ?? []);
   };
 

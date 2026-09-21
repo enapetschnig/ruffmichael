@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Search, RefreshCw, Loader2, Paperclip, Receipt, Check, FolderKanban, ExternalLink, Reply,
@@ -73,25 +73,43 @@ export default function Postfach() {
 
   useEffect(() => { laden_(); }, [laden_]);
 
-  const abholen = async () => {
-    setHolen(true);
+  // Abholen: von Hand (mit Rückmeldung) oder still im Hintergrund — beim Öffnen,
+  // alle 60 Sekunden und wenn man zur App zurückkehrt. Der Server holt zusätzlich
+  // jede Minute per Zeitplan; doppelte Läufe sind harmlos (graph_id ist eindeutig).
+  const laeuftGerade = useRef(false);
+  const abholen = useCallback(async (still = false) => {
+    if (laeuftGerade.current) return;
+    laeuftGerade.current = true;
+    if (!still) setHolen(true);
     try {
       const r = await outlook<{ neu: number; rechnungen: number; entfernt: number; offen: boolean }>("sync", { zeit: 100 });
-      await laden_();
-      toast({
-        title: r.neu > 0 ? `${r.neu} neue Mail${r.neu === 1 ? "" : "s"}` : "Keine neuen Mails",
-        description: [
-          r.rechnungen > 0 ? `${r.rechnungen} als Eingangsrechnung erkannt` : "",
-          r.entfernt > 0 ? `${r.entfernt} in Outlook gelöschte entfernt` : "",
-          r.offen ? "Es sind noch weitere offen — gleich nochmal holen." : "",
-        ].filter(Boolean).join(" · ") || undefined,
-      });
+      if (r.neu > 0 || r.entfernt > 0 || !still) await laden_();
+      if (!still || r.neu > 0) {
+        toast({
+          title: r.neu > 0 ? `${r.neu} neue Mail${r.neu === 1 ? "" : "s"}` : "Keine neuen Mails",
+          description: [
+            r.rechnungen > 0 ? `${r.rechnungen} als Eingangsrechnung erkannt` : "",
+            r.entfernt > 0 ? `${r.entfernt} in Outlook gelöschte entfernt` : "",
+            r.offen ? "Es sind noch weitere offen — gleich nochmal holen." : "",
+          ].filter(Boolean).join(" · ") || undefined,
+        });
+      }
     } catch (e) {
-      toast({ variant: "destructive", title: "Postfach nicht erreichbar", description: e instanceof Error ? e.message : String(e) });
+      if (!still) toast({ variant: "destructive", title: "Postfach nicht erreichbar", description: e instanceof Error ? e.message : String(e) });
     } finally {
+      laeuftGerade.current = false;
       setHolen(false);
     }
-  };
+  }, [laden_, toast]);
+
+  useEffect(() => {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+    abholen(true);
+    const takt = window.setInterval(() => { if (document.visibilityState === "visible") abholen(true); }, 60_000);
+    const zurueck = () => { if (document.visibilityState === "visible") abholen(true); };
+    document.addEventListener("visibilitychange", zurueck);
+    return () => { window.clearInterval(takt); document.removeEventListener("visibilitychange", zurueck); };
+  }, [abholen]);
 
   const gefiltert = useMemo(() => {
     const f = FILTER.find((x) => x.key === filter) ?? FILTER[0];
@@ -182,7 +200,7 @@ export default function Postfach() {
             <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setSchreiben({})}>
               <PenSquare className="h-4 w-4" /><span className="hidden sm:inline">Schreiben</span>
             </Button>
-            <Button size="sm" className="gap-1.5" onClick={abholen} disabled={holen}>
+            <Button size="sm" className="gap-1.5" onClick={() => abholen(false)} disabled={holen}>
               {holen ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
               <span className="hidden sm:inline">Abholen</span>
             </Button>
@@ -366,7 +384,7 @@ export default function Postfach() {
         <p className="text-xs text-muted-foreground">
           {ungelesen > 0 ? `${ungelesen} ungelesen · ` : ""}
           {letzterLauf ? `zuletzt geholt ${new Date(letzterLauf).toLocaleString("de-AT")}` : "noch nicht geholt"}
-          {" · holt sich alle 5 Minuten neue Mails · in Outlook wird nichts verändert"}
+          {" · gleicht sich jede Minute mit Outlook ab · in Outlook wird nichts verändert"}
         </p>
       </main>
 

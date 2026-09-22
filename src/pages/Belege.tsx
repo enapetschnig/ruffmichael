@@ -188,6 +188,11 @@ const Belege = () => {
       if (filter === "entwuerfe" && b.status !== "entwurf") return false;
       if (!q) return true;
       return [b.nummer, b.kunde_name, b.betreff, TYP_LABEL[b.typ]].filter(Boolean).some((v) => String(v).toLowerCase().includes(q));
+    // Nach Nummer sortiert (neueste zuerst), Entwürfe ohne Nummer ganz oben — wie in KingBill
+    }).sort((a, b) => {
+      if (!a.nummer !== !b.nummer) return a.nummer ? 1 : -1;
+      if (!a.nummer) return (b.created_at ?? "").localeCompare(a.created_at ?? "");
+      return (b.jahr ?? 0) - (a.jahr ?? 0) || (b.laufnummer ?? 0) - (a.laufnummer ?? 0) || String(b.nummer).localeCompare(String(a.nummer));
     });
   }, [basis, filter, suche]);
 

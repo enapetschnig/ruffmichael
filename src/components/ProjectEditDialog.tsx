@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,8 +7,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { saveUpdate, isOffline } from "@/lib/offlineData";
-import { customerAddress, customerDisplayName, type Customer } from "@/pages/Customers";
-import { plzEingabe, projektPlz, PLZ_FEHLT } from "@/lib/plz";
+import type { Customer } from "@/pages/Customers";
+import { plzAus, plzEingabe, PLZ_FEHLT } from "@/lib/plz";
+import { KundenAuswahl, kundeAdresse, type Kunde } from "@/components/kunde/KundenAuswahl";
+import { projektAdresse } from "@/components/projekt/NeuesProjektDialog";
 
 // Minimale Projektform, die dieser Dialog bearbeiten kann.
 export type EditableProject = {
@@ -28,36 +30,62 @@ interface ProjectEditDialogProps {
   project: EditableProject | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  customers: CustomerOption[];
+  /** Nicht mehr nötig — die Kundenauswahl lädt selbst. Bleibt für alte Aufrufer. */
+  customers?: CustomerOption[];
   statuses: StatusOption[];
   onSaved: () => void;
 }
 
-// Einheitlicher Dialog zum Bearbeiten von Projektdaten (Name, Kunde, PLZ,
-// Adresse, Ampel-Status, Beschreibung). Wird sowohl in der Projektliste als
-// auch in der Projekt-Übersicht verwendet, damit "Projekt bearbeiten" überall
-// gleich funktioniert.
-export function ProjectEditDialog({ project, open, onOpenChange, customers, statuses, onSaved }: ProjectEditDialogProps) {
+/** „Grundäckergasse 14, 1100 Wien“ → Straße / PLZ / Ort für die getrennten Felder. */
+const adresseTrennen = (adresse: string | null, plz: string | null) => {
+  const text = String(adresse ?? "").trim();
+  const m = text.match(/^(.*?)[,\s]+(?:[A-Z]{1,2}-)?(\d{4,5})\s+(.+)$/);
+  if (m) return { strasse: m[1].trim(), plz: m[2], ort: m[3].trim() };
+  return { strasse: text, plz: plz ?? "", ort: "" };
+};
+
+// Einheitlicher Dialog zum Bearbeiten von Projektdaten (Name, Kunde, Adresse,
+// Ampel-Status, Beschreibung). Projektliste und Projekt-Übersicht benutzen ihn.
+// Kundenauswahl und Adressfelder wie beim Anlegen (NeuesProjektDialog).
+export function ProjectEditDialog({ project, open, onOpenChange, statuses, onSaved }: ProjectEditDialogProps) {
   const { toast } = useToast();
   const [form, setForm] = useState({
-    name: "", plz: "", adresse: "", beschreibung: "",
-    customerId: "none" as string, statusId: "none" as string,
+    name: "", strasse: "", plz: "", ort: "", beschreibung: "",
+    customerId: "" as string, statusId: "none" as string,
   });
   const [saving, setSaving] = useState(false);
+  // Zuletzt vom Kunden übernommene Adresse — nur die wird beim Kundenwechsel ersetzt
+  const auto = useRef({ strasse: "", plz: "", ort: "" });
 
   // Formular bei jedem Öffnen mit den aktuellen Projektdaten vorbelegen.
   useEffect(() => {
     if (open && project) {
+      const a = adresseTrennen(project.adresse, project.plz);
       setForm({
         name: project.name ?? "",
-        plz: project.plz ?? "",
-        adresse: project.adresse ?? "",
+        strasse: a.strasse,
+        plz: project.plz ?? a.plz,
+        ort: a.ort,
         beschreibung: project.beschreibung ?? "",
-        customerId: project.customer_id ?? "none",
+        customerId: project.customer_id ?? "",
         statusId: project.status_id ?? "none",
       });
+      auto.current = { strasse: "", plz: "", ort: "" };
     }
   }, [open, project]);
+
+  const kundeWaehlen = (k: Kunde | null) => {
+    const a = kundeAdresse(k);
+    const vorher = auto.current; // der Updater läuft erst später, wenn auto.current schon neu ist
+    setForm((alt) => {
+      const neu = { ...alt, customerId: k?.id ?? "" };
+      // Adresse vom Kunden übernehmen, wenn sie leer ist oder vom vorigen Kunden stammt
+      const leerOderAuto = (["strasse", "plz", "ort"] as const).every((f) => !alt[f].trim() || alt[f] === vorher[f]);
+      if (k && leerOderAuto) { neu.strasse = a.strasse; neu.plz = a.plz || alt.plz; neu.ort = a.ort; }
+      return neu;
+    });
+    auto.current = { strasse: a.strasse, plz: a.plz, ort: a.ort };
+  };
 
   const handleSave = async () => {
     if (!project || saving) return;
@@ -70,25 +98,18 @@ export function ProjectEditDialog({ project, open, onOpenChange, customers, stat
       toast({ variant: "destructive", title: "Fehler", description: "Projektname ist erforderlich" });
       return;
     }
-    // PLZ: eigenes Feld, sonst vom gewählten Kunden (ältere Projekte haben teils keine)
-    const plz = projektPlz(form.plz, customers.find((c) => c.id === form.customerId)?.ort);
+    const plz = plzAus(form.plz);
     if (!plz) {
       toast({ variant: "destructive", title: "Postleitzahl fehlt", description: PLZ_FEHLT });
       return;
     }
     setSaving(true);
-    // Adresse: leer -> aus gewähltem Kunden ableiten (wie bei der Anlage).
-    let derivedAdresse = form.adresse.trim();
-    if (!derivedAdresse && form.customerId !== "none") {
-      const c = customers.find((c) => c.id === form.customerId);
-      if (c) derivedAdresse = [c.strasse, c.ort].filter(Boolean).join(", ");
-    }
     const res = await saveUpdate("projects", { id: project.id }, {
       name: form.name.trim(),
       plz,
-      adresse: derivedAdresse || null,
+      adresse: projektAdresse(form.strasse, plz, form.ort) || null,
       beschreibung: form.beschreibung.trim() || null,
-      customer_id: form.customerId !== "none" ? form.customerId : null,
+      customer_id: form.customerId || null,
       status_id: form.statusId !== "none" ? form.statusId : null,
     }, `Projekt ${form.name.trim()}`);
     setSaving(false);
@@ -102,38 +123,34 @@ export function ProjectEditDialog({ project, open, onOpenChange, customers, stat
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm sm:max-w-lg max-h-[90vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={(o) => !saving && onOpenChange(o)}>
+      <DialogContent className="max-w-[calc(100vw-1.5rem)] sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Projekt bearbeiten</DialogTitle>
           <DialogDescription>Projektdaten, Kunde und Ampel-Status ändern</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
+            <Label>Kunde</Label>
+            <KundenAuswahl wert={form.customerId} onChange={kundeWaehlen} />
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="edit-name">Projektname *</Label>
             <Input id="edit-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </div>
           <div className="space-y-2">
-            <Label>Kunde</Label>
-            <Select value={form.customerId} onValueChange={(v) => setForm({ ...form, customerId: v })}>
-              <SelectTrigger><SelectValue placeholder="Kunde auswählen" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">— Kein Kunde —</SelectItem>
-                {customers.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {customerDisplayName(c)}{customerAddress(c) ? ` (${customerAddress(c)})` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label htmlFor="edit-strasse">Straße</Label>
+            <Input id="edit-strasse" value={form.strasse} onChange={(e) => setForm({ ...form, strasse: e.target.value })} placeholder="Straße und Hausnummer" />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="edit-plz">PLZ *</Label>
-            <Input id="edit-plz" value={form.plz} inputMode="numeric" onChange={(e) => setForm({ ...form, plz: plzEingabe(e.target.value) })} placeholder="z.B. 2700" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="edit-adresse">Adresse</Label>
-            <Input id="edit-adresse" value={form.adresse} onChange={(e) => setForm({ ...form, adresse: e.target.value })} placeholder="Leer lassen = Adresse des Kunden" />
+          <div className="grid grid-cols-[6.5rem_1fr] gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="edit-plz">PLZ *</Label>
+              <Input id="edit-plz" value={form.plz} inputMode="numeric" onChange={(e) => setForm({ ...form, plz: plzEingabe(e.target.value) })} placeholder="2700" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-ort">Ort</Label>
+              <Input id="edit-ort" value={form.ort} onChange={(e) => setForm({ ...form, ort: e.target.value })} />
+            </div>
           </div>
           <div className="space-y-2">
             <Label>Ampel-Status</Label>

@@ -3,30 +3,26 @@ import { useEffect, useState, useRef } from "react";
 import { ArrowLeft, FolderOpen, Plus, FileText, Image, Package, Lock, Search, Upload, Camera, Trash2, ChevronDown, Home, Settings, Save, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { alleZeilen } from "@/lib/alleZeilen";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { QuickUploadDialog } from "@/components/QuickUploadDialog";
 import { MobilePhotoCapture } from "@/components/MobilePhotoCapture";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CustomerFormFields, customerFormToRow, customerAddress, customerDisplayName, type Customer } from "./Customers";
+import { customerDisplayName, type Customer } from "./Customers";
 import { enqueue } from "@/lib/offlineQueue";
-import { newId, saveInsert, saveUpload, saveUpdate, saveInvoke, isOffline } from "@/lib/offlineData";
-import { STANDARD_PROJECT_FOLDERS } from "@/lib/projectFolders";
+import { newId, isOffline } from "@/lib/offlineData";
 import { getSessionUser } from "@/lib/auth";
 import { projectAddress } from "@/lib/projectLabel";
 import { ProjectEditDialog } from "@/components/ProjectEditDialog";
 import { readCache, writeCache } from "@/lib/offlineStore";
-import { fetchStatusesCached, fetchCustomersCached } from "@/lib/cachedQueries";
+import { fetchStatusesCached } from "@/lib/cachedQueries";
 
 type ProjectCustomer = Pick<Customer, "id" | "vorname" | "nachname" | "strasse" | "ort">;
 
@@ -75,9 +71,7 @@ const toStorageKey = (name: string): string =>
     .replace(/ß/g, "ss")
     .replace(/[^a-zA-Z0-9._ ()-]/g, "_");
 
-// Kundenvorlage kommt aus der Kundenverwaltung — eine Quelle für alle Felder.
-import { emptyCustomerForm } from "@/pages/Customers";
-import { plzEingabe, projektPlz, PLZ_FEHLT } from "@/lib/plz";
+import { NeuesProjektDialog } from "@/components/projekt/NeuesProjektDialog";
 import { RestarbeitenSchild } from "@/components/restarbeiten/Restarbeiten";
 
 const Projects = () => {
@@ -88,17 +82,6 @@ const Projects = () => {
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [newProject, setNewProject] = useState({
-    name: "",
-    beschreibung: "",
-    adresse: "",
-    plz: "",
-  });
-  const [customers, setCustomers] = useState<ProjectCustomer[]>([]);
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("none");
-  const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
-  const [newCustomer, setNewCustomer] = useState(emptyCustomerForm);
-  const [creating, setCreating] = useState(false);
   const [quickUploadProject, setQuickUploadProject] = useState<{
     projectId: string;
     documentType: 'photos' | 'plans' | 'reports' | 'materials';
@@ -115,7 +98,6 @@ const Projects = () => {
   // Ampel-Status (project_statuses)
   const [statuses, setStatuses] = useState<ProjectStatus[]>([]);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  const [newProjectStatusId, setNewProjectStatusId] = useState<string>("none");
   const [showStatusSettings, setShowStatusSettings] = useState(false);
   const [editStatuses, setEditStatuses] = useState<ProjectStatus[]>([]);
   const [newStatusForm, setNewStatusForm] = useState({ name: "", color: "#22c55e" });
@@ -130,7 +112,6 @@ const Projects = () => {
     checkAdminStatus();
     fetchStatuses();
     fetchProjects();
-    fetchCustomers();
 
     // Realtime subscription
     const channel = supabase
@@ -162,18 +143,6 @@ const Projects = () => {
       .single();
 
     setIsAdmin(data?.role === "administrator");
-  };
-
-  const fetchCustomers = async () => {
-    const { data } = await alleZeilen<{ id: string; vorname: string | null; nachname: string; strasse: string | null; ort: string | null }>((von, bis) =>
-      supabase.from("customers").select("id, vorname, nachname, strasse, ort").order("nachname").order("vorname").order("id").range(von, bis));
-    if (data) {
-      setCustomers(data);
-      return;
-    }
-    // Offline/Fehler: letzter bekannter Stand aus der lokalen Ablage.
-    const cached = await fetchCustomersCached();
-    setCustomers((cached.data as unknown as ProjectCustomer[]) ?? []);
   };
 
   const fetchStatuses = async (): Promise<ProjectStatus[]> => {
@@ -232,129 +201,6 @@ const Projects = () => {
     // Fertiges Ergebnis (inkl. Zähler) für die Offline-Anzeige ablegen.
     void writeCache("projects:seite", projectsWithCounts);
   };
-
-  const handleCreateProject = async () => {
-    if (creating) return;
-    if (!newProject.name.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Fehler",
-        description: "Projektname ist erforderlich",
-      });
-      return;
-    }
-
-    // PLZ: Projektfeld, sonst vom (neuen oder gewählten) Kunden übernehmen
-    const gewaehlterKunde = selectedCustomerId !== "none" ? customers.find((c) => c.id === selectedCustomerId) : undefined;
-    const plz = showNewCustomerForm
-      ? projektPlz(newProject.plz, newCustomer.plz, newCustomer.ort)
-      : projektPlz(newProject.plz, gewaehlterKunde?.ort);
-    if (!plz) {
-      toast({
-        variant: "destructive",
-        title: "Postleitzahl fehlt",
-        description: PLZ_FEHLT,
-      });
-      return;
-    }
-
-    if (showNewCustomerForm && !newCustomer.nachname.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Fehler",
-        description: "Bitte Nachname des Kunden eingeben",
-      });
-      return;
-    }
-
-    setCreating(true);
-    try {
-      // Kunde: entweder neu anlegen oder bestehenden verwenden
-      let customerId: string | null = null;
-      let customerForAddress: { strasse: string | null; ort: string | null } | null = null;
-
-      const user = await getSessionUser();
-      let anyQueued = false;
-      const label = `Projekt ${newProject.name.trim()}`;
-
-      // Kunde: neu anlegen (client-ID) oder bestehenden verwenden
-      if (showNewCustomerForm) {
-        const row = customerFormToRow(newCustomer);
-        customerId = newId();
-        const cr = await saveInsert("customers", { ...row, id: customerId, created_by: user?.id ?? null }, `Kunde ${row.nachname}`);
-        if (cr.error) {
-          toast({ variant: "destructive", title: "Fehler", description: "Kunde konnte nicht angelegt werden" });
-          setCreating(false);
-          return;
-        }
-        anyQueued = anyQueued || cr.queued;
-        customerForAddress = { strasse: row.strasse, ort: row.ort };
-      } else if (selectedCustomerId !== "none") {
-        customerId = selectedCustomerId;
-        const c = customers.find((c) => c.id === selectedCustomerId);
-        customerForAddress = c ? { strasse: c.strasse, ort: c.ort } : null;
-      }
-
-      // Projektadresse: falls leer, aus Kundenadresse übernehmen
-      const derivedAdresse = newProject.adresse.trim()
-        || (customerForAddress ? [customerForAddress.strasse, customerForAddress.ort].filter(Boolean).join(", ") : "");
-
-      // Projekt (client-ID); sobald Kunde in der Warteschlange ist, auch Projekt (force)
-      const projectId = newId();
-      const pr = await saveInsert("projects", {
-        id: projectId,
-        name: newProject.name.trim(),
-        beschreibung: newProject.beschreibung.trim() || null,
-        adresse: derivedAdresse || null,
-        plz,
-        customer_id: customerId,
-        status_id: newProjectStatusId !== "none" ? newProjectStatusId : null,
-      }, label, anyQueued);
-      if (pr.error) {
-        toast({ variant: "destructive", title: "Fehler", description: "Projekt konnte nicht erstellt werden" });
-        setCreating(false);
-        return;
-      }
-      anyQueued = anyQueued || pr.queued;
-
-      // Standardordner anlegen (bei anyQueued -> force in die Warteschlange)
-      for (const folder of STANDARD_PROJECT_FOLDERS) {
-        const fr = await saveUpload(
-          { bucket: "project-files", path: `${projectId}/${folder}/.keep`, blob: new Blob([""], { type: "text/plain" }) },
-          label,
-          anyQueued
-        );
-        anyQueued = anyQueued || fr.queued;
-      }
-
-      // OneDrive-Ordner SOFORT anlegen: online direkt (Sekunden), offline in der
-      // Warteschlange NACH den Inserts (Kette). Fehler stören die Anlage nicht —
-      // der 10-Minuten-Sync ist das Sicherheitsnetz.
-      void saveInvoke("onedrive-sync", { projectId }, `OneDrive-Ordner: ${newProject.name.trim()}`, anyQueued);
-
-      toast({
-        title: anyQueued ? "Offline gespeichert" : "Erfolg",
-        description: anyQueued
-          ? "Projekt wird angelegt, sobald wieder Internet da ist."
-          : "Projekt wurde erstellt (inkl. Standardordner)",
-      });
-      setNewProject({ name: "", beschreibung: "", adresse: "", plz: "" });
-      setNewProjectStatusId("none");
-      setSelectedCustomerId("none");
-      setShowNewCustomerForm(false);
-      setNewCustomer(emptyCustomerForm);
-      setShowNewDialog(false);
-      fetchProjects();
-      fetchCustomers();
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  // PLZ, die der Kunde mitbringt — wird übernommen, wenn das Projektfeld leer bleibt
-  const kundenPlz = showNewCustomerForm
-    ? projektPlz("", newCustomer.plz, newCustomer.ort)
-    : projektPlz("", customers.find((c) => c.id === selectedCustomerId)?.ort);
 
   const handleToggleProjectStatus = async (projectId: string, currentStatus: string, projectName: string) => {
     if (togglingStatus) return; // Prevent double-click
@@ -855,137 +701,11 @@ const Projects = () => {
                   <Settings className="h-4 w-4" />
                 </Button>
               )}
-              <Dialog open={showNewDialog} onOpenChange={setShowNewDialog}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="gap-1 sm:gap-2">
-                  <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
-                  <span className="hidden sm:inline">Neues Projekt</span>
-                  <span className="sm:hidden">Neu</span>
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-sm sm:max-w-lg max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Neues Projekt erstellen</DialogTitle>
-                  <DialogDescription>Bauvorhaben hinzufügen</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Projektname *</Label>
-                    <Input
-                      id="name"
-                      value={newProject.name}
-                      onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
-                      placeholder="z.B. Einfamilienhaus Müller"
-                    />
-                  </div>
-
-                  {/* Kunde: aus Bestand wählen oder neu anlegen (gleiche Struktur wie Kundenverwaltung) */}
-                  <div className="rounded-lg border p-3 space-y-3">
-                    <Label>Kunde</Label>
-                    {!showNewCustomerForm ? (
-                      <>
-                        <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Kunde auswählen" />
-                          </SelectTrigger>
-                          {/* Kundenname + Adresse werden schnell lang: Liste nie breiter als der Bildschirm */}
-                          <SelectContent className="max-w-[calc(100vw-2rem)]">
-                            <SelectItem value="none">— Kein Kunde —</SelectItem>
-                            {customers.map((c) => (
-                              <SelectItem key={c.id} value={c.id}>
-                                {customerDisplayName(c)}{customerAddress(c) ? ` (${customerAddress(c)})` : ""}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="w-full gap-2"
-                          onClick={() => setShowNewCustomerForm(true)}
-                        >
-                          <Plus className="h-4 w-4" /> Neuen Kunden anlegen
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <CustomerFormFields form={newCustomer} setForm={setNewCustomer} />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="w-full"
-                          onClick={() => setShowNewCustomerForm(false)}
-                        >
-                          Stattdessen bestehenden Kunden wählen
-                        </Button>
-                      </>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="plz">PLZ des Projekts{kundenPlz ? "" : " *"}</Label>
-                    <Input
-                      id="plz"
-                      value={newProject.plz}
-                      inputMode="numeric"
-                      onChange={(e) => setNewProject({ ...newProject, plz: plzEingabe(e.target.value) })}
-                      placeholder={kundenPlz ? `${kundenPlz} (vom Kunden)` : "z.B. 2700"}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      {kundenPlz ? "Leer lassen = PLZ des Kunden" : "4-5 stellige Postleitzahl"}
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="adresse">Adresse</Label>
-                    <Input
-                      id="adresse"
-                      value={newProject.adresse}
-                      onChange={(e) => setNewProject({ ...newProject, adresse: e.target.value })}
-                      placeholder="Leer lassen = Adresse des Kunden"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="beschreibung">Beschreibung</Label>
-                    <Textarea
-                      id="beschreibung"
-                      value={newProject.beschreibung}
-                      onChange={(e) => setNewProject({ ...newProject, beschreibung: e.target.value })}
-                      placeholder="Kurze Projektbeschreibung..."
-                      className="min-h-20"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="projekt-status">Ampel-Status</Label>
-                    <Select value={newProjectStatusId} onValueChange={setNewProjectStatusId}>
-                      <SelectTrigger id="projekt-status">
-                        <SelectValue placeholder="Status wählen" />
-                      </SelectTrigger>
-                      <SelectContent className="max-w-[calc(100vw-2rem)]">
-                        <SelectItem value="none">
-                          <span className="flex items-center gap-2">
-                            <span className="h-3 w-3 rounded-full border-2 border-muted-foreground/50 shrink-0" />
-                            Kein Status
-                          </span>
-                        </SelectItem>
-                        {statuses.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            <span className="flex items-center gap-2">
-                              <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
-                              {s.name}
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button onClick={handleCreateProject} disabled={creating} className="w-full">
-                    {creating ? "Erstelle..." : "Projekt erstellen"}
-                  </Button>
-                </div>
-              </DialogContent>
-              </Dialog>
+              <Button size="sm" className="gap-1 sm:gap-2" onClick={() => setShowNewDialog(true)}>
+                <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Neues Projekt</span>
+                <span className="sm:hidden">Neu</span>
+              </Button>
       </PageHeader>
 
       <main className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 max-w-6xl">
@@ -1415,11 +1135,16 @@ const Projects = () => {
       </main>
 
       {/* Projekt bearbeiten – einheitlicher Dialog */}
+      <NeuesProjektDialog
+        open={showNewDialog}
+        onOpenChange={setShowNewDialog}
+        onErstellt={() => fetchProjects()}
+      />
+
       <ProjectEditDialog
         project={editProject}
         open={!!editProject}
         onOpenChange={(open) => !open && setEditProject(null)}
-        customers={customers}
         statuses={statuses}
         onSaved={fetchProjects}
       />

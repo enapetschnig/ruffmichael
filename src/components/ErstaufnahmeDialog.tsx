@@ -14,20 +14,11 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   VoiceInputButton,
   type VoiceContext,
   type VoiceResult,
 } from "@/components/VoiceInputButton";
 import {
-  CustomerFormFields,
-  customerFormToRow,
   customerDisplayName,
   customerAddress,
   type Customer,
@@ -46,6 +37,7 @@ import { cachedSelect } from "@/lib/offlineStore";
 // Kundenvorlage kommt aus der Kundenverwaltung — eine Quelle für alle Felder.
 import { emptyCustomerForm } from "@/pages/Customers";
 import { plzEingabe, projektPlz, PLZ_FEHLT } from "@/lib/plz";
+import { KundenAuswahl, kundeAdresse, type Kunde } from "@/components/kunde/KundenAuswahl";
 
 type ErstaufnahmeCustomer = Pick<
   Customer,
@@ -99,9 +91,12 @@ export function ErstaufnahmeDialog({
   const { toast } = useToast();
 
   const [customers, setCustomers] = useState<ErstaufnahmeCustomer[]>([]);
-  const [selectedCustomerId, setSelectedCustomerId] = useState("");
-  const [newCustomerMode, setNewCustomerMode] = useState(false);
-  const [customerForm, setCustomerForm] = useState(emptyCustomerForm);
+  // Gewählter (oder gerade angelegter) Kunde — gleiche Kundenauswahl wie überall in der App
+  const [kunde, setKunde] = useState<Kunde | null>(null);
+  // Neuer Kunde aus der Spracheingabe → öffnet „Neuer Kunde“ vorausgefüllt
+  const [neuVorlage, setNeuVorlage] = useState<Partial<typeof emptyCustomerForm> | null>(null);
+  // PLZ, die zuletzt automatisch vom Kunden kam (nur die wird beim Kundenwechsel ersetzt)
+  const [autoPlz, setAutoPlz] = useState("");
 
   const [projektName, setProjektName] = useState("");
   const [plz, setPlz] = useState("");
@@ -149,22 +144,20 @@ export function ErstaufnahmeDialog({
     return list;
   };
 
-  const applyPrefill = (p: ErstaufnahmePrefill, items: ChecklistItem[]) => {
+  const applyPrefill = (p: ErstaufnahmePrefill, items: ChecklistItem[], liste: ErstaufnahmeCustomer[] = customers) => {
     if (p.existingCustomerId) {
-      setSelectedCustomerId(p.existingCustomerId);
-      setNewCustomerMode(false);
+      const k = liste.find((c) => c.id === p.existingCustomerId);
+      if (k) kundeWaehlen(k as unknown as Kunde);
     } else if (p.kunde && Object.values(p.kunde).some((v) => v && String(v).trim())) {
       const k = p.kunde;
-      setNewCustomerMode(true);
-      setCustomerForm((f) => ({
-        ...f,
-        vorname: k.vorname?.trim() || f.vorname,
-        nachname: k.nachname?.trim() || f.nachname,
-        strasse: k.strasse?.trim() || f.strasse,
-        ort: k.ort?.trim() || f.ort,
-        telefon: k.telefon?.trim() || f.telefon,
-        email: k.email?.trim() || f.email,
-      }));
+      setNeuVorlage({
+        vorname: k.vorname?.trim() ?? "",
+        nachname: k.nachname?.trim() ?? "",
+        strasse: k.strasse?.trim() ?? "",
+        ort: k.ort?.trim() ?? "",
+        telefon: k.telefon?.trim() ?? "",
+        email: k.email?.trim() ?? "",
+      });
     }
     if (p.projektName?.trim()) setProjektName(p.projektName.trim());
     if (p.notizen?.trim()) setNotizen(p.notizen.trim());
@@ -188,9 +181,9 @@ export function ErstaufnahmeDialog({
   // Bei jedem Öffnen: Formular zurücksetzen, Daten laden, Prefill anwenden
   useEffect(() => {
     if (!open) return;
-    setSelectedCustomerId("");
-    setNewCustomerMode(false);
-    setCustomerForm(emptyCustomerForm);
+    setKunde(null);
+    setNeuVorlage(null);
+    setAutoPlz("");
     setProjektName("");
     setPlz("");
     setNotizen("");
@@ -198,7 +191,7 @@ export function ErstaufnahmeDialog({
     setEditChecklist(false);
     setNewItemText("");
     (async () => {
-      const [, items] = await Promise.all([fetchCustomers(), fetchChecklistItems()]);
+      const [liste, items] = await Promise.all([fetchCustomers(), fetchChecklistItems()]);
       const nutzer = await getSessionUser();
       if (nutzer) {
         const { data: rolle } = await supabase
@@ -206,7 +199,7 @@ export function ErstaufnahmeDialog({
           .eq("user_id", nutzer.id).eq("role", "administrator").maybeSingle();
         setIstAdmin(!!rolle);
       }
-      if (prefill) applyPrefill(prefill, items);
+      if (prefill) applyPrefill(prefill, items, liste);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, prefill]);
@@ -359,37 +352,28 @@ export function ErstaufnahmeDialog({
     return lines.join("\n");
   };
 
-  // PLZ, die der Kunde mitbringt — wird übernommen, wenn das PLZ-Feld leer bleibt
-  const erstaufnahmeKundenPlz = newCustomerMode
-    ? projektPlz("", customerForm.plz, customerForm.ort)
-    : projektPlz("", customers.find((c) => c.id === selectedCustomerId)?.ort);
+  // Kunde gewählt → PLZ sichtbar übernehmen (wenn leer oder vom vorigen Kunden)
+  const kundeWaehlen = (k: Kunde | null) => {
+    setKunde(k);
+    setNeuVorlage(null);
+    const kp = kundeAdresse(k).plz;
+    setPlz((alt) => (!alt.trim() || alt === autoPlz ? kp : alt));
+    setAutoPlz(kp);
+  };
 
   const handleFinish = async () => {
     if (saving) return;
 
-    if (newCustomerMode) {
-      if (!customerForm.nachname.trim()) {
-        toast({
-          variant: "destructive",
-          title: "Fehler",
-          description: "Bitte Nachname des Kunden eingeben",
-        });
-        return;
-      }
-    } else if (!selectedCustomerId) {
+    if (!kunde) {
       toast({
         variant: "destructive",
-        title: "Fehler",
-        description: "Bitte einen Kunden auswählen oder neu anlegen",
+        title: "Kunde fehlt",
+        description: "Bitte einen Kunden suchen und wählen – oder den neuen Kunden mit „Kunde speichern“ anlegen.",
       });
       return;
     }
 
-    // PLZ: eigenes Feld, sonst vom Kunden (auch „2700 Wr. Neustadt“ aus der Spracheingabe im Ort)
-    const plzKunde = newCustomerMode
-      ? [customerForm.plz, customerForm.ort]
-      : [customers.find((c) => c.id === selectedCustomerId)?.ort];
-    const plzFertig = projektPlz(plz, ...plzKunde);
+    const plzFertig = projektPlz(plz, kunde.ort);
     if (!plzFertig) {
       toast({
         variant: "destructive",
@@ -408,7 +392,6 @@ export function ErstaufnahmeDialog({
 
       // (a) Kunde anlegen (Client-ID) oder bestehenden verwenden.
       // Für die Zusammenfassung brauchen wir die Kundendaten auch offline lokal.
-      let customerId: string;
       const customer: {
         vorname: string | null;
         nachname: string | null;
@@ -418,47 +401,14 @@ export function ErstaufnahmeDialog({
         email: string | null;
       } = { vorname: null, nachname: null, strasse: null, ort: null, telefon: null, email: null };
 
-      if (newCustomerMode) {
-        const row = customerFormToRow(customerForm);
-        customerId = newId();
-        const custRes = await saveInsert(
-          "customers",
-          { id: customerId, ...row, created_by: user?.id ?? null },
-          `Kunde ${row.nachname || row.vorname || ""}`.trim()
-        );
-        if (custRes.error) {
-          toast({
-            variant: "destructive",
-            title: "Fehler",
-            description: "Kunde konnte nicht angelegt werden",
-          });
-          return;
-        }
-        queued = queued || custRes.queued;
-        customer.vorname = row.vorname;
-        customer.nachname = row.nachname;
-        customer.strasse = row.strasse;
-        customer.ort = row.ort;
-        customer.telefon = row.telefon;
-        customer.email = row.email;
-      } else {
-        const c = customers.find((c) => c.id === selectedCustomerId);
-        if (!c) {
-          toast({
-            variant: "destructive",
-            title: "Fehler",
-            description: "Ausgewählter Kunde wurde nicht gefunden",
-          });
-          return;
-        }
-        customerId = c.id;
-        customer.vorname = c.vorname;
-        customer.nachname = c.nachname;
-        customer.strasse = c.strasse;
-        customer.ort = c.ort;
-        customer.telefon = c.telefon;
-        customer.email = c.email;
-      }
+      // Der Kunde ist schon gespeichert (Kundenauswahl legt neue sofort an, auch offline).
+      const customerId = kunde.id;
+      customer.vorname = kunde.vorname;
+      customer.nachname = kunde.nachname;
+      customer.strasse = kunde.strasse;
+      customer.ort = kunde.ort;
+      customer.telefon = kunde.mobil || kunde.telefon;
+      customer.email = kunde.email;
 
       // (b) Projekt anlegen (Client-ID, Status: "Warte auf Angebotsbestätigung").
       // Status-Lesevorgang kann offline scheitern → dann einfach null.
@@ -629,50 +579,7 @@ export function ErstaufnahmeDialog({
           {/* Kunde */}
           <div className="space-y-1.5">
             <Label>Kunde *</Label>
-            {newCustomerMode ? (
-              <div className="rounded-lg border p-3 space-y-3">
-                {/* flex-wrap: am Handy rutscht der lange Button-Text in die nächste Zeile */}
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-sm font-medium">Neuer Kunde</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setNewCustomerMode(false)}
-                  >
-                    Bestehenden Kunden wählen
-                  </Button>
-                </div>
-                <CustomerFormFields form={customerForm} setForm={setCustomerForm} />
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Kunde auswählen" />
-                  </SelectTrigger>
-                  {/* Lange Namen/Adressen dürfen die Liste nicht über den Bildschirmrand ziehen */}
-                  <SelectContent className="max-w-[calc(100vw-2rem)]">
-                    {customers.map((c) => (
-                      <SelectItem key={c.id} value={c.id} className="break-words">
-                        {customerDisplayName(c)}
-                        {customerAddress(c) ? ` (${customerAddress(c)})` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="gap-1"
-                  onClick={() => setNewCustomerMode(true)}
-                >
-                  <Plus className="h-4 w-4" />
-                  Neuen Kunden anlegen
-                </Button>
-              </div>
-            )}
+            <KundenAuswahl wert={kunde?.id} onChange={kundeWaehlen} pflicht neuVorlage={neuVorlage} />
           </div>
 
           {/* Projektname */}
@@ -688,13 +595,13 @@ export function ErstaufnahmeDialog({
 
           {/* PLZ */}
           <div className="space-y-1.5">
-            <Label htmlFor="erstaufnahme-plz">PLZ{erstaufnahmeKundenPlz ? "" : " *"}</Label>
+            <Label htmlFor="erstaufnahme-plz">PLZ *</Label>
             <Input
               id="erstaufnahme-plz"
               value={plz}
               onChange={(e) => setPlz(plzEingabe(e.target.value))}
               inputMode="numeric"
-              placeholder={erstaufnahmeKundenPlz ? `${erstaufnahmeKundenPlz} (vom Kunden)` : "z. B. 2700"}
+              placeholder="z. B. 2700"
             />
           </div>
 

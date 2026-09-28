@@ -9,12 +9,10 @@ import { PageHeader } from "@/components/PageHeader";
 import { VoiceInputButton, type VoiceContext } from "@/components/VoiceInputButton";
 import { resolveTimeBlocks } from "@/lib/timeBlockResolver";
 import { enqueue } from "@/lib/offlineQueue";
-import { isOffline, newId, saveInsert, saveUpload, saveInvoke } from "@/lib/offlineData";
-import { STANDARD_PROJECT_FOLDERS } from "@/lib/projectFolders";
+import { isOffline, newId, saveInsert, saveUpload } from "@/lib/offlineData";
 import { getSessionUser } from "@/lib/auth";
 import { fetchActiveProjectsCached } from "@/lib/cachedQueries";
 import { projectLabel, projectAddress } from "@/lib/projectLabel";
-import { customerDisplayName, customerAddress, type Customer } from "@/pages/Customers";
 import { format, startOfWeek } from "date-fns";
 import { de } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -27,8 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { alleZeilen } from "@/lib/alleZeilen";
-import { plzEingabe, projektPlz, PLZ_FEHLT } from "@/lib/plz";
+import { NeuesProjektDialog } from "@/components/projekt/NeuesProjektDialog";
 import { toast as sonnerToast } from "sonner";
 import { 
   getNormalWorkingHours, 
@@ -48,10 +45,8 @@ type Project = {
 };
 
 // Kunde-Auswahl im "Neues Projekt"-Dialog
-type NewProjectCustomer = Pick<Customer, "id" | "vorname" | "nachname" | "strasse" | "ort">;
 
 // Ampel-Status-Option (project_statuses)
-type ProjectStatusOption = { id: string; name: string; color: string; sort_order: number };
 
 type ExistingEntry = {
   id: string;
@@ -107,17 +102,8 @@ const TimeTracking = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [creatingProject, setCreatingProject] = useState(false);
   const [submittingAbsence, setSubmittingAbsence] = useState(false);
   const [showNewProjectDialog, setShowNewProjectDialog] = useState(false);
-  const [newProjectName, setNewProjectName] = useState("");
-  const [newProjectPlz, setNewProjectPlz] = useState("");
-  const [newProjectAddress, setNewProjectAddress] = useState("");
-  const [newProjectBeschreibung, setNewProjectBeschreibung] = useState("");
-  const [selectedNewProjectCustomerId, setSelectedNewProjectCustomerId] = useState<string>("none");
-  const [newProjectStatusId, setNewProjectStatusId] = useState<string>("none");
-  const [newProjectCustomers, setNewProjectCustomers] = useState<NewProjectCustomer[]>([]);
-  const [projectStatuses, setProjectStatuses] = useState<ProjectStatusOption[]>([]);
   const [pendingBlockIdForNewProject, setPendingBlockIdForNewProject] = useState<string | null>(null);
 
   const [existingDayEntries, setExistingDayEntries] = useState<ExistingEntry[]>([]);
@@ -340,8 +326,6 @@ const TimeTracking = () => {
 
   useEffect(() => {
     fetchProjects();
-    fetchNewProjectCustomers();
-    fetchProjectStatuses();
 
     const channel = supabase
       .channel('projects-changes')
@@ -355,106 +339,11 @@ const TimeTracking = () => {
     };
   }, []);
 
-  // Kunden für den "Neues Projekt"-Dialog laden (gleiche Auswahl wie Projects.tsx)
-  const fetchNewProjectCustomers = async () => {
-    const { data } = await alleZeilen<{ id: string; vorname: string | null; nachname: string; strasse: string | null; ort: string | null }>((von, bis) =>
-      supabase.from("customers").select("id, vorname, nachname, strasse, ort").order("nachname").order("id").range(von, bis));
-    setNewProjectCustomers(data ?? []);
-  };
-
-  // Ampel-Status (project_statuses) für den "Neues Projekt"-Dialog laden
-  const fetchProjectStatuses = async () => {
-    const { data } = await supabase
-      .from("project_statuses")
-      .select("id, name, color, sort_order")
-      .order("sort_order", { ascending: true });
-    setProjectStatuses(data ?? []);
-  };
-
-  const handleCreateNewProject = async () => {
-    if (creatingProject) return;
-    
-    if (!newProjectName.trim()) {
-      sonnerToast.error("Bitte einen Projektnamen eingeben");
-      return;
-    }
-
-    // PLZ: Projektfeld, sonst vom gewählten Kunden übernehmen
-    const plzKunde = selectedNewProjectCustomerId !== "none"
-      ? newProjectCustomers.find((c) => c.id === selectedNewProjectCustomerId)?.ort
-      : null;
-    const plz = projektPlz(newProjectPlz, plzKunde);
-    if (!plz) {
-      sonnerToast.error(PLZ_FEHLT);
-      return;
-    }
-
-    setCreatingProject(true);
-
-    // Client-ID -> offline-fähig; abhängige Ordner referenzieren dieselbe ID.
-    const projectId = newId();
-    let anyQueued = false;
-    const label = `Projekt ${newProjectName.trim()}`;
-
-    // Kunde: gewählten Datensatz für die Adressableitung heranziehen
-    const selectedCustomer = selectedNewProjectCustomerId !== "none"
-      ? newProjectCustomers.find((c) => c.id === selectedNewProjectCustomerId) ?? null
-      : null;
-
-    // Projektadresse: falls leer, aus Kundenadresse übernehmen (wie Projects.tsx)
-    const derivedAdresse = newProjectAddress.trim()
-      || (selectedCustomer ? [selectedCustomer.strasse, selectedCustomer.ort].filter(Boolean).join(", ") : "");
-
-    const r = await saveInsert("projects", {
-      id: projectId,
-      name: newProjectName.trim(),
-      plz,
-      adresse: derivedAdresse || null,
-      status: "aktiv",
-      customer_id: selectedCustomer ? selectedCustomer.id : null,
-      beschreibung: newProjectBeschreibung.trim() || null,
-      status_id: newProjectStatusId !== "none" ? newProjectStatusId : null,
-    }, label);
-    if (r.error) {
-      sonnerToast.error(/23505|duplicate/i.test(r.error) ? "Ein Projekt mit diesem Namen und PLZ existiert bereits" : "Projekt konnte nicht erstellt werden");
-      setCreatingProject(false);
-      return;
-    }
-    anyQueued = r.queued;
-
-    // Standardordner anlegen (leere Ordner via .keep-Platzhalter). Sobald das
-    // Projekt in der Warteschlange steckt, gehen auch die Ordner in die
-    // Warteschlange (force), damit sie nicht online gegen ein noch nicht
-    // synchronisiertes Projekt laufen.
-    for (const folder of STANDARD_PROJECT_FOLDERS) {
-      const fr = await saveUpload(
-        { bucket: "project-files", path: `${projectId}/${folder}/.keep`, blob: new Blob([""], { type: "text/plain" }) },
-        label,
-        anyQueued
-      );
-      anyQueued = anyQueued || fr.queued;
-    }
-
-    // OneDrive-Ordner SOFORT anlegen (online direkt, offline über die Warteschlange
-    // nach den Inserts). Fehler stören nicht — der 10-Min-Sync ist das Sicherheitsnetz.
-    void saveInvoke("onedrive-sync", { projectId }, `OneDrive-Ordner: ${newProjectName.trim()}`, anyQueued);
-
-    sonnerToast.success(anyQueued ? "Projekt offline gespeichert – wird gesendet, sobald wieder Internet da ist" : "Projekt erfolgreich erstellt");
-
-    // Set the project in the pending block (client-ID ist stabil)
-    if (pendingBlockIdForNewProject) {
-      updateBlock(pendingBlockIdForNewProject, { projectId });
-    }
-
-    setShowNewProjectDialog(false);
-    setNewProjectName("");
-    setNewProjectPlz("");
-    setNewProjectAddress("");
-    setNewProjectBeschreibung("");
-    setSelectedNewProjectCustomerId("none");
-    setNewProjectStatusId("none");
+  // Neues Projekt aus der Zeiterfassung: gemeinsamer Dialog, danach gleich im Block auswählen
+  const projektErstellt = ({ id }: { id: string }) => {
+    if (pendingBlockIdForNewProject) updateBlock(pendingBlockIdForNewProject, { projectId: id });
     setPendingBlockIdForNewProject(null);
-    setCreatingProject(false);
+    fetchProjects();
   };
 
   const fetchProjects = async () => {
@@ -1371,94 +1260,8 @@ const TimeTracking = () => {
           </CardContent>
         </Card>
 
-        {/* New Project Dialog */}
-        <Dialog open={showNewProjectDialog} onOpenChange={setShowNewProjectDialog}>
-          <DialogContent className="max-w-sm sm:max-w-lg max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Neues Projekt erstellen</DialogTitle>
-              <DialogDescription>Geben Sie die Details ein.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div><Label>Projektname *</Label><Input value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} /></div>
-              <div>
-                <Label>Kunde</Label>
-                <Select value={selectedNewProjectCustomerId} onValueChange={setSelectedNewProjectCustomerId}>
-                  <SelectTrigger className="w-full min-w-0"><SelectValue placeholder="Kunde auswählen" /></SelectTrigger>
-                  {/* Popup nie breiter als der Bildschirm (lange Kunden-/Adresstexte am Handy) */}
-                  <SelectContent className="max-w-[calc(100vw-2rem)]">
-                    <SelectItem value="none">— Kein Kunde —</SelectItem>
-                    {newProjectCustomers.map((c) => (
-                      <SelectItem key={c.id} value={c.id} className="break-words">
-                        {customerDisplayName(c)}{customerAddress(c) ? ` (${customerAddress(c)})` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {(() => {
-                // PLZ des gewählten Kunden — wird übernommen, wenn das Feld leer bleibt
-                const kundenPlz = projektPlz("", newProjectCustomers.find((c) => c.id === selectedNewProjectCustomerId)?.ort);
-                return (
-                  <div>
-                    <Label>PLZ{kundenPlz ? "" : " *"}</Label>
-                    <Input value={newProjectPlz} inputMode="numeric" onChange={(e) => setNewProjectPlz(plzEingabe(e.target.value))} placeholder={kundenPlz ? `${kundenPlz} (vom Kunden)` : "z.B. 2700"} />
-                  </div>
-                );
-              })()}
-              <div>
-                <Label>Adresse</Label>
-                <Input value={newProjectAddress} onChange={(e) => setNewProjectAddress(e.target.value)} placeholder="Leer lassen = Adresse des Kunden" />
-              </div>
-              <div>
-                <Label>Beschreibung <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                <Textarea value={newProjectBeschreibung} onChange={(e) => setNewProjectBeschreibung(e.target.value)} placeholder="Kurze Projektbeschreibung..." className="min-h-20" />
-              </div>
-              <div>
-                <Label htmlFor="new-project-status">Ampel-Status</Label>
-                <Select value={newProjectStatusId} onValueChange={setNewProjectStatusId}>
-                  <SelectTrigger id="new-project-status" className="w-full min-w-0"><SelectValue placeholder="Status wählen" /></SelectTrigger>
-                  <SelectContent className="max-w-[calc(100vw-2rem)]">
-                    <SelectItem value="none">
-                      <span className="flex items-center gap-2">
-                        <span className="h-3 w-3 rounded-full border-2 border-muted-foreground/50 shrink-0" />
-                        Kein Status
-                      </span>
-                    </SelectItem>
-                    {projectStatuses.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        <span className="flex items-center gap-2">
-                          <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
-                          {s.name}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex flex-wrap gap-2 justify-end">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowNewProjectDialog(false);
-                    setNewProjectName("");
-                    setNewProjectPlz("");
-                    setNewProjectAddress("");
-                    setNewProjectBeschreibung("");
-                    setSelectedNewProjectCustomerId("none");
-                    setNewProjectStatusId("none");
-                    setPendingBlockIdForNewProject(null);
-                  }}
-                  disabled={creatingProject}
-                >
-                  Abbrechen
-                </Button>
-                <Button onClick={handleCreateNewProject} disabled={creatingProject}>
-                  {creatingProject ? 'Wird erstellt...' : 'Erstellen'}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        {/* Neues Projekt: derselbe Dialog wie in der Projektliste und am Dashboard */}
+        <NeuesProjektDialog open={showNewProjectDialog} onOpenChange={setShowNewProjectDialog} onErstellt={projektErstellt} />
 
         {/* Absence Dialog */}
         <Dialog open={showAbsenceDialog} onOpenChange={setShowAbsenceDialog}>

@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, FolderKanban, Users, BarChart3, LogOut, FileText, Download, User as UserIcon, Package, FilePlus2, ClipboardList, FileCheck, Paintbrush, Receipt, Camera, Shield, BookUser, Banknote, HardHat, LayoutGrid, Mail, CalendarDays, Inbox, Wrench, type LucideIcon } from "lucide-react";
+import { Clock, FolderKanban, Users, BarChart3, LogOut, FileText, Download, User as UserIcon, Package, FilePlus2, ClipboardList, FileCheck, Paintbrush, Receipt, Camera, Shield, BookUser, Banknote, HardHat, LayoutGrid, Mail, CalendarDays, Inbox, Wrench, Plus, type LucideIcon } from "lucide-react";
 import { KBButton, KBSectionHeader } from "@/components/kingbill";
 import { ErstaufnahmeDialog, type ErstaufnahmePrefill } from "@/components/ErstaufnahmeDialog";
 import { DashboardVoiceAssistant } from "@/components/DashboardVoiceAssistant";
@@ -12,6 +12,7 @@ import { DrawingEditor } from "@/components/DrawingEditor";
 import { FotoAufnahme } from "@/components/FotoAufnahme";
 import { TermineHeute } from "@/components/TermineHeute";
 import { WartungenFaellig } from "@/components/wartung/WartungenFaellig";
+import { NeuesProjektDialog } from "@/components/projekt/NeuesProjektDialog";
 import { cachedSelect } from "@/lib/offlineStore";
 import { warmOfflineCache } from "@/lib/cachedQueries";
 import { useToast } from "@/hooks/use-toast";
@@ -60,6 +61,7 @@ export default function Index() {
   const [showErstaufnahme, setShowErstaufnahme] = useState(false);
   const [showDrawing, setShowDrawing] = useState(false);
   const [showFotos, setShowFotos] = useState(false);
+  const [showNeuesProjekt, setShowNeuesProjekt] = useState(false);
   const [erstaufnahmePrefill, setErstaufnahmePrefill] = useState<ErstaufnahmePrefill | undefined>(undefined);
   const [user, setUser] = useState<User | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
@@ -423,18 +425,23 @@ export default function Index() {
         <div className="mt-4">
           <DashboardVoiceAssistant onErstaufnahme={(prefill) => { setErstaufnahmePrefill(prefill); setShowErstaufnahme(true); }} />
         </div>
-        {projects.length > 0 && (
-          <section className="mt-6 max-w-3xl">
-            <KBSectionHeader icon={FolderKanban} title="Aktive Projekte" />
-            <div className="mt-2 flex flex-col gap-2">
-              {projects.map((project) => <KBButton key={project.id} className="w-full min-h-[44px]" icon={FolderKanban} label={project.name} onClick={() => navigate(`/projects/${project.id}`)} />)}
-            </div>
-          </section>
-        )}
+        <section className="mt-6 max-w-3xl">
+          <div className="flex items-center gap-2">
+            <div className="flex-1 min-w-0"><KBSectionHeader icon={FolderKanban} title="Aktive Projekte" /></div>
+            <Button size="sm" className="gap-1.5 shrink-0" onClick={() => setShowNeuesProjekt(true)}>
+              <Plus className="h-4 w-4" /> Neues Projekt
+            </Button>
+          </div>
+          <div className="mt-2 flex flex-col gap-2">
+            {projects.map((project) => <KBButton key={project.id} className="w-full min-h-[44px]" icon={FolderKanban} label={project.name} onClick={() => navigate(`/projects/${project.id}`)} />)}
+            {projects.length === 0 && <p className="text-sm text-muted-foreground">Noch keine aktiven Projekte.</p>}
+          </div>
+        </section>
       </main>
       <ErstaufnahmeDialog open={showErstaufnahme} onOpenChange={setShowErstaufnahme} prefill={erstaufnahmePrefill} onFinished={(projectId) => navigate(`/projects/${projectId}`)} />
       <DrawingEditor open={showDrawing} onOpenChange={setShowDrawing} />
       <FotoAufnahme open={showFotos} onOpenChange={setShowFotos} />
+      <NeuesProjektDialog open={showNeuesProjekt} onOpenChange={setShowNeuesProjekt} onErstellt={({ id, queued }) => { fetchProjects(); if (!queued) navigate(`/projects/${id}`); }} />
     </div>
   );
 }

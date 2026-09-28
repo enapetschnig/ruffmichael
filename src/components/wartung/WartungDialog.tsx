@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Auswahl } from "@/components/Auswahl";
+import { KundenAuswahl } from "@/components/kunde/KundenAuswahl";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { getSessionUser } from "@/lib/auth";
@@ -15,9 +16,6 @@ import { INTERVALL_OPTIONEN, VORLAUF_OPTIONEN, type Wartung } from "@/lib/wartun
 
 export type KundeWahl = { id: string; vorname: string | null; nachname: string; firma: string | null; ort: string | null };
 export type ProjektWahl = { id: string; name: string; customer_id: string | null };
-
-const kundeLabel = (k: KundeWahl) =>
-  [k.firma?.trim() || [k.vorname, k.nachname].filter(Boolean).join(" "), k.ort].filter(Boolean).join(" · ");
 
 const leer = { customer_id: "", project_id: "", bezeichnung: "", faellig_am: "", vorlauf_tage: "14", intervall: "12", preis: "", notiz: "" };
 
@@ -101,15 +99,7 @@ export function WartungDialog({ open, onOpenChange, wartung, kunden, projekte, v
           </div>
           <div className="space-y-1.5">
             <Label>Kunde</Label>
-            <Auswahl
-              wert={f.customer_id}
-              optionen={kunden}
-              label={kundeLabel}
-              suchtext={(k) => [k.firma, k.vorname, k.nachname, k.ort].filter(Boolean).join(" ")}
-              platzhalter="Kunde wählen …"
-              leer="— kein Kunde —"
-              onChange={(id) => setF({ ...f, customer_id: id })}
-            />
+            <KundenAuswahl wert={f.customer_id} onChange={(k) => setF((alt) => ({ ...alt, customer_id: k?.id ?? "" }))} />
           </div>
           <div className="space-y-1.5">
             <Label>Projekt <span className="text-muted-foreground font-normal">(optional)</span></Label>

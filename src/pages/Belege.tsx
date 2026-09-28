@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Plus, Search, FileText, Receipt, AlertCircle, Layers, FileCheck, UserPlus, Loader2, Download } from "lucide-react";
+import { Plus, Search, FileText, Receipt, AlertCircle, Layers, FileCheck, Download } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,9 +12,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { getSessionUser } from "@/lib/auth";
-import { customerDisplayName, CustomerFormFields, customerFormToRow, emptyCustomerForm } from "@/pages/Customers";
+import { customerDisplayName } from "@/pages/Customers";
 import { BelegExport } from "@/components/BelegExport";
 import { Auswahl } from "@/components/Auswahl";
+import { KundenAuswahl, type Kunde } from "@/components/kunde/KundenAuswahl";
 import { projectLabel } from "@/lib/projectLabel";
 import { alleZeilen } from "@/lib/alleZeilen";
 import { cn } from "@/lib/utils";
@@ -57,10 +58,9 @@ const Belege = () => {
   const [neu, setNeu] = useState<{ typ: BelegTyp; kunde: string; projekt: string }>({ typ: "angebot", kunde: params.get("kunde") ?? "", projekt: params.get("projekt") ?? "" });
   const [anlegen, setAnlegen] = useState(false);
   // Neuen Kunden direkt aus dem Beleg-Dialog anlegen (wenn er noch nicht existiert)
-  const [neuerKundeOpen, setNeuerKundeOpen] = useState(false);
+  // Gewählter Kunde als ganzer Datensatz — auch ein gerade neu angelegter, der noch nicht in „kunden“ steht
+  const [gewaehlterKunde, setGewaehlterKunde] = useState<Kunde | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
-  const [kundeForm, setKundeForm] = useState({ ...emptyCustomerForm });
-  const [kundeSpeichert, setKundeSpeichert] = useState(false);
   // Aus der Projektübersicht / Kundenliste kommend: nur die passenden Belege
   const projektFilter = params.get("projekt");
   const kundeFilter = params.get("kunde");
@@ -154,7 +154,7 @@ const Belege = () => {
   const gefiltertHinweis = projektFilter || kundeFilter ? " (gefiltert)" : "";
 
   const belegAnlegen = async () => {
-    const k = kunden.find((x) => x.id === neu.kunde);
+    const k = (gewaehlterKunde?.id === neu.kunde ? gewaehlterKunde : null) ?? kunden.find((x) => x.id === neu.kunde);
     if (!k) return toast({ variant: "destructive", title: "Kunde fehlt", description: "Bitte einen Kunden wählen." });
     if (anlegen) return;
     setAnlegen(true);
@@ -182,29 +182,6 @@ const Belege = () => {
     setAnlegen(false);
     setNeuOpen(false);
     navigate(`/belege/${data.id}`);
-  };
-
-  const neuerKundeStarten = (suche = "") => {
-    // Suchbegriff sinnvoll vorbelegen: „Müller GmbH“ → Firma, sonst Nachname
-    const f = { ...emptyCustomerForm };
-    if (/gmbh|og|kg|ag|e\.u\.|gesmbh|ges\.m\.b\.h/i.test(suche)) { f.firma = suche; f.ist_unternehmer = true; } else { f.nachname = suche; }
-    setKundeForm(f);
-    setNeuerKundeOpen(true);
-  };
-  const kundeAnlegen = async () => {
-    if (!kundeForm.nachname.trim()) return toast({ variant: "destructive", title: "Nachname fehlt", description: "Bitte Nachname bzw. Ansprechperson eingeben — bei Firmen zusätzlich die Firma." });
-    if (kundeSpeichert) return;
-    setKundeSpeichert(true);
-    const user = await getSessionUser();
-    const row = customerFormToRow(kundeForm);
-    const { data, error } = await supabase.from("customers").insert({ ...row, created_by: user?.id ?? null }).select("id, kundennr, vorname, nachname, firma, strasse, ort, uid, ist_unternehmer, reverse_charge, zahlungsziel_tage, email").single();
-    setKundeSpeichert(false);
-    if (error || !data) return toast({ variant: "destructive", title: "Kunde nicht angelegt", description: error?.message });
-    const k = data as KundeOpt;
-    setKunden((l) => [...l, k].sort((a, b) => a.nachname.localeCompare(b.nachname)));
-    setNeu((n) => ({ ...n, kunde: k.id }));
-    setNeuerKundeOpen(false);
-    toast({ title: "Kunde angelegt", description: `${kundeName(k)} ist gespeichert und für diesen Beleg gewählt.` });
   };
 
   const filterKunde = kundeFilter ? kunden.find((x) => x.id === kundeFilter) : null;
@@ -340,13 +317,15 @@ const Belege = () => {
               {!neu.projekt && <p className="text-xs text-muted-foreground">Ohne Projekt bleibt das PDF nur in der App (kein OneDrive-Ordner, keine Stunden zum Holen).</p>}
             </div>
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between gap-2">
-                <Label>Kunde *</Label>
-                <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 text-primary" onClick={() => neuerKundeStarten()}><UserPlus className="h-4 w-4" />Neuer Kunde</Button>
-              </div>
-              <Auswahl wert={neu.kunde} optionen={kunden} label={(k) => `${k.kundennr ? `${k.kundennr} · ` : ""}${kundeName(k)}${k.ort ? ` (${k.ort})` : ""}`} suchtext={(k) => `${k.kundennr ?? ""} ${k.firma ?? ""} ${k.vorname ?? ""} ${k.nachname} ${k.ort ?? ""} ${k.strasse ?? ""}`} platzhalter="Kunde wählen — tippen zum Suchen" onChange={(id) => setNeu({ ...neu, kunde: id })} onNeu={neuerKundeStarten} />
+              <Label>Kunde *</Label>
+              <KundenAuswahl
+                wert={neu.kunde}
+                zeigeRechnungsdaten
+                pflicht
+                onChange={(k) => { setGewaehlterKunde(k); setNeu({ ...neu, kunde: k?.id ?? "" }); }}
+              />
               {projektKundeWeicht && <p className="text-xs text-amber-700 dark:text-amber-400">Achtung: Das Projekt gehört einem anderen Kunden.</p>}
-              {neu.kunde && kunden.find((k) => k.id === neu.kunde)?.reverse_charge && <p className="text-xs text-muted-foreground">Reverse Charge ist bei diesem Kunden hinterlegt — der Beleg wird ohne USt erstellt.</p>}
+              {neu.kunde && (gewaehlterKunde?.id === neu.kunde ? gewaehlterKunde : kunden.find((k) => k.id === neu.kunde))?.reverse_charge && <p className="text-xs text-muted-foreground">Reverse Charge ist bei diesem Kunden hinterlegt — der Beleg wird ohne USt erstellt.</p>}
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setNeuOpen(false)}>Abbrechen</Button>
@@ -361,19 +340,6 @@ const Belege = () => {
         hinweis={projektFilter || kundeFilter ? "Der Projekt-/Kundenfilter der Liste gilt hier nicht — exportiert werden alle Belege des gewählten Zeitraums." : undefined} />
 
       {/* Neuer Kunde — direkt aus dem Beleg heraus, damit man nicht erst in die Kundenverwaltung muss */}
-      <Dialog open={neuerKundeOpen} onOpenChange={(o) => { if (!kundeSpeichert) setNeuerKundeOpen(o); }}>
-        <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-xl max-h-[90dvh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Neuen Kunden anlegen</DialogTitle>
-            <DialogDescription>Wird in der Kundenverwaltung gespeichert und gleich für diesen Beleg gewählt.</DialogDescription>
-          </DialogHeader>
-          <CustomerFormFields form={kundeForm} setForm={setKundeForm} zeigeRechnungsdaten />
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setNeuerKundeOpen(false)} disabled={kundeSpeichert}>Abbrechen</Button>
-            <Button onClick={kundeAnlegen} disabled={kundeSpeichert} className="gap-1">{kundeSpeichert ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}Kunde anlegen</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

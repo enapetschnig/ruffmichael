@@ -257,7 +257,7 @@ const ProjectOverview = () => {
     <div className="kb-page min-h-screen">
       <PageHeader title={projectName || "Projekt"} backPath="/projects">
             {/* Projekt bearbeiten: wie in der Projektliste für alle sichtbar. */}
-              <Button variant="outline" size="sm" className="gap-1" onClick={() => setEditOpen(true)}>
+              <Button variant="outline" size="sm" className="gap-1" onClick={() => setEditOpen(true)} aria-label="Projekt bearbeiten">
                 <Pencil className="h-4 w-4" />
                 <span className="hidden sm:inline">Bearbeiten</span>
               </Button>

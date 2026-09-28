@@ -1278,6 +1278,7 @@ export type Database = {
           kategorie_grund: string | null
           kategorie_quelle: string | null
           kategorie_sicherheit: number | null
+          koerper_html: string | null
           koerper_text: string | null
           konversation_id: string | null
           kunde_id: string | null
@@ -1309,6 +1310,7 @@ export type Database = {
           kategorie_grund?: string | null
           kategorie_quelle?: string | null
           kategorie_sicherheit?: number | null
+          koerper_html?: string | null
           koerper_text?: string | null
           konversation_id?: string | null
           kunde_id?: string | null
@@ -1340,6 +1342,7 @@ export type Database = {
           kategorie_grund?: string | null
           kategorie_quelle?: string | null
           kategorie_sicherheit?: number | null
+          koerper_html?: string | null
           koerper_text?: string | null
           konversation_id?: string | null
           kunde_id?: string | null
@@ -1837,6 +1840,56 @@ export type Database = {
           },
         ]
       }
+      restarbeiten: {
+        Row: {
+          beschreibung: string
+          created_at: string
+          created_by: string | null
+          erledigt: boolean
+          erledigt_am: string | null
+          erledigt_von: string | null
+          faellig_am: string | null
+          id: string
+          project_id: string
+          updated_at: string
+          zustaendig: string | null
+        }
+        Insert: {
+          beschreibung: string
+          created_at?: string
+          created_by?: string | null
+          erledigt?: boolean
+          erledigt_am?: string | null
+          erledigt_von?: string | null
+          faellig_am?: string | null
+          id?: string
+          project_id: string
+          updated_at?: string
+          zustaendig?: string | null
+        }
+        Update: {
+          beschreibung?: string
+          created_at?: string
+          created_by?: string | null
+          erledigt?: boolean
+          erledigt_am?: string | null
+          erledigt_von?: string | null
+          faellig_am?: string | null
+          id?: string
+          project_id?: string
+          updated_at?: string
+          zustaendig?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "restarbeiten_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       time_account_transactions: {
         Row: {
           balance_after: number
@@ -2132,6 +2185,98 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      wartungen: {
+        Row: {
+          beleg_id: string | null
+          bezeichnung: string
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          erledigt_am: string | null
+          erledigt_von: string | null
+          faellig_am: string
+          id: string
+          intervall_monate: number | null
+          mail_gesendet_am: string | null
+          notiz: string | null
+          preis: number | null
+          project_id: string | null
+          status: string
+          updated_at: string
+          vorgaenger_id: string | null
+          vorlauf_tage: number
+        }
+        Insert: {
+          beleg_id?: string | null
+          bezeichnung: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          erledigt_am?: string | null
+          erledigt_von?: string | null
+          faellig_am: string
+          id?: string
+          intervall_monate?: number | null
+          mail_gesendet_am?: string | null
+          notiz?: string | null
+          preis?: number | null
+          project_id?: string | null
+          status?: string
+          updated_at?: string
+          vorgaenger_id?: string | null
+          vorlauf_tage?: number
+        }
+        Update: {
+          beleg_id?: string | null
+          bezeichnung?: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          erledigt_am?: string | null
+          erledigt_von?: string | null
+          faellig_am?: string
+          id?: string
+          intervall_monate?: number | null
+          mail_gesendet_am?: string | null
+          notiz?: string | null
+          preis?: number | null
+          project_id?: string | null
+          status?: string
+          updated_at?: string
+          vorgaenger_id?: string | null
+          vorlauf_tage?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wartungen_beleg_id_fkey"
+            columns: ["beleg_id"]
+            isOneToOne: false
+            referencedRelation: "belege"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wartungen_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wartungen_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wartungen_vorgaenger_id_fkey"
+            columns: ["vorgaenger_id"]
+            isOneToOne: false
+            referencedRelation: "wartungen"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       week_settings: {
         Row: {

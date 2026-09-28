@@ -4,13 +4,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, FolderKanban, Users, BarChart3, LogOut, FileText, Download, User as UserIcon, Package, FilePlus2, ClipboardList, FileCheck, Paintbrush, Receipt, Camera, Shield, BookUser, Banknote, HardHat, LayoutGrid, Mail, CalendarDays, Inbox, type LucideIcon } from "lucide-react";
+import { Clock, FolderKanban, Users, BarChart3, LogOut, FileText, Download, User as UserIcon, Package, FilePlus2, ClipboardList, FileCheck, Paintbrush, Receipt, Camera, Shield, BookUser, Banknote, HardHat, LayoutGrid, Mail, CalendarDays, Inbox, Wrench, type LucideIcon } from "lucide-react";
 import { KBButton, KBSectionHeader } from "@/components/kingbill";
 import { ErstaufnahmeDialog, type ErstaufnahmePrefill } from "@/components/ErstaufnahmeDialog";
 import { DashboardVoiceAssistant } from "@/components/DashboardVoiceAssistant";
 import { DrawingEditor } from "@/components/DrawingEditor";
 import { FotoAufnahme } from "@/components/FotoAufnahme";
 import { TermineHeute } from "@/components/TermineHeute";
+import { WartungenFaellig } from "@/components/wartung/WartungenFaellig";
 import { cachedSelect } from "@/lib/offlineStore";
 import { warmOfflineCache } from "@/lib/cachedQueries";
 import { useToast } from "@/hooks/use-toast";
@@ -359,6 +360,8 @@ export default function Index() {
       </header>
 
       <main className="mx-auto w-full max-w-[1600px] px-3 sm:px-4 lg:px-6 py-4 sm:py-6">
+        {/* Fällige Wartungen ganz oben — je nach eingestellter Vorwarnzeit */}
+        {isAdmin && <WartungenFaellig />}
         <ErledigteWuensche />
         {user && isAdmin && <NeuerungenBanner userId={user.id} />}
         {/* Was heute ansteht — direkt aus Michaels Outlook-Kalender */}
@@ -387,6 +390,7 @@ export default function Index() {
           </Bereich>}
           {isAdmin && <Bereich icon={CalendarDays} title="Kalender">
             <KBButton className="w-full" icon={CalendarDays} label="Termine (Outlook)" onClick={() => navigate("/kalender")} />
+            <KBButton className="w-full" icon={Wrench} label="Wartungen" onClick={() => navigate("/wartungen")} />
           </Bereich>}
           <Bereich icon={BookUser} title="Kunden">
             <KBButton className="w-full" icon={BookUser} label="Kunden" onClick={() => navigate("/customers")} />

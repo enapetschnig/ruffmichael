@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Plus, Search, FileText, Receipt, AlertCircle, Check, ChevronsUpDown, Layers, FileCheck, UserPlus, Loader2, Download } from "lucide-react";
+import { Plus, Search, FileText, Receipt, AlertCircle, Layers, FileCheck, UserPlus, Loader2, Download } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,19 +9,18 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { getSessionUser } from "@/lib/auth";
 import { customerDisplayName, CustomerFormFields, customerFormToRow, emptyCustomerForm } from "@/pages/Customers";
 import { BelegExport } from "@/components/BelegExport";
+import { Auswahl } from "@/components/Auswahl";
 import { projectLabel } from "@/lib/projectLabel";
 import { alleZeilen } from "@/lib/alleZeilen";
 import { cn } from "@/lib/utils";
 import {
-  TYP_LABEL, STATUS_LABEL, STATUS_VARIANT, eur, datum, heuteISO, plusTage, istRechnung, istAngebot, offen,
-  ladeFirmendaten, type Beleg, type BelegTyp,
+  TYP_LABEL, STATUS_LABEL, STATUS_VARIANT, eur, datum, heuteISO, istRechnung, istAngebot, offen,
+  ladeFirmendaten, belegEntwurfAnlegen, type Beleg, type BelegTyp,
 } from "@/lib/faktura";
 
 type KundeOpt = { id: string; kundennr: string | null; vorname: string | null; nachname: string; firma: string | null; strasse: string | null; ort: string | null; uid: string | null; ist_unternehmer: boolean; reverse_charge: boolean; zahlungsziel_tage: number | null; email: string | null };
@@ -35,54 +34,6 @@ const NEU_TYPEN: { typ: BelegTyp; icon: React.ReactNode; text: string }[] = [
   { typ: "schlussrechnung", icon: <FileCheck className="h-5 w-5" />, text: "Abschluss eines Projekts — zieht erstellte Teilrechnungen automatisch ab" },
 ];
 const kundeName = (k: KundeOpt) => k.firma?.trim() || customerDisplayName({ vorname: k.vorname ?? "", nachname: k.nachname });
-
-/** Auswahlfeld mit Suche — 116 Kunden ohne Suche sind am Handy nicht bedienbar. */
-function Auswahl<T extends { id: string }>({ wert, optionen, label, suchtext, platzhalter, leer, onChange, onNeu }: {
-  wert: string; optionen: T[]; label: (o: T) => string; suchtext: (o: T) => string; platzhalter: string; leer?: string; onChange: (id: string) => void;
-  /** Wird angeboten, wenn die Suche nichts findet — z. B. „… als neuen Kunden anlegen“ */
-  onNeu?: (suche: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [suche, setSuche] = useState("");
-  const gewaehlt = optionen.find((o) => o.id === wert);
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between font-normal h-11">
-          <span className={cn("truncate", !gewaehlt && "text-muted-foreground")}>{gewaehlt ? label(gewaehlt) : platzhalter}</span>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
-        <Command filter={(value, search) => (value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0)}>
-          <CommandInput placeholder="Tippen zum Suchen…" value={suche} onValueChange={setSuche} />
-          <CommandList className="max-h-64">
-            <CommandEmpty>
-              {onNeu ? (
-                <button type="button" className="w-full text-left px-2 py-1.5 text-sm rounded-md hover:bg-accent flex items-center gap-2" onClick={() => { onNeu(suche.trim()); setOpen(false); }}>
-                  <UserPlus className="h-4 w-4 shrink-0" />{suche.trim() ? `„${suche.trim()}“ als neuen Kunden anlegen` : "Neuen Kunden anlegen"}
-                </button>
-              ) : "Nichts gefunden."}
-            </CommandEmpty>
-            <CommandGroup>
-              {leer && (
-                <CommandItem value="__leer__" onSelect={() => { onChange(""); setOpen(false); }}>
-                  <Check className={cn("mr-2 h-4 w-4", wert ? "opacity-0" : "opacity-100")} />{leer}
-                </CommandItem>
-              )}
-              {optionen.map((o) => (
-                <CommandItem key={o.id} value={`${suchtext(o)} ${o.id}`} onSelect={() => { onChange(o.id); setOpen(false); }}>
-                  <Check className={cn("mr-2 h-4 w-4", wert === o.id ? "opacity-100" : "opacity-0")} />
-                  <span className="truncate">{label(o)}</span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-}
 
 /** Liste aller Angebote und Rechnungen (nur Admin). */
 const Belege = () => {
@@ -207,36 +158,15 @@ const Belege = () => {
     if (!k) return toast({ variant: "destructive", title: "Kunde fehlt", description: "Bitte einen Kunden wählen." });
     if (anlegen) return;
     setAnlegen(true);
-    const firma = await ladeFirmendaten();
     const user = await getSessionUser();
-    const heute = heuteISO();
-    const zahlungsziel = k.zahlungsziel_tage ?? firma?.zahlungsziel_tage ?? 14;
-    const rechnung = istRechnung(neu.typ);
-    const { data, error } = await supabase.from("belege").insert({
+    const { beleg: data, error } = await belegEntwurfAnlegen({
       typ: neu.typ,
-      project_id: neu.projekt || null,
-      customer_id: k.id,
-      // Snapshot der Kundendaten
-      kunde_name: kundeName(k),
-      kunde_zusatz: k.firma?.trim() ? customerDisplayName({ vorname: k.vorname ?? "", nachname: k.nachname }) : null,
-      kunde_strasse: k.strasse, kunde_plz_ort: k.ort, kunde_uid: k.uid, kunde_email: k.email,
-      datum: heute,
-      faellig_am: rechnung ? plusTage(heute, zahlungsziel) : null,
-      gueltig_bis: neu.typ === "angebot" ? plusTage(heute, firma?.angebot_gueltig_tage ?? 30) : null,
-      // Leistungszeitraum ist Pflicht auf der Rechnung — Vorbelegung heute, „Stunden holen“ erweitert
-      leistung_von: rechnung ? heute : null,
-      leistung_bis: rechnung ? heute : null,
-      // Reverse Charge gilt auch fürs Angebot: der Kunde soll keine USt sehen, die es nicht gibt
-      reverse_charge: !!k.reverse_charge,
-      ust_satz: firma?.ust_satz ?? 20,
-      skonto_prozent: rechnung ? firma?.skonto_prozent ?? null : null,
-      skonto_tage: rechnung ? firma?.skonto_tage ?? null : null,
-      einleitung: rechnung ? firma?.rechnung_einleitung : firma?.angebot_einleitung,
-      schlusstext: rechnung ? firma?.rechnung_schluss : firma?.angebot_schluss,
+      kunde: k,
+      projektId: neu.projekt || null,
       betreff: neu.projekt ? projectLabel(projekte.find((p) => p.id === neu.projekt) as never) : null,
-      created_by: user?.id ?? null,
-    }).select().single();
-    if (error || !data) { setAnlegen(false); return toast({ variant: "destructive", title: "Fehler", description: error?.message }); }
+      userId: user?.id ?? null,
+    });
+    if (error || !data) { setAnlegen(false); return toast({ variant: "destructive", title: "Fehler", description: error }); }
 
     // Schlussrechnung: festgeschriebene Teilrechnungen desselben Projekts automatisch abziehen
     if (neu.typ === "schlussrechnung" && neu.projekt) {

@@ -1,7 +1,7 @@
 import { PageHeader } from "@/components/PageHeader";
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, FileText, FileCheck, FolderOpen, Package, Camera, ImagePlus, Lock, FileSignature, Plus, CheckCircle2, Pencil, Settings, Receipt, Mail } from "lucide-react";
+import { ArrowLeft, FileText, FileCheck, FolderOpen, Package, Camera, ImagePlus, Lock, FileSignature, Plus, CheckCircle2, Pencil, Settings, Receipt, Mail, Wrench } from "lucide-react";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { projectLabel } from "@/lib/projectLabel";
 import { saveUpdate } from "@/lib/offlineData";
 import { UebernahmeDialog } from "@/components/UebernahmeDialog";
+import { RestarbeitenKnopf } from "@/components/restarbeiten/Restarbeiten";
 import { cachedSelect } from "@/lib/offlineStore";
 import { fetchCustomersCached, fetchStatusesCached } from "@/lib/cachedQueries";
 import { ProjectEditDialog, type EditableProject, type CustomerOption, type StatusOption } from "@/components/ProjectEditDialog";
@@ -286,6 +287,8 @@ const ProjectOverview = () => {
 
         {/* Schnellaktionen */}
         <div className="mb-4 flex flex-wrap gap-2">
+          {/* Restarbeiten: farbig — rot überfällig, orange offen, sonst neutral */}
+          {projectId && <RestarbeitenKnopf projectId={projectId} isAdmin={isAdmin} />}
           <Button className="gap-2" onClick={() => setUebernahmeOpen(true)}>
             <FileCheck className="h-4 w-4" />
             Übernahmebestätigung erstellen
@@ -300,6 +303,13 @@ const ProjectOverview = () => {
             <Button variant="outline" className="gap-2" onClick={() => navigate(`/postfach?projekt=${projectId}`)}>
               <Mail className="h-4 w-4" />
               Schriftverkehr{schriftverkehr > 0 ? ` (${schriftverkehr})` : ""}
+            </Button>
+          )}
+          {/* Wartung für dieses Projekt eintragen (Kunde wird übernommen) */}
+          {isAdmin && (
+            <Button variant="outline" className="gap-2" onClick={() => navigate(`/wartungen?neu=1&projekt=${projectId}${project?.customer_id ? `&kunde=${project.customer_id}` : ""}`)}>
+              <Wrench className="h-4 w-4" />
+              Wartung eintragen
             </Button>
           )}
         </div>

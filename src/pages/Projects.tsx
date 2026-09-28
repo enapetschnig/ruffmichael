@@ -49,6 +49,7 @@ type Project = {
   project_statuses?: Pick<ProjectStatus, "id" | "name" | "color"> | null;
   customer_id?: string | null;
   customers?: ProjectCustomer | null;
+  restarbeiten?: { erledigt: boolean; faellig_am: string | null }[] | null;
   created_at: string;
   updated_at: string;
   fileCount?: {
@@ -76,6 +77,8 @@ const toStorageKey = (name: string): string =>
 
 // Kundenvorlage kommt aus der Kundenverwaltung — eine Quelle für alle Felder.
 import { emptyCustomerForm } from "@/pages/Customers";
+import { plzEingabe, projektPlz, PLZ_FEHLT } from "@/lib/plz";
+import { RestarbeitenSchild } from "@/components/restarbeiten/Restarbeiten";
 
 const Projects = () => {
   const navigate = useNavigate();
@@ -135,6 +138,10 @@ const Projects = () => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => {
         fetchProjects();
       })
+      // Restarbeiten abgehakt/neu → farbige Zähler in der Liste gleich nachziehen
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'restarbeiten' }, () => {
+        fetchProjects();
+      })
       .subscribe();
 
     return () => {
@@ -190,7 +197,7 @@ const Projects = () => {
 
     const { data, error } = await supabase
       .from("projects")
-      .select("*, customers(id, vorname, nachname, strasse, ort), project_statuses(id, name, color)")
+      .select("*, customers(id, vorname, nachname, strasse, ort), project_statuses(id, name, color), restarbeiten(erledigt, faellig_am)")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -237,20 +244,16 @@ const Projects = () => {
       return;
     }
 
-    if (!newProject.plz.trim()) {
+    // PLZ: Projektfeld, sonst vom (neuen oder gewählten) Kunden übernehmen
+    const gewaehlterKunde = selectedCustomerId !== "none" ? customers.find((c) => c.id === selectedCustomerId) : undefined;
+    const plz = showNewCustomerForm
+      ? projektPlz(newProject.plz, newCustomer.plz, newCustomer.ort)
+      : projektPlz(newProject.plz, gewaehlterKunde?.ort);
+    if (!plz) {
       toast({
         variant: "destructive",
-        title: "Fehler",
-        description: "PLZ ist erforderlich",
-      });
-      return;
-    }
-
-    if (!/^\d{4,5}$/.test(newProject.plz.trim())) {
-      toast({
-        variant: "destructive",
-        title: "Fehler",
-        description: "PLZ muss 4-5 Ziffern enthalten",
+        title: "Postleitzahl fehlt",
+        description: PLZ_FEHLT,
       });
       return;
     }
@@ -303,7 +306,7 @@ const Projects = () => {
         name: newProject.name.trim(),
         beschreibung: newProject.beschreibung.trim() || null,
         adresse: derivedAdresse || null,
-        plz: newProject.plz.trim(),
+        plz,
         customer_id: customerId,
         status_id: newProjectStatusId !== "none" ? newProjectStatusId : null,
       }, label, anyQueued);
@@ -347,6 +350,11 @@ const Projects = () => {
       setCreating(false);
     }
   };
+
+  // PLZ, die der Kunde mitbringt — wird übernommen, wenn das Projektfeld leer bleibt
+  const kundenPlz = showNewCustomerForm
+    ? projektPlz("", newCustomer.plz, newCustomer.ort)
+    : projektPlz("", customers.find((c) => c.id === selectedCustomerId)?.ort);
 
   const handleToggleProjectStatus = async (projectId: string, currentStatus: string, projectName: string) => {
     if (togglingStatus) return; // Prevent double-click
@@ -917,16 +925,16 @@ const Projects = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="plz">PLZ *</Label>
+                    <Label htmlFor="plz">PLZ des Projekts{kundenPlz ? "" : " *"}</Label>
                     <Input
                       id="plz"
                       value={newProject.plz}
-                      onChange={(e) => setNewProject({ ...newProject, plz: e.target.value })}
-                      placeholder="z.B. 9613"
-                      maxLength={5}
+                      inputMode="numeric"
+                      onChange={(e) => setNewProject({ ...newProject, plz: plzEingabe(e.target.value) })}
+                      placeholder={kundenPlz ? `${kundenPlz} (vom Kunden)` : "z.B. 2700"}
                     />
                     <p className="text-xs text-muted-foreground">
-                      4-5 stellige Postleitzahl
+                      {kundenPlz ? "Leer lassen = PLZ des Kunden" : "4-5 stellige Postleitzahl"}
                     </p>
                   </div>
                   <div className="space-y-2">
@@ -1084,6 +1092,7 @@ const Projects = () => {
                     <div className="flex-1 min-w-0">
                       <CardTitle className="text-base sm:text-xl flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
                         {renderAmpel(project)}
+                        <RestarbeitenSchild liste={project.restarbeiten} />
                         <span className="truncate">
                           {project.name}
                           {projectDisplayAddress(project) && (
@@ -1300,6 +1309,7 @@ const Projects = () => {
                           <div className="flex-1 min-w-0">
                             <CardTitle className="text-base sm:text-xl flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
                               {renderAmpel(project)}
+                              <RestarbeitenSchild liste={project.restarbeiten} />
                               <span className="truncate">
                                 {project.name}
                                 {projectDisplayAddress(project) && (

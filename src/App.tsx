@@ -36,6 +36,7 @@ import BelegDetail from "./pages/BelegDetail";
 import Postfach from "./pages/Postfach";
 import Eingangsrechnungen from "./pages/Eingangsrechnungen";
 import Kalender from "./pages/Kalender";
+import Wartungen from "./pages/Wartungen";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -153,6 +154,7 @@ function AppContent() {
         <Route path="/postfach" element={<NurAngemeldet><Postfach /></NurAngemeldet>} />
         <Route path="/eingangsrechnungen" element={<NurAngemeldet><Eingangsrechnungen /></NurAngemeldet>} />
         <Route path="/kalender" element={<NurAngemeldet><Kalender /></NurAngemeldet>} />
+        <Route path="/wartungen" element={<NurAngemeldet><Wartungen /></NurAngemeldet>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       </div>

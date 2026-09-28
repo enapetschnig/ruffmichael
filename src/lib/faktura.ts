@@ -145,3 +145,56 @@ export async function belegPdf(belegId: string): Promise<{ url?: string; pfad?: 
   if (error) return { error: error.message };
   return data ?? { error: "Keine Antwort" };
 }
+
+/** Kundendaten, die ein neuer Beleg als Schnappschuss übernimmt. */
+export type BelegKunde = {
+  id: string; vorname: string | null; nachname: string; firma: string | null; strasse: string | null; ort: string | null;
+  uid: string | null; reverse_charge: boolean; zahlungsziel_tage: number | null; email: string | null;
+};
+
+export const BELEG_KUNDE_FELDER = "id, vorname, nachname, firma, strasse, ort, uid, reverse_charge, zahlungsziel_tage, email";
+
+/**
+ * Legt einen Beleg-Entwurf an — eine Stelle für die Belegliste und die Wartungen,
+ * damit Fälligkeit, Leistungszeitraum, Texte und Kundenschnappschuss überall gleich sind.
+ */
+export async function belegEntwurfAnlegen(opt: {
+  typ: BelegTyp;
+  kunde: BelegKunde;
+  projektId?: string | null;
+  betreff?: string | null;
+  userId?: string | null;
+}): Promise<{ beleg?: Beleg; error?: string }> {
+  const { typ, kunde: k } = opt;
+  const firma = await ladeFirmendaten();
+  const heute = heuteISO();
+  const zahlungsziel = k.zahlungsziel_tage ?? firma?.zahlungsziel_tage ?? 14;
+  const rechnung = istRechnung(typ);
+  const person = [k.vorname, k.nachname].filter(Boolean).join(" ").trim();
+  const { data, error } = await supabase.from("belege").insert({
+    typ,
+    project_id: opt.projektId || null,
+    customer_id: k.id,
+    // Snapshot der Kundendaten
+    kunde_name: k.firma?.trim() || person,
+    kunde_zusatz: k.firma?.trim() ? person || null : null,
+    kunde_strasse: k.strasse, kunde_plz_ort: k.ort, kunde_uid: k.uid, kunde_email: k.email,
+    datum: heute,
+    faellig_am: rechnung ? plusTage(heute, zahlungsziel) : null,
+    gueltig_bis: typ === "angebot" ? plusTage(heute, firma?.angebot_gueltig_tage ?? 30) : null,
+    // Leistungszeitraum ist Pflicht auf der Rechnung — Vorbelegung heute, „Stunden holen“ erweitert
+    leistung_von: rechnung ? heute : null,
+    leistung_bis: rechnung ? heute : null,
+    // Reverse Charge gilt auch fürs Angebot: der Kunde soll keine USt sehen, die es nicht gibt
+    reverse_charge: !!k.reverse_charge,
+    ust_satz: firma?.ust_satz ?? 20,
+    skonto_prozent: rechnung ? firma?.skonto_prozent ?? null : null,
+    skonto_tage: rechnung ? firma?.skonto_tage ?? null : null,
+    einleitung: rechnung ? firma?.rechnung_einleitung : firma?.angebot_einleitung,
+    schlusstext: rechnung ? firma?.rechnung_schluss : firma?.angebot_schluss,
+    betreff: opt.betreff ?? null,
+    created_by: opt.userId ?? null,
+  }).select().single();
+  if (error || !data) return { error: error?.message ?? "Beleg konnte nicht angelegt werden" };
+  return { beleg: data };
+}

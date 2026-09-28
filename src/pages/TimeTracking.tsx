@@ -28,6 +28,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { alleZeilen } from "@/lib/alleZeilen";
+import { plzEingabe, projektPlz, PLZ_FEHLT } from "@/lib/plz";
 import { toast as sonnerToast } from "sonner";
 import { 
   getNormalWorkingHours, 
@@ -373,13 +374,18 @@ const TimeTracking = () => {
   const handleCreateNewProject = async () => {
     if (creatingProject) return;
     
-    if (!newProjectName.trim() || !newProjectPlz.trim()) {
-      sonnerToast.error("Name und PLZ sind Pflichtfelder");
+    if (!newProjectName.trim()) {
+      sonnerToast.error("Bitte einen Projektnamen eingeben");
       return;
     }
 
-    if (!/^\d{4,5}$/.test(newProjectPlz.trim())) {
-      sonnerToast.error("PLZ muss 4-5 Ziffern haben");
+    // PLZ: Projektfeld, sonst vom gewählten Kunden übernehmen
+    const plzKunde = selectedNewProjectCustomerId !== "none"
+      ? newProjectCustomers.find((c) => c.id === selectedNewProjectCustomerId)?.ort
+      : null;
+    const plz = projektPlz(newProjectPlz, plzKunde);
+    if (!plz) {
+      sonnerToast.error(PLZ_FEHLT);
       return;
     }
 
@@ -402,7 +408,7 @@ const TimeTracking = () => {
     const r = await saveInsert("projects", {
       id: projectId,
       name: newProjectName.trim(),
-      plz: newProjectPlz.trim(),
+      plz,
       adresse: derivedAdresse || null,
       status: "aktiv",
       customer_id: selectedCustomer ? selectedCustomer.id : null,
@@ -1389,7 +1395,16 @@ const TimeTracking = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div><Label>PLZ *</Label><Input value={newProjectPlz} onChange={(e) => setNewProjectPlz(e.target.value)} maxLength={5} /></div>
+              {(() => {
+                // PLZ des gewählten Kunden — wird übernommen, wenn das Feld leer bleibt
+                const kundenPlz = projektPlz("", newProjectCustomers.find((c) => c.id === selectedNewProjectCustomerId)?.ort);
+                return (
+                  <div>
+                    <Label>PLZ{kundenPlz ? "" : " *"}</Label>
+                    <Input value={newProjectPlz} inputMode="numeric" onChange={(e) => setNewProjectPlz(plzEingabe(e.target.value))} placeholder={kundenPlz ? `${kundenPlz} (vom Kunden)` : "z.B. 2700"} />
+                  </div>
+                );
+              })()}
               <div>
                 <Label>Adresse</Label>
                 <Input value={newProjectAddress} onChange={(e) => setNewProjectAddress(e.target.value)} placeholder="Leer lassen = Adresse des Kunden" />

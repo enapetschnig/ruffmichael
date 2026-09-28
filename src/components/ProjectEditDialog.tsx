@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { saveUpdate, isOffline } from "@/lib/offlineData";
 import { customerAddress, customerDisplayName, type Customer } from "@/pages/Customers";
+import { plzEingabe, projektPlz, PLZ_FEHLT } from "@/lib/plz";
 
 // Minimale Projektform, die dieser Dialog bearbeiten kann.
 export type EditableProject = {
@@ -69,8 +70,10 @@ export function ProjectEditDialog({ project, open, onOpenChange, customers, stat
       toast({ variant: "destructive", title: "Fehler", description: "Projektname ist erforderlich" });
       return;
     }
-    if (!/^\d{4,5}$/.test(form.plz.trim())) {
-      toast({ variant: "destructive", title: "Fehler", description: "PLZ muss 4-5 Ziffern enthalten" });
+    // PLZ: eigenes Feld, sonst vom gewählten Kunden (ältere Projekte haben teils keine)
+    const plz = projektPlz(form.plz, customers.find((c) => c.id === form.customerId)?.ort);
+    if (!plz) {
+      toast({ variant: "destructive", title: "Postleitzahl fehlt", description: PLZ_FEHLT });
       return;
     }
     setSaving(true);
@@ -82,7 +85,7 @@ export function ProjectEditDialog({ project, open, onOpenChange, customers, stat
     }
     const res = await saveUpdate("projects", { id: project.id }, {
       name: form.name.trim(),
-      plz: form.plz.trim(),
+      plz,
       adresse: derivedAdresse || null,
       beschreibung: form.beschreibung.trim() || null,
       customer_id: form.customerId !== "none" ? form.customerId : null,
@@ -126,7 +129,7 @@ export function ProjectEditDialog({ project, open, onOpenChange, customers, stat
           </div>
           <div className="space-y-2">
             <Label htmlFor="edit-plz">PLZ *</Label>
-            <Input id="edit-plz" value={form.plz} maxLength={5} onChange={(e) => setForm({ ...form, plz: e.target.value })} placeholder="z.B. 9613" />
+            <Input id="edit-plz" value={form.plz} inputMode="numeric" onChange={(e) => setForm({ ...form, plz: plzEingabe(e.target.value) })} placeholder="z.B. 2700" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="edit-adresse">Adresse</Label>

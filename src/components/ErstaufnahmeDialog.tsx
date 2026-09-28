@@ -45,6 +45,7 @@ import { cachedSelect } from "@/lib/offlineStore";
 
 // Kundenvorlage kommt aus der Kundenverwaltung — eine Quelle für alle Felder.
 import { emptyCustomerForm } from "@/pages/Customers";
+import { plzEingabe, projektPlz, PLZ_FEHLT } from "@/lib/plz";
 
 type ErstaufnahmeCustomer = Pick<
   Customer,
@@ -358,6 +359,11 @@ export function ErstaufnahmeDialog({
     return lines.join("\n");
   };
 
+  // PLZ, die der Kunde mitbringt — wird übernommen, wenn das PLZ-Feld leer bleibt
+  const erstaufnahmeKundenPlz = newCustomerMode
+    ? projektPlz("", customerForm.plz, customerForm.ort)
+    : projektPlz("", customers.find((c) => c.id === selectedCustomerId)?.ort);
+
   const handleFinish = async () => {
     if (saving) return;
 
@@ -379,11 +385,16 @@ export function ErstaufnahmeDialog({
       return;
     }
 
-    if (!/^\d{4,5}$/.test(plz.trim())) {
+    // PLZ: eigenes Feld, sonst vom Kunden (auch „2700 Wr. Neustadt“ aus der Spracheingabe im Ort)
+    const plzKunde = newCustomerMode
+      ? [customerForm.plz, customerForm.ort]
+      : [customers.find((c) => c.id === selectedCustomerId)?.ort];
+    const plzFertig = projektPlz(plz, ...plzKunde);
+    if (!plzFertig) {
       toast({
         variant: "destructive",
-        title: "Fehler",
-        description: "PLZ muss 4-5 Ziffern enthalten",
+        title: "Postleitzahl fehlt",
+        description: PLZ_FEHLT,
       });
       return;
     }
@@ -466,7 +477,7 @@ export function ErstaufnahmeDialog({
         statusName = null;
       }
 
-      const projectPlz = plz.trim();
+      const projectPlz = plzFertig;
       const adresse = [customer.strasse, customer.ort].filter(Boolean).join(", ") || null;
       const projectName =
         projektName.trim() ||
@@ -677,13 +688,13 @@ export function ErstaufnahmeDialog({
 
           {/* PLZ */}
           <div className="space-y-1.5">
-            <Label htmlFor="erstaufnahme-plz">PLZ *</Label>
+            <Label htmlFor="erstaufnahme-plz">PLZ{erstaufnahmeKundenPlz ? "" : " *"}</Label>
             <Input
               id="erstaufnahme-plz"
               value={plz}
-              onChange={(e) => setPlz(e.target.value)}
+              onChange={(e) => setPlz(plzEingabe(e.target.value))}
               inputMode="numeric"
-              placeholder="z. B. 4020"
+              placeholder={erstaufnahmeKundenPlz ? `${erstaufnahmeKundenPlz} (vom Kunden)` : "z. B. 2700"}
             />
           </div>
 

@@ -1,10 +1,80 @@
-import { Resend } from "https://esm.sh/resend@2.0.0";
 import { jsPDF } from "https://esm.sh/jspdf@2.5.2";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// Resend erst beim Versand anlegen: ohne RESEND_API_KEY wirft der Konstruktor —
-// das Drucken (nurPdf) soll trotzdem funktionieren.
-const resendHolen = () => new Resend(Deno.env.get("RESEND_API_KEY"));
+// Versand über Michaels Microsoft-365-Postfach (wie Angebote/Rechnungen in der Function
+// „outlook“): Absender office@ruffinstallateur.at, Kopie in „Gesendete Elemente“.
+// Früher Resend — der Schlüssel dafür wurde nie gesetzt, darum ging nichts raus.
+const GRAPH = "https://graph.microsoft.com/v1.0";
+
+async function msToken(): Promise<string> {
+  const tenant = Deno.env.get("MS_TENANT_ID"), clientId = Deno.env.get("MS_CLIENT_ID"), secret = Deno.env.get("MS_CLIENT_SECRET");
+  if (!tenant || !clientId || !secret) throw new Error("Die Microsoft-Zugangsdaten fehlen (MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET).");
+  const res = await fetch(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ client_id: clientId, client_secret: secret, grant_type: "client_credentials", scope: "https://graph.microsoft.com/.default" }),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.access_token) throw new Error(`Microsoft-Anmeldung fehlgeschlagen: ${data.error_description || JSON.stringify(data)}`);
+  return data.access_token;
+}
+
+async function graph<T>(tok: string, pfad: string, init?: RequestInit): Promise<T> {
+  const kopf: Record<string, string> = { Authorization: `Bearer ${tok}` };
+  if (init?.body) kopf["Content-Type"] = "application/json";
+  const res = await fetch(pfad.startsWith("http") ? pfad : `${GRAPH}${pfad}`, { ...init, headers: kopf });
+  if (res.status === 202 || res.status === 204) return {} as T;
+  const text = await res.text();
+  if (!res.ok) throw new Error(`Outlook ${res.status}: ${text.slice(0, 300)}`);
+  return text ? JSON.parse(text) as T : {} as T;
+}
+
+function postfach(): string {
+  const ziel = Deno.env.get("MS_MAIL_TARGET") || Deno.env.get("MS_DRIVE_TARGET") || "";
+  if (!ziel.includes("@")) throw new Error("Kein Postfach eingestellt — MS_MAIL_TARGET muss eine E-Mail-Adresse sein.");
+  return ziel;
+}
+
+/** Mail mit PDF über Outlook senden — große Anhänge (viele Fotos) stückweise hochladen. */
+async function perOutlookSenden(opt: { an: string[]; cc: string[]; betreff: string; html: string; dateiname: string; pdfBase64: string }) {
+  const tok = await msToken();
+  const mb = encodeURIComponent(postfach());
+  const empfaenger = (liste: string[]) => liste.map((a) => ({ emailAddress: { address: a } }));
+  const bytes = Uint8Array.from(atob(opt.pdfBase64), (c) => c.charCodeAt(0));
+  if (bytes.length < 3 * 1024 * 1024) {
+    await graph(tok, `/users/${mb}/sendMail`, {
+      method: "POST",
+      body: JSON.stringify({
+        message: {
+          subject: opt.betreff, body: { contentType: "HTML", content: opt.html },
+          toRecipients: empfaenger(opt.an), ccRecipients: empfaenger(opt.cc),
+          attachments: [{ "@odata.type": "#microsoft.graph.fileAttachment", name: opt.dateiname, contentType: "application/pdf", contentBytes: opt.pdfBase64 }],
+        },
+        saveToSentItems: true,
+      }),
+    });
+    return;
+  }
+  const entwurf = await graph<{ id: string }>(tok, `/users/${mb}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ subject: opt.betreff, body: { contentType: "HTML", content: opt.html }, toRecipients: empfaenger(opt.an), ccRecipients: empfaenger(opt.cc) }),
+  });
+  const sitzung = await graph<{ uploadUrl: string }>(tok, `/users/${mb}/messages/${entwurf.id}/attachments/createUploadSession`, {
+    method: "POST",
+    body: JSON.stringify({ AttachmentItem: { attachmentType: "file", name: opt.dateiname, size: bytes.length, contentType: "application/pdf" } }),
+  });
+  const stueck = 4 * 1024 * 1024;
+  for (let von = 0; von < bytes.length; von += stueck) {
+    const bis = Math.min(von + stueck, bytes.length);
+    const res = await fetch(sitzung.uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Length": String(bis - von), "Content-Range": `bytes ${von}-${bis - 1}/${bytes.length}` },
+      body: bytes.subarray(von, bis),
+    });
+    if (!res.ok) throw new Error(`PDF-Anhang: ${res.status} ${(await res.text()).slice(0, 200)}`);
+  }
+  await graph(tok, `/users/${mb}/messages/${entwurf.id}/send`, { method: "POST" });
+}
 
 // Supabase Admin Client for reading settings
 const supabaseAdmin = createClient(
@@ -495,61 +565,33 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // Generate simple email HTML
     const emailHtml = generateEmailHtml({ disturbance, materials, technicians });
 
-    // Fetch office email from settings with fallback
+    // Empfänger: der Kunde; das Büro bekommt eine Kopie (Einstellung „Regiebericht
+    // E-Mail-Empfänger“). Die Mail liegt außerdem in „Gesendete Elemente“ des Firmenpostfachs.
     const { data: setting } = await supabaseAdmin
       .from("app_settings")
       .select("value")
       .eq("key", "disturbance_report_email")
       .maybeSingle();
+    const buero = String(setting?.value ?? "").trim();
+    const absender = postfach().toLowerCase();
+    const kunde = String(disturbance.kunde_email ?? "").trim();
+    const an = kunde ? [kunde] : (buero ? [buero] : [absender]);
+    const cc = kunde && buero && buero.toLowerCase() !== absender && buero.toLowerCase() !== kunde.toLowerCase() ? [buero] : [];
 
-    const officeEmail = setting?.value || "hallo@epowergmbh.at";
-    console.log("Using office email:", officeEmail);
-
-    // Prepare recipients - office email for all reports
-    const recipients = [officeEmail];
-    if (disturbance.kunde_email) {
-      recipients.push(disturbance.kunde_email);
-    }
-
-    // Create filename
     const dateForFilename = formatDateShort(disturbance.datum).replace(/\./g, "-");
     const kundeForFilename = disturbance.kunde_name.replace(/[^a-zA-Z0-9äöüÄÖÜß]/g, "_");
     const pdfFilename = `Regiebericht_${kundeForFilename}_${dateForFilename}.pdf`;
-
     const subject = `Regiebericht - ${disturbance.kunde_name} - ${formatDateShort(disturbance.datum)}`;
 
-    console.log("Sending email with PDF attachment to:", recipients);
-
-    const fromAddress = Deno.env.get("REPORT_FROM_EMAIL") || "Ruff Michael GmbH <noreply@chrisnapetschnig.at>";
-    const emailResponse = await resendHolen().emails.send({
-      from: fromAddress,
-      to: recipients,
-      subject: subject,
-      html: emailHtml,
-      attachments: [
-        {
-          filename: pdfFilename,
-          content: pdfBase64,
-        },
-      ],
-    });
-
-    // Resend meldet Fehler im Feld .error (kein throw) -> NICHT als gesendet markieren,
-    // damit der Versand erneut versucht werden kann.
-    if ((emailResponse as { error?: { message?: string } })?.error) {
-      const msg = (emailResponse as { error?: { message?: string } }).error?.message || "E-Mail-Versand fehlgeschlagen";
-      console.error("Resend error:", msg);
-      return new Response(
-        JSON.stringify({ success: false, error: msg }),
-        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
+    console.log("Sende Regiebericht über Outlook an:", an, "Kopie:", cc);
+    await perOutlookSenden({ an, cc, betreff: subject, html: emailHtml, dateiname: pdfFilename, pdfBase64 });
+    const emailResponse = { an, cc, von: absender };
 
     console.log("Email sent successfully:", emailResponse);
 
     // Status erst NACH bestätigtem Versand setzen (einzige Quelle der Wahrheit,
     // gilt online wie beim Offline-Sync).
-    await supabaseAdmin.from("disturbances").update({ status: "gesendet" }).eq("id", disturbance.id);
+    await supabaseAdmin.from("disturbances").update({ status: "gesendet", pdf_gesendet_am: new Date().toISOString() }).eq("id", disturbance.id);
 
     return new Response(
       JSON.stringify({ success: true, emailResponse }),

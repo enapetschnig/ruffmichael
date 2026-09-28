@@ -1,7 +1,7 @@
 import { PageHeader } from "@/components/PageHeader";
 import { useState, useEffect } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Zap, Calendar, Clock, User, Mail, Phone, MapPin, Edit, Trash2, Package, Plus, ArrowLeft, PenLine, Users, Lock, Printer, Wrench, Loader2, FileDown } from "lucide-react";
+import { Zap, Calendar, Clock, User, Mail, Phone, MapPin, Edit, Trash2, Package, Plus, ArrowLeft, PenLine, Users, Lock, Printer, Wrench, Loader2, FileDown, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,7 @@ import { DisturbancePhotos } from "@/components/DisturbancePhotos";
 import { SignatureDialog } from "@/components/SignatureDialog";
 import { BelegVorschau } from "@/components/BelegVorschau";
 import { WartungDialog, type ProjektWahl } from "@/components/wartung/WartungDialog";
-import { regieberichtPdf } from "@/lib/regiebericht";
+import { regieberichtPdf, regieberichtSenden } from "@/lib/regiebericht";
 import { pdfDrucken } from "@/lib/pdfDrucken";
 import { addMonths } from "date-fns";
 
@@ -71,6 +71,7 @@ const DisturbanceDetail = () => {
   const [pdfLaedt, setPdfLaedt] = useState<null | "drucken" | "pdf">(null);
   // Wartung fürs nächste Mal direkt aus dem Bericht
   const [wartungOffen, setWartungOffen] = useState(false);
+  const [sendet, setSendet] = useState(false);
   const [projekte, setProjekte] = useState<ProjektWahl[]>([]);
 
   useEffect(() => {
@@ -328,6 +329,24 @@ const DisturbanceDetail = () => {
     }
   };
 
+  // Unterschrieben, aber (noch) nicht verschickt — z. B. weil der Versand früher scheiterte
+  const berichtSenden = async () => {
+    if (!disturbance || sendet) return;
+    if (isOffline()) {
+      toast({ variant: "destructive", title: "Nur mit Internet", description: "Der Bericht geht über das Firmenpostfach raus — bitte mit Internet erneut versuchen." });
+      return;
+    }
+    setSendet(true);
+    const r = await regieberichtSenden(disturbance.id);
+    setSendet(false);
+    if (r.error) {
+      toast({ variant: "destructive", title: "Nicht gesendet", description: r.error });
+      return;
+    }
+    toast({ title: "Regiebericht gesendet", description: `An ${r.an?.join(", ") ?? "den Kunden"} — über Outlook, Kopie in „Gesendete Elemente“.` });
+    fetchDisturbance();
+  };
+
   const wartungStarten = async () => {
     const { data } = await supabase.from("projects").select("id, name, customer_id").order("name");
     setProjekte((data ?? []) as ProjektWahl[]);
@@ -407,7 +426,13 @@ const DisturbanceDetail = () => {
                 {disturbance.is_verrechnet ? "✓ Verrechnet" : "Als verrechnet markieren"}
               </Button>
             )}
-            {canEdit && disturbance.status === "offen" && (
+            {canEdit && disturbance.status === "offen" && !!disturbance.unterschrift_kunde && (
+              <Button onClick={berichtSenden} className="gap-1" disabled={sendet}>
+                {sendet ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                Bericht senden
+              </Button>
+            )}
+            {canEdit && disturbance.status === "offen" && !disturbance.unterschrift_kunde && (
               <Button onClick={() => setShowSignatureDialog(true)} className="gap-1">
                 <PenLine className="h-4 w-4" />
                 Zur Unterschrift

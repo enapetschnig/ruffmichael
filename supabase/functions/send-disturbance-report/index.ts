@@ -2,7 +2,9 @@ import { Resend } from "https://esm.sh/resend@2.0.0";
 import { jsPDF } from "https://esm.sh/jspdf@2.5.2";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+// Resend erst beim Versand anlegen: ohne RESEND_API_KEY wirft der Konstruktor —
+// das Drucken (nurPdf) soll trotzdem funktionieren.
+const resendHolen = () => new Resend(Deno.env.get("RESEND_API_KEY"));
 
 // Supabase Admin Client for reading settings
 const supabaseAdmin = createClient(
@@ -41,7 +43,7 @@ interface Disturbance {
   kunde_telefon: string | null;
   beschreibung: string;
   notizen: string | null;
-  unterschrift_kunde: string;
+  unterschrift_kunde: string | null;
 }
 
 interface ReportRequest {
@@ -50,6 +52,8 @@ interface ReportRequest {
   technicianNames?: string[];
   technicianName?: string; // Legacy support
   photos?: Photo[];
+  /** Nur das PDF zurückgeben (Drucken/Teilen in der App) — auch ohne Unterschrift, ohne Versand */
+  nurPdf?: boolean;
 }
 
 function formatDate(dateStr: string): string {
@@ -371,6 +375,16 @@ async function generatePDF(data: ReportRequest & { technicians: string[] }, phot
       doc.text("[Unterschrift konnte nicht geladen werden]", margin, yPos + 10);
       yPos += 20;
     }
+  } else {
+    // Noch nicht unterschrieben: leere Linie zum Unterschreiben auf Papier
+    doc.setDrawColor(120, 120, 120);
+    doc.line(margin, yPos + 20, margin + 80, yPos + 20);
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(9);
+    doc.setTextColor(120, 120, 120);
+    doc.text("Datum, Unterschrift Kunde", margin, yPos + 25);
+    doc.setTextColor(0, 0, 0);
+    yPos += 32;
   }
 
   // Confirmation text
@@ -440,13 +454,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { disturbance, materials, technicianNames, technicianName, photos }: ReportRequest = await req.json();
+    const { disturbance, materials, technicianNames, technicianName, photos, nurPdf }: ReportRequest = await req.json();
 
     // Backward compatibility + fallback
     const technicians = technicianNames?.length ? technicianNames : 
                         technicianName ? [technicianName] : ["Techniker"];
 
-    if (!disturbance || !disturbance.unterschrift_kunde) {
+    if (!disturbance || (!nurPdf && !disturbance.unterschrift_kunde)) {
       return new Response(
         JSON.stringify({ error: "Disturbance data and signature required" }),
         { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
@@ -469,6 +483,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     // Generate PDF
     const pdfBase64 = await generatePDF({ disturbance, materials, technicians, photos }, photoImages);
+
+    // Nur Drucken/Teilen: PDF zurückgeben, nichts versenden, Status unverändert
+    if (nurPdf) {
+      return new Response(
+        JSON.stringify({ pdf: pdfBase64 }),
+        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
 
     // Generate simple email HTML
     const emailHtml = generateEmailHtml({ disturbance, materials, technicians });
@@ -499,7 +521,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     console.log("Sending email with PDF attachment to:", recipients);
 
     const fromAddress = Deno.env.get("REPORT_FROM_EMAIL") || "Ruff Michael GmbH <noreply@chrisnapetschnig.at>";
-    const emailResponse = await resend.emails.send({
+    const emailResponse = await resendHolen().emails.send({
       from: fromAddress,
       to: recipients,
       subject: subject,

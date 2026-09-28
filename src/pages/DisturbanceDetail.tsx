@@ -1,7 +1,7 @@
 import { PageHeader } from "@/components/PageHeader";
 import { useState, useEffect } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Zap, Calendar, Clock, User, Mail, Phone, MapPin, Edit, Trash2, Package, Plus, ArrowLeft, PenLine, Users, Lock } from "lucide-react";
+import { Zap, Calendar, Clock, User, Mail, Phone, MapPin, Edit, Trash2, Package, Plus, ArrowLeft, PenLine, Users, Lock, Printer, Wrench, Loader2, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,11 @@ import { DisturbanceForm } from "@/components/DisturbanceForm";
 import { DisturbanceMaterials } from "@/components/DisturbanceMaterials";
 import { DisturbancePhotos } from "@/components/DisturbancePhotos";
 import { SignatureDialog } from "@/components/SignatureDialog";
+import { BelegVorschau } from "@/components/BelegVorschau";
+import { WartungDialog, type ProjektWahl } from "@/components/wartung/WartungDialog";
+import { regieberichtPdf } from "@/lib/regiebericht";
+import { pdfDrucken } from "@/lib/pdfDrucken";
+import { addMonths } from "date-fns";
 
 type Disturbance = {
   id: string;
@@ -61,6 +66,12 @@ const DisturbanceDetail = () => {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [autoOpenSignatureHandled, setAutoOpenSignatureHandled] = useState(false);
+  // Drucken/PDF — geht immer, auch ohne Unterschrift
+  const [pdf, setPdf] = useState<{ url: string; blob: Blob; name: string } | null>(null);
+  const [pdfLaedt, setPdfLaedt] = useState<null | "drucken" | "pdf">(null);
+  // Wartung fürs nächste Mal direkt aus dem Bericht
+  const [wartungOffen, setWartungOffen] = useState(false);
+  const [projekte, setProjekte] = useState<ProjektWahl[]>([]);
 
   useEffect(() => {
     checkAuthAndFetch();
@@ -289,6 +300,40 @@ const DisturbanceDetail = () => {
 
   const canEdit = disturbance && (currentUserId === disturbance.user_id || isAdmin);
 
+  /** „Drucken“ = direkt in den Druckdialog; „PDF“ = ansehen, teilen, herunterladen. */
+  const pdfHolen = async (wofuer: "drucken" | "pdf") => {
+    if (!disturbance || pdfLaedt) return;
+    if (isOffline()) {
+      toast({ variant: "destructive", title: "Nur mit Internet", description: "Das PDF wird am Server erstellt — bitte mit Internet erneut versuchen." });
+      return;
+    }
+    setPdfLaedt(wofuer);
+    try {
+      const r = await regieberichtPdf(disturbance.id);
+      if (r.error || !r.blob) {
+        toast({ variant: "destructive", title: "PDF fehlgeschlagen", description: r.error });
+        return;
+      }
+      if (wofuer === "drucken") {
+        try {
+          await pdfDrucken(r.blob);
+          return;
+        } catch {
+          // Direktdruck nicht möglich → Vorschau mit Drucken/Teilen-Knöpfen
+        }
+      }
+      setPdf({ url: URL.createObjectURL(r.blob), blob: r.blob, name: r.dateiname ?? "Regiebericht.pdf" });
+    } finally {
+      setPdfLaedt(null);
+    }
+  };
+
+  const wartungStarten = async () => {
+    const { data } = await supabase.from("projects").select("id, name, customer_id").order("name");
+    setProjekte((data ?? []) as ProjektWahl[]);
+    setWartungOffen(true);
+  };
+
   // Konsistent mit Nachträgen: Sobald der Kunde unterschrieben hat oder der Bericht
   // gesendet/abgeschlossen ist, wird er schreibgeschützt. Ansehen/PDF bleiben möglich,
   // aber Bearbeiten und Löschen werden ausgeblendet.
@@ -338,6 +383,21 @@ const DisturbanceDetail = () => {
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {getStatusBadge(disturbance.status, disturbance.is_verrechnet)}
+            {/* Drucken geht immer — ohne Unterschrift mit leerer Linie zum Unterschreiben auf Papier */}
+            <Button size="sm" className="gap-1" onClick={() => pdfHolen("drucken")} disabled={pdfLaedt !== null}>
+              {pdfLaedt === "drucken" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+              Drucken
+            </Button>
+            <Button variant="outline" size="sm" className="gap-1" onClick={() => pdfHolen("pdf")} disabled={pdfLaedt !== null}>
+              {pdfLaedt === "pdf" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+              PDF
+            </Button>
+            {isAdmin && (
+              <Button variant="outline" size="sm" className="gap-1" onClick={wartungStarten}>
+                <Wrench className="h-4 w-4" />
+                Wartung eintragen
+              </Button>
+            )}
             {isAdmin && disturbance.status !== "offen" && (
               <Button
                 variant={disturbance.is_verrechnet ? "secondary" : "outline"}
@@ -554,6 +614,32 @@ const DisturbanceDetail = () => {
         onOpenChange={setShowEditForm}
         onSuccess={handleEditSuccess}
         editData={disturbance}
+      />
+
+      {/* PDF: ansehen, drucken, teilen, herunterladen */}
+      <BelegVorschau
+        open={!!pdf}
+        onClose={() => setPdf(null)}
+        titel={`Regiebericht ${disturbance.kunde_name}`}
+        url={pdf?.url ?? null}
+        blob={pdf?.blob ?? null}
+        dateiname={pdf?.name ?? "Regiebericht.pdf"}
+      />
+
+      {/* Nächste Wartung: Kunde wird gesucht, Termin in einem Jahr vorgeschlagen */}
+      <WartungDialog
+        open={wartungOffen}
+        onOpenChange={setWartungOffen}
+        wartung={null}
+        kunden={[]}
+        projekte={projekte}
+        vorgabe={{
+          kundeSuche: disturbance.kunde_name,
+          bezeichnung: (disturbance.beschreibung ?? "").split("\n")[0].trim().slice(0, 80),
+          faellig_am: format(addMonths(new Date(disturbance.datum), 12), "yyyy-MM-dd"),
+          notiz: `Aus Regiebericht vom ${format(new Date(disturbance.datum), "dd.MM.yyyy")}`,
+        }}
+        onGespeichert={() => toast({ title: "Wartung eingetragen", description: "Sie erscheint rechtzeitig vorher am Dashboard." })}
       />
 
       {/* Signature Dialog */}

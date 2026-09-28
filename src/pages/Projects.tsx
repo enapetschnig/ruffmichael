@@ -19,7 +19,7 @@ import { customerDisplayName, type Customer } from "./Customers";
 import { enqueue } from "@/lib/offlineQueue";
 import { newId, isOffline } from "@/lib/offlineData";
 import { getSessionUser } from "@/lib/auth";
-import { projectAddress } from "@/lib/projectLabel";
+import { projectAddress, nameEnthaeltAdresse } from "@/lib/projectLabel";
 import { ProjectEditDialog } from "@/components/ProjectEditDialog";
 import { readCache, writeCache } from "@/lib/offlineStore";
 import { fetchStatusesCached } from "@/lib/cachedQueries";
@@ -60,8 +60,8 @@ type Project = {
 
 // Anzeige: Projektname, dahinter die Adresse des Kunden.
 // Einheitliche Fallback-Kette wie im Rest der App (Kundenadresse → Projektadresse → PLZ).
-export const projectDisplayAddress = (p: Pick<Project, "adresse" | "plz" | "customers">): string =>
-  projectAddress({ name: "", adresse: p.adresse, plz: p.plz, customers: p.customers });
+export const projectDisplayAddress = (p: Pick<Project, "name" | "adresse" | "plz" | "customers">): string =>
+  nameEnthaeltAdresse(p) ? "" : projectAddress({ name: "", adresse: p.adresse, plz: p.plz, customers: p.customers });
 
 // Umlaute/ß für Storage-Keys transliterieren (Supabase lehnt Nicht-ASCII-Keys ab).
 const toStorageKey = (name: string): string =>

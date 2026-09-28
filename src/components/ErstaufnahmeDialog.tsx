@@ -38,6 +38,7 @@ import { cachedSelect } from "@/lib/offlineStore";
 import { emptyCustomerForm } from "@/pages/Customers";
 import { plzEingabe, projektPlz, PLZ_FEHLT } from "@/lib/plz";
 import { KundenAuswahl, kundeAdresse, type Kunde } from "@/components/kunde/KundenAuswahl";
+import { projektNameVorschlag } from "@/lib/projectLabel";
 
 type ErstaufnahmeCustomer = Pick<
   Customer,
@@ -97,6 +98,7 @@ export function ErstaufnahmeDialog({
   const [neuVorlage, setNeuVorlage] = useState<Partial<typeof emptyCustomerForm> | null>(null);
   // PLZ, die zuletzt automatisch vom Kunden kam (nur die wird beim Kundenwechsel ersetzt)
   const [autoPlz, setAutoPlz] = useState("");
+  const [autoName, setAutoName] = useState("");
 
   const [projektName, setProjektName] = useState("");
   const [plz, setPlz] = useState("");
@@ -184,6 +186,7 @@ export function ErstaufnahmeDialog({
     setKunde(null);
     setNeuVorlage(null);
     setAutoPlz("");
+    setAutoName("");
     setProjektName("");
     setPlz("");
     setNotizen("");
@@ -359,6 +362,11 @@ export function ErstaufnahmeDialog({
     const kp = kundeAdresse(k).plz;
     setPlz((alt) => (!alt.trim() || alt === autoPlz ? kp : alt));
     setAutoPlz(kp);
+    // Projektname sichtbar vorschlagen: „Nachname Straße Ort“
+    const ka = kundeAdresse(k);
+    const name = k ? projektNameVorschlag({ nachname: k.nachname, firma: k.firma, strasse: ka.strasse, ort: ka.ort }) : "";
+    setProjektName((alt) => (!alt.trim() || alt === autoName ? name : alt));
+    setAutoName(name);
   };
 
   const handleFinish = async () => {
@@ -431,7 +439,7 @@ export function ErstaufnahmeDialog({
       const adresse = [customer.strasse, customer.ort].filter(Boolean).join(", ") || null;
       const projectName =
         projektName.trim() ||
-        [customer.nachname, customer.vorname].filter(Boolean).join(" ").trim() ||
+        projektNameVorschlag({ nachname: customer.nachname, firma: kunde.firma, strasse: customer.strasse, ort: kundeAdresse(kunde).ort }) ||
         "Erstaufnahme";
 
       const projectId = newId();
@@ -589,7 +597,7 @@ export function ErstaufnahmeDialog({
               id="erstaufnahme-projektname"
               value={projektName}
               onChange={(e) => setProjektName(e.target.value)}
-              placeholder="Leer lassen – wird aus dem Kundennamen gebildet"
+              placeholder="Leer lassen = Nachname Straße Ort des Kunden"
             />
           </div>
 

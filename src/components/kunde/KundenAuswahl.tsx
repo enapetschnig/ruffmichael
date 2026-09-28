@@ -66,10 +66,12 @@ export function useKunden() {
  * Suchen nach Name, Firma, Ort, Straße, Telefon oder Kundennummer; wer fehlt,
  * wird direkt hier angelegt (auch offline) und ist sofort gewählt.
  */
-export function KundenAuswahl({ wert, onChange, zeigeRechnungsdaten = false, pflicht = false, className, neuVorlage }: {
+export function KundenAuswahl({ wert, onChange, zeigeRechnungsdaten = false, pflicht = false, className, neuVorlage, startSuche }: {
   wert: string | null | undefined;
   /** Öffnet „Neuer Kunde“ vorausgefüllt (z. B. aus der Spracheingabe) — bei jeder neuen Vorlage */
   neuVorlage?: Partial<typeof emptyCustomerForm> | null;
+  /** Suchfeld vorbelegen (z. B. Kundenname aus einem Regiebericht) */
+  startSuche?: string;
   onChange: (kunde: Kunde | null) => void;
   /** Rechnungsdaten (UID, Reverse Charge …) beim Neuanlegen zeigen — nur Admin/Belege */
   zeigeRechnungsdaten?: boolean;
@@ -78,7 +80,7 @@ export function KundenAuswahl({ wert, onChange, zeigeRechnungsdaten = false, pfl
 }) {
   const { toast } = useToast();
   const kunden = useKunden();
-  const [suche, setSuche] = useState("");
+  const [suche, setSuche] = useState(startSuche ?? "");
   const [offen, setOffen] = useState(false);
   const [neu, setNeu] = useState<typeof emptyCustomerForm | null>(null);
   const [speichert, setSpeichert] = useState(false);

@@ -12,6 +12,7 @@ import { fetchStatusesCached, type CachedStatus } from "@/lib/cachedQueries";
 import { newId, saveInsert, saveInvoke, saveUpload } from "@/lib/offlineData";
 import { STANDARD_PROJECT_FOLDERS } from "@/lib/projectFolders";
 import { PLZ_FEHLT, plzAus, plzEingabe } from "@/lib/plz";
+import { projektNameVorschlag } from "@/lib/projectLabel";
 
 const leer = { name: "", strasse: "", plz: "", ort: "", beschreibung: "", statusId: "none" };
 
@@ -49,7 +50,8 @@ export function NeuesProjektDialog({ open, onOpenChange, onErstellt }: {
     setKunde(k);
     const a = kundeAdresse(k);
     const vorschlag = {
-      name: k ? (k.firma?.trim() || [k.nachname, k.vorname].filter(Boolean).join(" ")).trim() : "",
+      // Michaels Schema: „Nachname Straße Ort“ (Firmen: Firma statt Nachname)
+      name: k ? projektNameVorschlag({ nachname: k.nachname, firma: k.firma, strasse: a.strasse, ort: a.ort }) : "",
       strasse: a.strasse, plz: a.plz, ort: a.ort,
     };
     // Vorigen Stand festhalten — der Updater läuft erst später, wenn auto.current schon neu ist
@@ -63,6 +65,18 @@ export function NeuesProjektDialog({ open, onOpenChange, onErstellt }: {
       return neu;
     });
     auto.current = vorschlag;
+  };
+
+  // Straße/Ort geändert: automatischen Namen mitziehen (selbst getippte Namen bleiben)
+  const adresseAendern = (feld: "strasse" | "ort", wert: string) => {
+    setF((alt) => {
+      const neu = { ...alt, [feld]: wert };
+      if (kunde && (!alt.name.trim() || alt.name === auto.current.name)) {
+        neu.name = projektNameVorschlag({ nachname: kunde.nachname, firma: kunde.firma, strasse: neu.strasse, ort: neu.ort });
+        auto.current = { ...auto.current, name: neu.name };
+      }
+      return neu;
+    });
   };
 
   const erstellen = async () => {
@@ -121,11 +135,11 @@ export function NeuesProjektDialog({ open, onOpenChange, onErstellt }: {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="projekt-name">Projektname *</Label>
-            <Input id="projekt-name" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="z. B. Müller Heizungstausch" />
+            <Input id="projekt-name" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="Nachname Straße Ort — z. B. Müller Hauptstraße 5 Baden" />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="projekt-strasse">Straße</Label>
-            <Input id="projekt-strasse" value={f.strasse} onChange={(e) => setF({ ...f, strasse: e.target.value })} placeholder="Straße und Hausnummer" />
+            <Input id="projekt-strasse" value={f.strasse} onChange={(e) => adresseAendern("strasse", e.target.value)} placeholder="Straße und Hausnummer" />
           </div>
           <div className="grid grid-cols-[6.5rem_1fr] gap-3">
             <div className="space-y-1.5">
@@ -134,7 +148,7 @@ export function NeuesProjektDialog({ open, onOpenChange, onErstellt }: {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="projekt-ort">Ort</Label>
-              <Input id="projekt-ort" value={f.ort} onChange={(e) => setF({ ...f, ort: e.target.value })} />
+              <Input id="projekt-ort" value={f.ort} onChange={(e) => adresseAendern("ort", e.target.value)} />
             </div>
           </div>
           <div className="space-y-1.5">

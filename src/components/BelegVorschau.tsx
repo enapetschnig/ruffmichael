@@ -1,5 +1,6 @@
-import { useEffect, useRef } from "react";
-import { Download, Printer, ExternalLink, Share2, Send } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Download, Printer, ExternalLink, Share2, Send, Loader2 } from "lucide-react";
+import { pdfDrucken } from "@/lib/pdfDrucken";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
@@ -33,9 +34,21 @@ export function BelegVorschau({
     return () => { if (url && url.startsWith("blob:")) URL.revokeObjectURL(url); };
   }, [url]);
 
-  const drucken = () => {
-    try { frame.current?.contentWindow?.print(); }
-    catch { if (url) window.open(url, "_blank"); }
+  // Direkt in den Druckdialog — alle Seiten, auch am iPhone (iframe.print() druckt dort nur Seite 1)
+  const [druckt, setDruckt] = useState(false);
+  const drucken = async () => {
+    if (druckt) return;
+    setDruckt(true);
+    try {
+      const quelle = blob ?? url;
+      if (!quelle) return;
+      await pdfDrucken(quelle);
+    } catch {
+      try { frame.current?.contentWindow?.print(); }
+      catch { if (url) window.open(url, "_blank"); }
+    } finally {
+      setDruckt(false);
+    }
   };
 
   const teilen = async () => {
@@ -66,11 +79,11 @@ export function BelegVorschau({
                 <Button size="sm" className="gap-1" onClick={onMail}><Send className="h-4 w-4" /><span className="hidden sm:inline">Per Mail</span></Button>
               )}
               {kannTeilen && (
-                <Button variant={ios ? "default" : "outline"} size="sm" className="gap-1" onClick={teilen}><Share2 className="h-4 w-4" /><span className="hidden sm:inline">Teilen</span></Button>
+                <Button variant={ios ? "default" : "outline"} size="sm" className="gap-1" onClick={teilen} aria-label="Teilen"><Share2 className="h-4 w-4" /><span className="hidden sm:inline">Teilen</span></Button>
               )}
-              <Button variant="outline" size="sm" className="gap-1" onClick={drucken}><Printer className="h-4 w-4" /><span className="hidden sm:inline">Drucken</span></Button>
+              <Button variant="outline" size="sm" className="gap-1" onClick={drucken} disabled={druckt} aria-label="Drucken">{druckt ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}<span className="hidden sm:inline">Drucken</span></Button>
               <Button variant="outline" size="sm" className="gap-1" asChild>
-                <a href={url} download={dateiname}><Download className="h-4 w-4" /><span className="hidden sm:inline">Herunterladen</span></a>
+                <a href={url} download={dateiname} aria-label="Herunterladen"><Download className="h-4 w-4" /><span className="hidden sm:inline">Herunterladen</span></a>
               </Button>
               {!url.startsWith("blob:") && (
                 <Button variant="outline" size="sm" className="gap-1" asChild>

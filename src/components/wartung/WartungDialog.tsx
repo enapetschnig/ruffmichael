@@ -27,7 +27,7 @@ export function WartungDialog({ open, onOpenChange, wartung, kunden, projekte, v
   kunden: KundeWahl[];
   projekte: ProjektWahl[];
   /** Vorbelegung beim Anlegen, z. B. aus einem Projekt heraus */
-  vorgabe?: { customer_id?: string | null; project_id?: string | null };
+  vorgabe?: { customer_id?: string | null; project_id?: string | null; bezeichnung?: string; faellig_am?: string; notiz?: string; kundeSuche?: string };
   onGespeichert: () => void;
 }) {
   const { toast } = useToast();
@@ -45,7 +45,14 @@ export function WartungDialog({ open, onOpenChange, wartung, kunden, projekte, v
       intervall: wartung.intervall_monate ? String(wartung.intervall_monate) : "einmalig",
       preis: wartung.preis != null ? String(wartung.preis).replace(".", ",") : "",
       notiz: wartung.notiz ?? "",
-    } : { ...leer, customer_id: vorgabe?.customer_id ?? "", project_id: vorgabe?.project_id ?? "" });
+    } : {
+      ...leer,
+      customer_id: vorgabe?.customer_id ?? "",
+      project_id: vorgabe?.project_id ?? "",
+      bezeichnung: vorgabe?.bezeichnung ?? "",
+      faellig_am: vorgabe?.faellig_am ?? "",
+      notiz: vorgabe?.notiz ?? "",
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, wartung]);
 
@@ -99,7 +106,7 @@ export function WartungDialog({ open, onOpenChange, wartung, kunden, projekte, v
           </div>
           <div className="space-y-1.5">
             <Label>Kunde</Label>
-            <KundenAuswahl wert={f.customer_id} onChange={(k) => setF((alt) => ({ ...alt, customer_id: k?.id ?? "" }))} />
+            <KundenAuswahl key={open ? "offen" : "zu"} startSuche={f.customer_id ? undefined : vorgabe?.kundeSuche} wert={f.customer_id} onChange={(k) => setF((alt) => ({ ...alt, customer_id: k?.id ?? "" }))} />
           </div>
           <div className="space-y-1.5">
             <Label>Projekt <span className="text-muted-foreground font-normal">(optional)</span></Label>

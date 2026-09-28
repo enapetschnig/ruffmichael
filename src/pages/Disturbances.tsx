@@ -1,7 +1,7 @@
 import { PageHeader } from "@/components/PageHeader";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Zap, Plus, Calendar, Clock, User, Mail, Phone, MapPin, Filter, Search, ArrowLeft } from "lucide-react";
+import { Zap, Plus, Calendar, Clock, User, Mail, Phone, MapPin, Filter, Search, ArrowLeft, FileClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { DisturbanceForm } from "@/components/DisturbanceForm";
+import { hatInhalt, ladeRegieEntwurf } from "@/lib/regieEntwurf";
 
 type Disturbance = {
   id: string;
@@ -44,6 +45,15 @@ const Disturbances = () => {
   const [editingDisturbance, setEditingDisturbance] = useState<Disturbance | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("alle");
+  // Angefangener (noch nicht gespeicherter) Regiebericht auf diesem Gerät
+  const [entwurf, setEntwurf] = useState(() => ladeRegieEntwurf<{ kundeName?: string; beschreibung?: string }, { material?: string }>());
+  useEffect(() => {
+    const neu = () => setEntwurf(ladeRegieEntwurf());
+    window.addEventListener("regiebericht-entwurf", neu);
+    window.addEventListener("storage", neu);
+    return () => { window.removeEventListener("regiebericht-entwurf", neu); window.removeEventListener("storage", neu); };
+  }, []);
+  const entwurfOffen = !!entwurf && hatInhalt(entwurf.formData, entwurf.materials ?? []);
 
   useEffect(() => {
     checkAuth();
@@ -191,11 +201,30 @@ const Disturbances = () => {
             </p>
           </div>
           {/* Am Handy volle Breite, damit der Haupt-Button gut treffbar ist */}
-          <Button onClick={() => setShowForm(true)} className="gap-2 w-full sm:w-auto flex-shrink-0">
+          <Button onClick={() => { setEditingDisturbance(null); setShowForm(true); }} className="gap-2 w-full sm:w-auto flex-shrink-0">
             <Plus className="h-4 w-4" />
-            Neuer Regiebericht
+            {entwurfOffen ? "Entwurf fortsetzen" : "Neuer Regiebericht"}
           </Button>
         </div>
+
+        {/* Angefangener Bericht: sichtbar, damit er nicht vergessen wird */}
+        {entwurfOffen && entwurf && (
+          <button
+            type="button"
+            onClick={() => { setEditingDisturbance(null); setShowForm(true); }}
+            className="mb-4 w-full text-left rounded-lg border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/30 p-3 flex items-start gap-3 hover:bg-amber-100/70"
+          >
+            <FileClock className="h-5 w-5 shrink-0 text-amber-600 mt-0.5" />
+            <span className="min-w-0 flex-1">
+              <span className="block font-semibold">Angefangener Regiebericht (Entwurf)</span>
+              <span className="block text-sm text-muted-foreground break-words">
+                {[entwurf.formData.kundeName, entwurf.formData.beschreibung].filter(Boolean).join(" · ") || "ohne Kunde"}
+                {" · gesichert "}{format(new Date(entwurf.gespeichertAm), "dd.MM. HH:mm")}
+              </span>
+            </span>
+            <span className="shrink-0 text-sm font-medium text-amber-700 self-center">Weiter →</span>
+          </button>
+        )}
 
         {/* Filter Section */}
         <Card className="mb-6">

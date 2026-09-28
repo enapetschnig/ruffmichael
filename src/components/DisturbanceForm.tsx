@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Calendar, Clock, User, Mail, Phone, MapPin, FileText, Package, Plus, Trash2 } from "lucide-react";
+import { Calendar, Clock, User, Mail, Phone, MapPin, FileText, Package, Plus, Trash2, Save } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import { format } from "date-fns";
 import { MultiEmployeeSelect } from "@/components/MultiEmployeeSelect";
 import { VoiceInputButton, type VoiceContext } from "@/components/VoiceInputButton";
 import { MaterialPicker } from "@/components/MaterialPicker";
+import { hatInhalt, ladeRegieEntwurf, loescheRegieEntwurf, speichereRegieEntwurf } from "@/lib/regieEntwurf";
 
 type MaterialEntry = {
   id: string;
@@ -75,6 +76,11 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
   const [aiFilledFields, setAiFilledFields] = useState<Set<string>>(new Set());
   const [customerSuggestions, setCustomerSuggestions] = useState<CustomerSuggestion[]>([]);
   const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
+  // Entwurf (nur neue Berichte): Zeitpunkt des wiederhergestellten Entwurfs + „fertig geladen“-Schalter,
+  // damit das Zurücksetzen beim Öffnen nicht als leerer Entwurf gespeichert wird
+  const [entwurfVom, setEntwurfVom] = useState<string | null>(null);
+  const [zuletztGesichert, setZuletztGesichert] = useState<string | null>(null);
+  const bereit = useRef(false);
 
   useEffect(() => {
     if (editData) {
@@ -109,8 +115,53 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
       });
       setSelectedEmployees([]);
       setMaterials([]);
+      setEntwurfVom(null);
+      setZuletztGesichert(null);
+      // Angefangenen Bericht zurückholen — nichts geht verloren
+      if (open) {
+        const e = ladeRegieEntwurf<typeof formData, MaterialEntry>();
+        if (e && hatInhalt(e.formData, e.materials ?? [])) {
+          setFormData((alt) => ({ ...alt, ...e.formData }));
+          setSelectedEmployees(e.selectedEmployees ?? []);
+          setMaterials(e.materials ?? []);
+          setEntwurfVom(e.gespeichertAm);
+        }
+      }
     }
+    bereit.current = open && !editData;
   }, [editData, open]);
+
+  // Bei jeder Eingabe sichern (kurz verzögert) — nur neue Berichte und nur mit Inhalt
+  useEffect(() => {
+    if (!open || editData || !bereit.current || saving) return;
+    const t = window.setTimeout(() => {
+      if (!hatInhalt(formData, materials)) return;
+      speichereRegieEntwurf({ formData, selectedEmployees, materials });
+      setZuletztGesichert(new Date().toISOString());
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [formData, selectedEmployees, materials, open, editData, saving]);
+
+  const entwurfVerwerfen = () => {
+    if (!confirm("Entwurf wirklich verwerfen? Die Eingaben gehen verloren.")) return;
+    loescheRegieEntwurf();
+    setFormData({
+      datum: format(new Date(), "yyyy-MM-dd"),
+      startTime: "08:00",
+      endTime: "10:00",
+      pauseMinutes: 0,
+      kundeName: "",
+      kundeEmail: "",
+      kundeAdresse: "",
+      kundeTelefon: "",
+      beschreibung: "",
+      notizen: "",
+    });
+    setSelectedEmployees([]);
+    setMaterials([]);
+    setEntwurfVom(null);
+    setZuletztGesichert(null);
+  };
 
   // Load voice context (employees + Kundenverwaltung + recent customers + material catalog)
   useEffect(() => {
@@ -269,6 +320,7 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return; // Doppelklick: sonst zwei Berichte
     setSaving(true);
 
     const user = await getSessionUser();
@@ -490,6 +542,10 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
       }
       if (timeRes.queued) anyQueued = true;
 
+      // Gespeichert (oder sicher in der Warteschlange) → Entwurf wird nicht mehr gebraucht
+      bereit.current = false;
+      loescheRegieEntwurf();
+
       if (anyQueued) {
         toast({ title: "Offline gespeichert", description: "Wird automatisch gesendet, sobald wieder Internet da ist." });
       } else {
@@ -668,7 +724,11 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[calc(100vw-1.5rem)] sm:max-w-lg max-h-[90vh] flex flex-col overflow-hidden p-4 sm:p-6">
+      <DialogContent
+        className="max-w-[calc(100vw-1.5rem)] sm:max-w-lg max-h-[90vh] flex flex-col overflow-hidden p-4 sm:p-6"
+        // Versehentliches Danebentippen schließt das Formular nicht mehr (nur X oder Abbrechen)
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader className="flex-shrink-0 pr-8">
           <DialogTitle className="text-base sm:text-lg flex items-center gap-2">
             <FileText className="h-5 w-5 flex-shrink-0" />
@@ -677,6 +737,19 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
           <DialogDescription className="text-xs sm:text-sm">
             Erfassen Sie einen Service-Einsatz beim Kunden. Die Arbeitszeit wird automatisch für alle beteiligten Mitarbeiter gebucht.
           </DialogDescription>
+          {!editData && (entwurfVom || zuletztGesichert) && (
+            <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-emerald-300 bg-emerald-50 dark:bg-emerald-950/30 px-2.5 py-1.5 text-xs" role="status">
+              <Save className="h-3.5 w-3.5 shrink-0 text-emerald-700" />
+              <span className="flex-1 min-w-0">
+                {entwurfVom
+                  ? `Entwurf vom ${format(new Date(entwurfVom), "dd.MM. HH:mm")} wiederhergestellt — wird laufend gesichert.`
+                  : "Als Entwurf gesichert — geht auch beim Schließen nicht verloren."}
+              </span>
+              {entwurfVom && (
+                <button type="button" className="underline text-muted-foreground" onClick={entwurfVerwerfen}>Verwerfen</button>
+              )}
+            </div>
+          )}
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto pr-1">

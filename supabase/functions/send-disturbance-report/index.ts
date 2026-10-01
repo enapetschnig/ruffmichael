@@ -565,8 +565,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // Generate simple email HTML
     const emailHtml = generateEmailHtml({ disturbance, materials, technicians });
 
-    // Empfänger: der Kunde; das Büro bekommt eine Kopie (Einstellung „Regiebericht
-    // E-Mail-Empfänger“). Die Mail liegt außerdem in „Gesendete Elemente“ des Firmenpostfachs.
+    // Empfänger: der Kunde (falls E-Mail hinterlegt). Das Firmenpostfach office@ bekommt
+    // IMMER eine Kopie in den Posteingang — nicht nur in „Gesendete Elemente“. Dazu die
+    // Adresse aus der Einstellung „Regiebericht E-Mail-Empfänger“, falls eine andere.
     const { data: setting } = await supabaseAdmin
       .from("app_settings")
       .select("value")
@@ -575,8 +576,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const buero = String(setting?.value ?? "").trim();
     const absender = postfach().toLowerCase();
     const kunde = String(disturbance.kunde_email ?? "").trim();
-    const an = kunde ? [kunde] : (buero ? [buero] : [absender]);
-    const cc = kunde && buero && buero.toLowerCase() !== absender && buero.toLowerCase() !== kunde.toLowerCase() ? [buero] : [];
+    const an = kunde ? [kunde] : [absender];
+    const cc = [...new Set([absender, buero.toLowerCase()].filter((x) => x && !an.some((a) => a.toLowerCase() === x)))];
 
     const dateForFilename = formatDateShort(disturbance.datum).replace(/\./g, "-");
     const kundeForFilename = disturbance.kunde_name.replace(/[^a-zA-Z0-9äöüÄÖÜß]/g, "_");

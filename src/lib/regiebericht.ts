@@ -25,7 +25,7 @@ export async function technikerNamen(disturbanceId: string, ersatzUserId?: strin
 /** Daten für die PDF-Erzeugung/den Versand — dieselben wie beim Unterschreiben. */
 async function berichtDaten(disturbanceId: string) {
   const { data: d, error } = await supabase.from("disturbances").select("*").eq("id", disturbanceId).single();
-  if (error || !d) return { error: error?.message ?? "Regiebericht nicht gefunden" } as const;
+  if (error || !d) return { error: error?.message ?? "Arbeitsbestätigung nicht gefunden" } as const;
   const [materialien, fotos, techniker] = await Promise.all([
     supabase.from("disturbance_materials").select("*").eq("disturbance_id", disturbanceId).order("created_at"),
     supabase.from("disturbance_photos").select("id, file_path, file_name").eq("disturbance_id", disturbanceId).order("created_at"),
@@ -60,5 +60,5 @@ export async function regieberichtPdf(disturbanceId: string): Promise<{ blob?: B
   const bytes = Uint8Array.from(atob(data.pdf), (c) => c.charCodeAt(0));
   const tag = String(d.datum).split("-").reverse().join(".");
   const name = String(d.kunde_name ?? "Kunde").replace(/[^\p{L}\p{N} ._-]/gu, "_").trim();
-  return { blob: new Blob([bytes], { type: "application/pdf" }), dateiname: `Regiebericht ${name} ${tag}.pdf` };
+  return { blob: new Blob([bytes], { type: "application/pdf" }), dateiname: `Arbeitsbestaetigung ${name} ${tag}.pdf` };
 }

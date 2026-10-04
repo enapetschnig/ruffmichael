@@ -111,7 +111,7 @@ export const SignatureDialog = ({
     if (offlineSignedId === disturbance.id) {
       toast({
         title: "Bereits eingereiht",
-        description: "Der Bericht wird gesendet, sobald wieder Internet da ist.",
+        description: "Die Arbeitsbestätigung wird gesendet, sobald wieder Internet da ist.",
       });
       return;
     }
@@ -165,7 +165,7 @@ export const SignatureDialog = ({
         technicianNames = ["Techniker"];
       }
 
-      const label = `Regiebericht senden: ${disturbance.kunde_name}`;
+      const label = `Arbeitsbestätigung senden: ${disturbance.kunde_name}`;
       const signatureTimestamp = new Date().toISOString();
       const sendBody = {
         disturbance: {
@@ -202,7 +202,7 @@ export const SignatureDialog = ({
         setOfflineSignedId(disturbance.id);
         toast({
           title: "Offline gespeichert",
-          description: "Bericht wird gesendet, sobald wieder Internet da ist.",
+          description: "Die Arbeitsbestätigung wird gesendet, sobald wieder Internet da ist.",
         });
         onSuccess();
         onOpenChange(false);
@@ -234,7 +234,7 @@ export const SignatureDialog = ({
         toast({
           variant: "destructive",
           title: "Senden fehlgeschlagen",
-          description: "Der Bericht konnte nicht gesendet werden. Der Status bleibt unverändert — bitte erneut versuchen.",
+          description: "Die Arbeitsbestätigung konnte nicht gesendet werden. Der Status bleibt unverändert — bitte erneut versuchen.",
         });
         return;
       }
@@ -250,12 +250,12 @@ export const SignatureDialog = ({
         toast({
           variant: "destructive",
           title: "Hinweis",
-          description: "Der Bericht wurde gesendet, aber der Status konnte nicht auf „Gesendet\" gesetzt werden.",
+          description: "Die Arbeitsbestätigung wurde gesendet, aber der Status konnte nicht auf „Gesendet\" gesetzt werden.",
         });
       } else {
         toast({
-          title: "Regiebericht gesendet",
-          description: "Der Bericht wurde erfolgreich per E-Mail versendet.",
+          title: "Arbeitsbestätigung gesendet",
+          description: "Die Arbeitsbestätigung wurde per E-Mail versendet.",
         });
       }
 
@@ -266,7 +266,7 @@ export const SignatureDialog = ({
       toast({
         variant: "destructive",
         title: "Fehler",
-        description: "Der Bericht konnte nicht gesendet werden",
+        description: "Die Arbeitsbestätigung konnte nicht gesendet werden",
       });
     } finally {
       setSending(false);
@@ -279,10 +279,10 @@ export const SignatureDialog = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 pr-6">
             <FileText className="h-5 w-5 shrink-0" />
-            Regiebericht zur Unterschrift
+            Auftrag & Arbeitsbestätigung zur Unterschrift
           </DialogTitle>
           <DialogDescription>
-            Bitte lassen Sie den Kunden unterschreiben und senden Sie dann den Bericht.
+            Bitte lassen Sie den Kunden unterschreiben und senden Sie dann die Arbeitsbestätigung.
           </DialogDescription>
         </DialogHeader>
 
@@ -295,7 +295,11 @@ export const SignatureDialog = ({
                 Unterschrift des Kunden
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-2">
+              {/* Gleicher Wortlaut wie im PDF — Auftrag und Bestätigung in einem */}
+              <p className="text-sm text-muted-foreground">
+                Mit meiner Unterschrift erteile ich den Auftrag für die angeführten Regieleistungen und bestätige deren ordnungsgemäße Durchführung.
+              </p>
               <SignaturePad onSignatureChange={setSignature} />
             </CardContent>
           </Card>
@@ -430,7 +434,7 @@ export const SignatureDialog = ({
             ) : (
               <>
                 <Send className="h-4 w-4" />
-                Regiebericht senden
+                Unterschreiben & senden
               </>
             )}
           </Button>

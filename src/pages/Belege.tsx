@@ -30,7 +30,7 @@ type ProjektOpt = { id: string; name: string; plz: string | null; adresse: strin
 // Belegarten als Karten statt Aufklappliste — man sieht sofort, wofür jede da ist.
 const NEU_TYPEN: { typ: BelegTyp; icon: React.ReactNode; text: string }[] = [
   { typ: "angebot", icon: <FileText className="h-5 w-5" />, text: "Preisvorschlag an den Kunden — wird später mit einem Klick zur Rechnung" },
-  { typ: "rechnung", icon: <Receipt className="h-5 w-5" />, text: "Abrechnung einer fertigen Leistung — Stunden und Regieberichte lassen sich holen" },
+  { typ: "rechnung", icon: <Receipt className="h-5 w-5" />, text: "Abrechnung einer fertigen Leistung — Stunden und Arbeitsbestätigungen (Regie) lassen sich holen" },
   { typ: "teilrechnung", icon: <Layers className="h-5 w-5" />, text: "Abschlag nach Baufortschritt — der Rest kommt auf die Schlussrechnung" },
   { typ: "schlussrechnung", icon: <FileCheck className="h-5 w-5" />, text: "Abschluss eines Projekts — zieht erstellte Teilrechnungen automatisch ab" },
 ];

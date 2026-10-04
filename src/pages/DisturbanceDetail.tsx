@@ -112,7 +112,7 @@ const DisturbanceDetail = () => {
       toast({
         variant: "destructive",
         title: "Fehler",
-        description: "Regiebericht konnte nicht geladen werden",
+        description: "Arbeitsbestätigung konnte nicht geladen werden",
       });
       navigate("/disturbances");
     } else {
@@ -214,7 +214,7 @@ const DisturbanceDetail = () => {
       toast({
         variant: "destructive",
         title: "Löschen nicht möglich",
-        description: "Diesem Regiebericht sind Stundeneinträge von Team-Mitgliedern zugeordnet, die nicht entfernt werden können. Bitte behalten Sie den Bericht, da die gebuchten Team-Stunden sonst erhalten bleiben würden.",
+        description: "Dieser Arbeitsbestätigung sind Stundeneinträge von Team-Mitgliedern zugeordnet, die nicht entfernt werden können. Bitte behalten Sie den Bericht, da die gebuchten Team-Stunden sonst erhalten bleiben würden.",
       });
       setDeleting(false);
       return;
@@ -236,12 +236,12 @@ const DisturbanceDetail = () => {
       toast({
         variant: "destructive",
         title: "Fehler",
-        description: "Regiebericht konnte nicht gelöscht werden",
+        description: "Arbeitsbestätigung konnte nicht gelöscht werden",
       });
     } else {
       toast({
         title: "Erfolg",
-        description: "Regiebericht wurde gelöscht",
+        description: "Arbeitsbestätigung wurde gelöscht",
       });
       navigate("/disturbances");
     }
@@ -323,7 +323,7 @@ const DisturbanceDetail = () => {
           // Direktdruck nicht möglich → Vorschau mit Drucken/Teilen-Knöpfen
         }
       }
-      setPdf({ url: URL.createObjectURL(r.blob), blob: r.blob, name: r.dateiname ?? "Regiebericht.pdf" });
+      setPdf({ url: URL.createObjectURL(r.blob), blob: r.blob, name: r.dateiname ?? "Arbeitsbestaetigung.pdf" });
     } finally {
       setPdfLaedt(null);
     }
@@ -333,7 +333,7 @@ const DisturbanceDetail = () => {
   const berichtSenden = async () => {
     if (!disturbance || sendet) return;
     if (isOffline()) {
-      toast({ variant: "destructive", title: "Nur mit Internet", description: "Der Bericht geht über das Firmenpostfach raus — bitte mit Internet erneut versuchen." });
+      toast({ variant: "destructive", title: "Nur mit Internet", description: "Die Arbeitsbestätigung geht über das Firmenpostfach raus — bitte mit Internet erneut versuchen." });
       return;
     }
     setSendet(true);
@@ -343,7 +343,7 @@ const DisturbanceDetail = () => {
       toast({ variant: "destructive", title: "Nicht gesendet", description: r.error });
       return;
     }
-    toast({ title: "Regiebericht gesendet", description: `An ${r.an?.join(", ") ?? "den Kunden"} — über Outlook, Kopie in „Gesendete Elemente“.` });
+    toast({ title: "Arbeitsbestätigung gesendet", description: `An ${r.an?.join(", ") ?? "den Kunden"} — über Outlook, Kopie in „Gesendete Elemente“.` });
     fetchDisturbance();
   };
 
@@ -373,9 +373,9 @@ const DisturbanceDetail = () => {
   if (!disturbance) {
     return (
       <div className="kb-page min-h-screen">
-        <PageHeader title="Regiebericht nicht gefunden" backPath="/disturbances" />
+        <PageHeader title="Arbeitsbestätigung nicht gefunden" backPath="/disturbances" />
         <main className="container mx-auto px-3 sm:px-4 lg:px-6 py-6 text-center">
-          <p>Der angeforderte Regiebericht konnte nicht gefunden werden.</p>
+          <p>Die angeforderte Arbeitsbestätigung konnte nicht gefunden werden.</p>
           <Button onClick={() => navigate("/disturbances")} className="mt-4">
             Zurück zur Übersicht
           </Button>
@@ -386,7 +386,7 @@ const DisturbanceDetail = () => {
 
   return (
     <div className="kb-page min-h-screen">
-      <PageHeader title="Regiebericht Details" backPath="/disturbances" />
+      <PageHeader title="Auftrag & Arbeitsbestätigung" backPath="/disturbances" />
 
       <main className="container mx-auto px-3 sm:px-4 lg:px-6 py-6 max-w-4xl space-y-6">
         {/* Header with status and actions */}
@@ -429,7 +429,7 @@ const DisturbanceDetail = () => {
             {canEdit && disturbance.status === "offen" && !!disturbance.unterschrift_kunde && (
               <Button onClick={berichtSenden} className="gap-1" disabled={sendet}>
                 {sendet ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                Bericht senden
+                Arbeitsbestätigung senden
               </Button>
             )}
             {canEdit && disturbance.status === "offen" && !disturbance.unterschrift_kunde && (
@@ -453,9 +453,9 @@ const DisturbanceDetail = () => {
                   </AlertDialogTrigger>
                   <AlertDialogContent className="max-w-[calc(100vw-1.5rem)] sm:max-w-lg max-h-[90vh] overflow-y-auto">
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Regiebericht löschen?</AlertDialogTitle>
+                      <AlertDialogTitle>Arbeitsbestätigung löschen?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Diese Aktion kann nicht rückgängig gemacht werden. Der Regiebericht und alle zugehörigen Materialien werden endgültig gelöscht.
+                        Diese Aktion kann nicht rückgängig gemacht werden. Die Arbeitsbestätigung und alle zugehörigen Materialien werden endgültig gelöscht.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -645,10 +645,10 @@ const DisturbanceDetail = () => {
       <BelegVorschau
         open={!!pdf}
         onClose={() => setPdf(null)}
-        titel={`Regiebericht ${disturbance.kunde_name}`}
+        titel={`Arbeitsbestätigung ${disturbance.kunde_name}`}
         url={pdf?.url ?? null}
         blob={pdf?.blob ?? null}
-        dateiname={pdf?.name ?? "Regiebericht.pdf"}
+        dateiname={pdf?.name ?? "Arbeitsbestaetigung.pdf"}
       />
 
       {/* Nächste Wartung: Kunde wird gesucht, Termin in einem Jahr vorgeschlagen */}
@@ -662,7 +662,7 @@ const DisturbanceDetail = () => {
           kundeSuche: disturbance.kunde_name,
           bezeichnung: (disturbance.beschreibung ?? "").split("\n")[0].trim().slice(0, 80),
           faellig_am: format(addMonths(new Date(disturbance.datum), 12), "yyyy-MM-dd"),
-          notiz: `Aus Regiebericht vom ${format(new Date(disturbance.datum), "dd.MM.yyyy")}`,
+          notiz: `Aus Arbeitsbestätigung vom ${format(new Date(disturbance.datum), "dd.MM.yyyy")}`,
         }}
         onGespeichert={() => toast({ title: "Wartung eingetragen", description: "Sie erscheint rechtzeitig vorher am Dashboard." })}
       />

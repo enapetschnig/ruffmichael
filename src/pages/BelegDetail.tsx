@@ -199,7 +199,7 @@ const BelegDetail = () => {
       const nochDa = pos.some((x) => x.id !== id && x.quelle_typ === "regiebericht" && x.quelle_ids.some((q) => p.quelle_ids.includes(q)));
       if (!nochDa) {
         const { error: e2 } = await supabase.rpc("faktura_regieberichte_markieren", { p_beleg: null, p_ids: p.quelle_ids });
-        if (e2) toast({ variant: "destructive", title: "Regiebericht nicht freigegeben", description: e2.message });
+        if (e2) toast({ variant: "destructive", title: "Arbeitsbestätigung nicht freigegeben", description: e2.message });
       }
     }
     posLaden();
@@ -285,7 +285,7 @@ const BelegDetail = () => {
     setStundenOpen(false); await posLaden(); setBusy(null);
   };
 
-  // ── Regieberichte holen ────────────────────────────────────────────────
+  // ── Arbeitsbestätigungen holen ────────────────────────────────────────────────
   const passtZumKunden = (name: string | null) => {
     if (!b || !name) return false;
     const ziel = (b.kunde_name ?? "").toLowerCase();
@@ -302,13 +302,13 @@ const BelegDetail = () => {
     if (!b || busy) return;
     const gew = regie.filter((r) => r.gewaehlt);
     if (gew.some((r) => Number(r.stunden) > 0 && (parseZahl(r.satzWert) ?? 0) <= 0)) {
-      return toast({ variant: "destructive", title: "Stundensatz fehlt", description: "Für jeden gewählten Regiebericht mit Stunden einen Satz > 0 angeben." });
+      return toast({ variant: "destructive", title: "Stundensatz fehlt", description: "Für jede gewählte Arbeitsbestätigung mit Stunden einen Satz > 0 angeben." });
     }
     setBusy("regie");
     let von = b.leistung_von, bis = b.leistung_bis;
     for (const r of gew) {
       const { error: em } = await supabase.rpc("faktura_regieberichte_markieren", { p_beleg: b.id, p_ids: [r.id] });
-      if (em) { toast({ variant: "destructive", title: "Regiebericht nicht übernommen", description: em.message }); break; }
+      if (em) { toast({ variant: "destructive", title: "Arbeitsbestätigung nicht übernommen", description: em.message }); break; }
       const zeilen: Database["public"]["Tables"]["beleg_positionen"]["Insert"][] = [];
       const kopfText = `Regiearbeit ${datum(r.datum)} – ${r.mitarbeiter}`;
       if (Number(r.stunden) > 0) {
@@ -320,7 +320,7 @@ const BelegDetail = () => {
         for (const m of (r.materialien as unknown as RegieMaterial[]) ?? []) {
           if (!m?.material) continue;
           const { menge, einheit } = mengeLesen(m.menge);
-          zeilen.push({ beleg_id: b.id, pos: null, art: "position", text: m.material, beschreibung: m.notizen || `Material laut Regiebericht vom ${datum(r.datum)}`, menge, einheit, einzelpreis: 0, quelle_typ: "regiebericht", quelle_ids: [r.id] });
+          zeilen.push({ beleg_id: b.id, pos: null, art: "position", text: m.material, beschreibung: m.notizen || `Material laut Arbeitsbestätigung vom ${datum(r.datum)}`, menge, einheit, einzelpreis: 0, quelle_typ: "regiebericht", quelle_ids: [r.id] });
         }
       }
       // Reihenfolge bleibt: Zeilen einzeln einfügen, die DB vergibt fortlaufende Nummern
@@ -334,7 +334,7 @@ const BelegDetail = () => {
     if ((von !== b.leistung_von) || (bis !== b.leistung_bis)) await kopf({ leistung_von: von, leistung_bis: bis });
     setRegieOpen(false); await posLaden(); setBusy(null);
     const material = gew.reduce((s, r) => s + (r.mitMaterial ? ((r.materialien as unknown as RegieMaterial[]) ?? []).length : 0), 0);
-    if (material > 0) toast({ title: "Material ohne Preis", description: `${material} Materialzeile(n) aus den Regieberichten haben noch keinen Preis — bitte eintragen (gelb markiert).` });
+    if (material > 0) toast({ title: "Material ohne Preis", description: `${material} Materialzeile(n) aus den Arbeitsbestätigungen haben noch keinen Preis — bitte eintragen (gelb markiert).` });
   };
 
   // ── Aktionen ───────────────────────────────────────────────────────────
@@ -562,7 +562,7 @@ const BelegDetail = () => {
               <Button variant="outline" size="sm" className="gap-1" onClick={stundenLaden} disabled={busy !== null}><Clock className="h-4 w-4" />Stunden holen</Button>
             )}
             {entwurf && rechnung && (
-              <Button variant="outline" size="sm" className="gap-1" onClick={regieLaden} disabled={busy !== null}><ClipboardList className="h-4 w-4" />Regieberichte holen</Button>
+              <Button variant="outline" size="sm" className="gap-1" onClick={regieLaden} disabled={busy !== null}><ClipboardList className="h-4 w-4" />Arbeitsbestätigungen holen</Button>
             )}
             {!entwurf && istAngebot(b.typ) && (
               <Button variant="outline" size="sm" className="gap-1" onClick={angebotBearbeiten} disabled={busy !== null}><Pencil className="h-4 w-4" />Bearbeiten</Button>
@@ -618,7 +618,7 @@ const BelegDetail = () => {
         {preisFehlt > 0 && entwurf && (
           <div className="flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm">
             <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
-            <span>{preisFehlt} Materialzeile{preisFehlt === 1 ? "" : "n"} aus Regieberichten {preisFehlt === 1 ? "hat" : "haben"} noch keinen Preis (gelb markiert).</span>
+            <span>{preisFehlt} Materialzeile{preisFehlt === 1 ? "" : "n"} aus Arbeitsbestätigungen {preisFehlt === 1 ? "hat" : "haben"} noch keinen Preis (gelb markiert).</span>
           </div>
         )}
 
@@ -659,7 +659,7 @@ const BelegDetail = () => {
                     <div className="space-y-1"><Label className="text-xs">Leistung von{rechnung || b.typ === "gutschrift" ? " *" : ""}</Label><Input type="date" value={b.leistung_von ?? ""} disabled={!entwurf} onChange={(e) => kopf({ leistung_von: e.target.value || null })} /></div>
                     <div className="space-y-1"><Label className="text-xs">Leistung bis</Label><Input type="date" value={b.leistung_bis ?? ""} disabled={!entwurf} onChange={(e) => kopf({ leistung_bis: e.target.value || null })} /></div>
                   </div>
-                  {(rechnung || b.typ === "gutschrift") && <p className="text-[11px] text-muted-foreground">* Pflichtangaben auf der Rechnung (§ 11 UStG). „Stunden holen“ und „Regieberichte holen“ setzen den Leistungszeitraum automatisch.</p>}
+                  {(rechnung || b.typ === "gutschrift") && <p className="text-[11px] text-muted-foreground">* Pflichtangaben auf der Rechnung (§ 11 UStG). „Stunden holen“ und „Arbeitsbestätigungen holen“ setzen den Leistungszeitraum automatisch.</p>}
                   <div className="space-y-1"><Label className="text-xs">Betreff</Label><Input value={b.betreff ?? ""} disabled={!entwurf} onChange={(e) => kopfLokal({ betreff: e.target.value })} onBlur={(e) => kopf({ betreff: e.target.value || null })} /></div>
                   <div className="flex items-center justify-between gap-3 rounded-md border p-2">
                     <div className="min-w-0">
@@ -702,7 +702,7 @@ const BelegDetail = () => {
               <CardContent className="space-y-2">
                 {sortiert.length === 0 && (
                   <p className="text-sm text-muted-foreground py-4 text-center">
-                    Noch keine Positionen. {rechnung ? "„Stunden holen“, „Regieberichte holen“ oder " : ""}„Position“ hinzufügen.
+                    Noch keine Positionen. {rechnung ? "„Stunden holen“, „Arbeitsbestätigungen holen“ oder " : ""}„Position“ hinzufügen.
                   </p>
                 )}
                 {sortiert.map((p, i) => {
@@ -753,7 +753,7 @@ const BelegDetail = () => {
                               </div>
                               {p.quelle_typ !== "manuell" && (
                                 <div className="text-[11px] text-muted-foreground">
-                                  {p.quelle_typ === "stunden" ? `Aus der Zeiterfassung: ${p.quelle_ids.length} Zeitblöcke` : p.quelle_typ === "regiebericht" ? "Aus einem Regiebericht — beim Löschen wird er wieder frei" : abzug ? "Abzug einer erstellten Teilrechnung — Betrag ist fix" : p.quelle_typ}
+                                  {p.quelle_typ === "stunden" ? `Aus der Zeiterfassung: ${p.quelle_ids.length} Zeitblöcke` : p.quelle_typ === "regiebericht" ? "Aus einer Arbeitsbestätigung — beim Löschen wird sie wieder frei" : abzug ? "Abzug einer erstellten Teilrechnung — Betrag ist fix" : p.quelle_typ}
                                 </div>
                               )}
                             </>
@@ -840,14 +840,14 @@ const BelegDetail = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Regieberichte holen */}
+      {/* Arbeitsbestätigungen holen */}
       <Dialog open={regieOpen} onOpenChange={setRegieOpen}>
         <DialogContent className="max-w-sm sm:max-w-2xl max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Regieberichte auf die Rechnung</DialogTitle>
-            <DialogDescription>Alle noch nicht verrechneten Regieberichte. Passende Kunden sind vorausgewählt. Stunden werden mit dem Satz des Monteurs verrechnet, Material kommt als eigene Zeile — den Preis trägst du danach ein.</DialogDescription>
+            <DialogTitle>Arbeitsbestätigungen auf die Rechnung</DialogTitle>
+            <DialogDescription>Alle noch nicht verrechneten Arbeitsbestätigungen (Regie). Passende Kunden sind vorausgewählt. Stunden werden mit dem Satz des Monteurs verrechnet, Material kommt als eigene Zeile — den Preis trägst du danach ein.</DialogDescription>
           </DialogHeader>
-          {regie.length === 0 ? <p className="text-sm text-muted-foreground py-4">Keine offenen Regieberichte.</p> : (
+          {regie.length === 0 ? <p className="text-sm text-muted-foreground py-4">Keine offenen Arbeitsbestätigungen.</p> : (
             <div className="space-y-2">
               {regie.map((r, i) => {
                 const mat = (r.materialien as unknown as RegieMaterial[]) ?? [];
@@ -975,12 +975,12 @@ const BelegDetail = () => {
                 : istAngebot(b.typ)
                   ? `Die nächste Nummer wird vergeben und das PDF erzeugt.${b.project_id ? " Es wird im Projektordner „Anbote“ abgelegt und nach OneDrive übertragen." : ""} Ein Angebot kannst du danach jederzeit wieder bearbeiten.`
                   : b.typ === "gutschrift"
-                    ? "Die Gutschrift bekommt die nächste Nummer. Damit gilt die zugehörige Rechnung als storniert, übernommene Stunden und Regieberichte werden wieder frei."
+                    ? "Die Gutschrift bekommt die nächste Nummer. Damit gilt die zugehörige Rechnung als storniert, übernommene Stunden und Arbeitsbestätigungen werden wieder frei."
                   : b.project_id
                     ? "Die nächste Nummer wird vergeben. Rechnungen lassen sich danach nicht mehr ändern, nur stornieren; das PDF wird im Projektordner „Anbote“ abgelegt und nach OneDrive übertragen."
                     : "Die nächste Nummer wird vergeben. Rechnungen lassen sich danach nicht mehr ändern, nur stornieren. Ohne Projekt bleibt das PDF nur in der App (kein OneDrive).")}
-              {!zahlungLoeschenId && frage === "storno" && "Es wird eine Gutschrift über den vollen Betrag vorbereitet (als Entwurf zum Prüfen). Erst wenn du dort „Gutschrift erstellen“ drückst, gilt die Rechnung als storniert und Stunden wie Regieberichte werden wieder frei."}
-              {!zahlungLoeschenId && frage === "loeschen" && "Der Entwurf wird gelöscht, übernommene Stunden und Regieberichte werden wieder freigegeben."}
+              {!zahlungLoeschenId && frage === "storno" && "Es wird eine Gutschrift über den vollen Betrag vorbereitet (als Entwurf zum Prüfen). Erst wenn du dort „Gutschrift erstellen“ drückst, gilt die Rechnung als storniert und Stunden wie Arbeitsbestätigungen werden wieder frei."}
+              {!zahlungLoeschenId && frage === "loeschen" && "Der Entwurf wird gelöscht, übernommene Stunden und Arbeitsbestätigungen werden wieder freigegeben."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

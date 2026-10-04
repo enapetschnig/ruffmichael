@@ -372,7 +372,7 @@ export default function Index() {
         <div className="mb-4 grid grid-cols-3 gap-2 sm:hidden">
           <KBButton className="w-full min-h-[72px] flex-col gap-1.5 py-3 text-sm" icon={Clock} label="Zeit buchen" onClick={() => navigate("/time-tracking")} />
           <KBButton className="w-full min-h-[72px] flex-col gap-1.5 py-3 text-sm" icon={Camera} label="Foto" onClick={() => setShowFotos(true)} />
-          <KBButton className="w-full min-h-[72px] flex-col gap-1.5 py-3 text-sm" icon={FileText} label="Regiebericht" onClick={() => navigate("/disturbances")} />
+          <KBButton className="w-full min-h-[72px] flex-col gap-1.5 py-3 text-sm" icon={FileText} label="Auftrag" onClick={() => navigate("/disturbances")} />
         </div>
 
         <nav aria-label="Hauptmenü" className="columns-1 md:columns-2 xl:columns-4 gap-3 sm:gap-4 [&>*]:mb-3 sm:[&>*]:mb-4 [&>*]:break-inside-avoid [&_.kb-btn]:min-h-[52px] sm:[&_.kb-btn]:min-h-[2.25rem]">
@@ -408,7 +408,7 @@ export default function Index() {
           </Bereich>}
           <Bereich icon={HardHat} title="Betrieb">
             <KBButton className="w-full" icon={Clock} label="Zeiterfassung" onClick={() => navigate("/time-tracking")} />
-            <KBButton className="w-full" icon={FileText} label="Regieberichte" onClick={() => navigate("/disturbances")} />
+            <KBButton className="w-full" icon={FileText} label="Aufträge & Arbeitsbestätigungen" onClick={() => navigate("/disturbances")} />
             <KBButton className="w-full" icon={FolderKanban} label="Projekte" onClick={() => navigate("/projects")} />
             <KBButton className="w-full" icon={BarChart3} label="Meine Stunden" onClick={() => navigate("/my-hours")} />
             <KBButton className="w-full" icon={FileText} label="Meine Dokumente" onClick={() => navigate("/my-documents")} />

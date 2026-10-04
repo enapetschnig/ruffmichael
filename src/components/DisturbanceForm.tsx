@@ -413,7 +413,7 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
         .eq("id", editData.id);
 
       if (error) {
-        toast({ variant: "destructive", title: "Fehler", description: "Regiebericht konnte nicht aktualisiert werden" });
+        toast({ variant: "destructive", title: "Fehler", description: "Arbeitsbestätigung konnte nicht aktualisiert werden" });
         setSaving(false);
         return;
       }
@@ -432,18 +432,18 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
         // editing another user's Regiebericht also cannot touch that owner's own
         // entry (RLS), so their booked hours would be left stale. Make it explicit.
         toast({
-          title: "Regiebericht aktualisiert",
-          description: "Zeiten des Regieberichts geändert — die Stundeneinträge der Team-Mitglieder müssen ggf. manuell angepasst werden",
+          title: "Arbeitsbestätigung aktualisiert",
+          description: "Zeiten der Arbeitsbestätigung geändert — die Stundeneinträge der Team-Mitglieder müssen ggf. manuell angepasst werden",
         });
       } else {
-        toast({ title: "Erfolg", description: "Regiebericht wurde aktualisiert" });
+        toast({ title: "Erfolg", description: "Arbeitsbestätigung wurde aktualisiert" });
       }
     } else {
       // Create new disturbance — offline-fähig. Die id wird clientseitig erzeugt und
       // in die Eltern-Zeile geschrieben, damit Kind-Zeilen (Worker/Material/Zeiten)
       // schon offline auf sie verweisen und der Sync die FK-Reihenfolge wahrt.
       const disturbanceId = newId();
-      const label = `Regiebericht: ${formData.kundeName.trim()}`;
+      const label = `Arbeitsbestätigung: ${formData.kundeName.trim()}`;
       let anyQueued = false;
 
       // 1) Eltern: disturbance (user_id NUR beim Insert — dieser User wird Eigentümer)
@@ -453,7 +453,7 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
         label
       );
       if (distRes.error) {
-        toast({ variant: "destructive", title: "Fehler", description: "Regiebericht konnte nicht erstellt werden" });
+        toast({ variant: "destructive", title: "Fehler", description: "Arbeitsbestätigung konnte nicht erstellt werden" });
         setSaving(false);
         return;
       }
@@ -471,7 +471,7 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
       ];
       const workersRes = await saveInsert("disturbance_workers", workerRows, label, anyQueued);
       if (workersRes.error) {
-        toast({ variant: "destructive", title: "Fehler", description: "Regiebericht konnte nicht erstellt werden" });
+        toast({ variant: "destructive", title: "Fehler", description: "Arbeitsbestätigung konnte nicht erstellt werden" });
         setSaving(false);
         return;
       }
@@ -494,7 +494,7 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
           anyQueued
         );
         if (matRes.error) {
-          toast({ variant: "destructive", title: "Fehler", description: "Regiebericht konnte nicht erstellt werden" });
+          toast({ variant: "destructive", title: "Fehler", description: "Arbeitsbestätigung konnte nicht erstellt werden" });
           setSaving(false);
           return;
         }
@@ -536,7 +536,7 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
         anyQueued
       );
       if (timeRes.error) {
-        toast({ variant: "destructive", title: "Fehler", description: "Regiebericht konnte nicht erstellt werden" });
+        toast({ variant: "destructive", title: "Fehler", description: "Arbeitsbestätigung konnte nicht erstellt werden" });
         setSaving(false);
         return;
       }
@@ -549,7 +549,7 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
       if (anyQueued) {
         toast({ title: "Offline gespeichert", description: "Wird automatisch gesendet, sobald wieder Internet da ist." });
       } else {
-        toast({ title: "Erfolg", description: "Regiebericht wurde erfasst" });
+        toast({ title: "Erfolg", description: "Auftrag & Arbeitsbestätigung wurde erfasst" });
       }
 
       setSaving(false);
@@ -732,7 +732,7 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
         <DialogHeader className="flex-shrink-0 pr-8">
           <DialogTitle className="text-base sm:text-lg flex items-center gap-2">
             <FileText className="h-5 w-5 flex-shrink-0" />
-            {editData ? "Regiebericht bearbeiten" : "Neuen Regiebericht erfassen"}
+            {editData ? "Arbeitsbestätigung bearbeiten" : "Neuer Auftrag & Arbeitsbestätigung"}
           </DialogTitle>
           <DialogDescription className="text-xs sm:text-sm">
             Erfassen Sie einen Service-Einsatz beim Kunden. Die Arbeitszeit wird automatisch für alle beteiligten Mitarbeiter gebucht.
@@ -759,7 +759,7 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
             mode="disturbance"
             context={voiceContext}
             onResult={handleVoiceResult}
-            label="Regiebericht per Sprache diktieren"
+            label="Auftrag per Sprache diktieren"
           />
           {transcription && (
             <div className="rounded-md border bg-muted/50 p-2 text-xs italic text-muted-foreground">
@@ -1022,7 +1022,7 @@ export const DisturbanceForm = ({ open, onOpenChange, onSuccess, editData }: Dis
             const form = document.querySelector('form');
             if (form) form.requestSubmit();
           }} disabled={saving}>
-            {saving ? "Speichern..." : editData ? "Aktualisieren" : "Regiebericht erfassen"}
+            {saving ? "Speichern..." : editData ? "Aktualisieren" : "Auftrag erfassen"}
           </Button>
         </div>
       </DialogContent>

@@ -186,7 +186,7 @@ const Disturbances = () => {
   return (
     <div className="kb-page min-h-screen">
       {/* Header */}
-      <PageHeader title="Regieberichte" backPath="/" />
+      <PageHeader title="Aufträge & Arbeitsbestätigungen" backPath="/" />
 
       <main className="container mx-auto px-3 sm:px-4 lg:px-6 py-6 max-w-4xl">
         {/* Header with action button */}
@@ -194,7 +194,7 @@ const Disturbances = () => {
           <div className="min-w-0">
             <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
               <Zap className="h-5 w-5 sm:h-6 sm:w-6 text-primary flex-shrink-0" />
-              Regieberichte
+              Aufträge & Arbeitsbestätigungen
             </h1>
             <p className="text-sm sm:text-base text-muted-foreground">
               Service-Einsätze dokumentieren
@@ -203,7 +203,7 @@ const Disturbances = () => {
           {/* Am Handy volle Breite, damit der Haupt-Button gut treffbar ist */}
           <Button onClick={() => { setEditingDisturbance(null); setShowForm(true); }} className="gap-2 w-full sm:w-auto flex-shrink-0">
             <Plus className="h-4 w-4" />
-            {entwurfOffen ? "Entwurf fortsetzen" : "Neuer Regiebericht"}
+            {entwurfOffen ? "Entwurf fortsetzen" : "Neuer Auftrag"}
           </Button>
         </div>
 
@@ -216,7 +216,7 @@ const Disturbances = () => {
           >
             <FileClock className="h-5 w-5 shrink-0 text-amber-600 mt-0.5" />
             <span className="min-w-0 flex-1">
-              <span className="block font-semibold">Angefangener Regiebericht (Entwurf)</span>
+              <span className="block font-semibold">Angefangener Auftrag (Entwurf)</span>
               <span className="block text-sm text-muted-foreground break-words">
                 {[entwurf.formData.kundeName, entwurf.formData.beschreibung].filter(Boolean).join(" · ") || "ohne Kunde"}
                 {" · gesichert "}{format(new Date(entwurf.gespeichertAm), "dd.MM. HH:mm")}
@@ -266,12 +266,12 @@ const Disturbances = () => {
               <p className="text-sm sm:text-base text-muted-foreground mb-4">
                 {searchQuery || statusFilter !== "alle"
                   ? "Keine Einträge entsprechen Ihren Filterkriterien"
-                  : "Erstellen Sie Ihren ersten Regiebericht"}
+                  : "Erstellen Sie Ihren ersten Auftrag"}
               </p>
               {!searchQuery && statusFilter === "alle" && (
                 <Button onClick={() => setShowForm(true)} variant="outline">
                   <Plus className="h-4 w-4 mr-2" />
-                  Ersten Regiebericht erfassen
+                  Ersten Auftrag erfassen
                 </Button>
               )}
             </CardContent>

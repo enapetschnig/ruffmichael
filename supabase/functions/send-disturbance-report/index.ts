@@ -226,7 +226,8 @@ async function generatePDF(data: ReportRequest & { technicians: string[] }, phot
   // Subtitle
   doc.setFontSize(16);
   doc.setTextColor(100, 100, 100);
-  doc.text("Regiebericht", margin, yPos);
+  // Titel auf Wunsch von Michael (Rechtsanwalt): Auftrag + Bestätigung in einem Dokument
+  doc.text("Auftrag und Arbeitsbestätigung für Regieleistung", margin, yPos);
   yPos += 12;
 
   // Reset text color
@@ -461,7 +462,7 @@ async function generatePDF(data: ReportRequest & { technicians: string[] }, phot
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(100, 100, 100);
-  const confirmText = "Der Kunde bestätigt mit seiner Unterschrift die ordnungsgemäße Durchführung der oben genannten Arbeiten.";
+  const confirmText = "Mit seiner Unterschrift erteilt der Kunde den Auftrag für die oben angeführten Regieleistungen und bestätigt deren ordnungsgemäße Durchführung.";
   const confirmLines = doc.splitTextToSize(confirmText, contentWidth);
   doc.text(confirmLines, margin, yPos);
   yPos += 15;
@@ -495,11 +496,11 @@ function generateEmailHtml(data: ReportRequest & { technicians: string[] }): str
     <body>
       <div class="container">
         <div class="header">Ruff Michael GmbH</div>
-        <h2>Regiebericht</h2>
+        <h2>Auftrag und Arbeitsbestätigung für Regieleistung</h2>
         
         <p>Sehr geehrte Damen und Herren,</p>
         
-        <p>im Anhang finden Sie den Regiebericht für den Einsatz bei <strong>${disturbance.kunde_name}</strong> vom <strong>${formatDate(disturbance.datum)}</strong>.</p>
+        <p>im Anhang finden Sie Auftrag und Arbeitsbestätigung für die Regieleistung bei <strong>${disturbance.kunde_name}</strong> vom <strong>${formatDate(disturbance.datum)}</strong>.</p>
         
         <div class="info-box">
           <strong>Zusammenfassung:</strong><br>
@@ -508,7 +509,7 @@ function generateEmailHtml(data: ReportRequest & { technicians: string[] }): str
           Gesamtstunden: ${disturbance.stunden.toFixed(2)} h
         </div>
         
-        <p>Der vollständige Bericht mit allen Details und der Kundenunterschrift befindet sich im angehängten PDF-Dokument.</p>
+        <p>Das vollständige Dokument mit allen Details und der Kundenunterschrift befindet sich im angehängten PDF.</p>
         
         <p>Mit freundlichen Grüßen,<br>
         Ruff Michael GmbH – Wärme, Kälte, Regelung</p>
@@ -581,10 +582,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const dateForFilename = formatDateShort(disturbance.datum).replace(/\./g, "-");
     const kundeForFilename = disturbance.kunde_name.replace(/[^a-zA-Z0-9äöüÄÖÜß]/g, "_");
-    const pdfFilename = `Regiebericht_${kundeForFilename}_${dateForFilename}.pdf`;
-    const subject = `Regiebericht - ${disturbance.kunde_name} - ${formatDateShort(disturbance.datum)}`;
+    const pdfFilename = `Auftrag_Arbeitsbestaetigung_${kundeForFilename}_${dateForFilename}.pdf`;
+    const subject = `Auftrag und Arbeitsbestätigung für Regieleistung - ${disturbance.kunde_name} - ${formatDateShort(disturbance.datum)}`;
 
-    console.log("Sende Regiebericht über Outlook an:", an, "Kopie:", cc);
+    console.log("Sende Arbeitsbestätigung über Outlook an:", an, "Kopie:", cc);
     await perOutlookSenden({ an, cc, betreff: subject, html: emailHtml, dateiname: pdfFilename, pdfBase64 });
     const emailResponse = { an, cc, von: absender };
 

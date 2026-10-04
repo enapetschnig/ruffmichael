@@ -1414,7 +1414,7 @@ export default function Admin() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="disturbance-email">Regiebericht E-Mail-Empfänger</Label>
+              <Label htmlFor="disturbance-email">Arbeitsbestätigung (Regie): E-Mail-Kopie an</Label>
               <div className="flex flex-col sm:flex-row gap-2">
                 <Input
                   id="disturbance-email"
@@ -1435,7 +1435,7 @@ export default function Admin() {
                 </Button>
               </div>
               <p className="text-sm text-muted-foreground">
-                Diese E-Mail-Adresse erhält alle Regieberichte als Kopie.
+                Diese E-Mail-Adresse erhält alle unterschriebenen Arbeitsbestätigungen als Kopie (office@ bekommt sie immer).
               </p>
             </div>
           </CardContent>

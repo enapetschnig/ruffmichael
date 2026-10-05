@@ -352,9 +352,7 @@ async function generatePDF(data: ReportRequest & { technicians: string[] }, phot
     doc.setFont("helvetica", "normal"); doc.setFontSize(7);
     doc.text(`${von}-${bis}`, xH + cHelf / 2, z1 + 7.8, { align: "center" });
   }
-  if (disturbance.unterschrift_kunde) {
-    try { doc.addImage(disturbance.unterschrift_kunde, "PNG", xU + 4, z1 + 0.6, 30, zeileH - 1.2); } catch (e) { console.error("Unterschrift:", e); }
-  }
+  // Unterschrift nur einmal — unten bei Datum/Unterschrift (Wunsch Michael, 05.10.2026)
   // Gesamt
   doc.setFont("helvetica", "bold"); doc.setFontSize(9.5);
   doc.text(stundenText(h), xM + cMont / 2, gesamtY + 5.5, { align: "center" });

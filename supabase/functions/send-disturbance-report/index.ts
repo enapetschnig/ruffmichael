@@ -114,6 +114,7 @@ interface Disturbance {
   beschreibung: string;
   notizen: string | null;
   unterschrift_kunde: string | null;
+  unterschrift_am?: string | null;
 }
 
 interface ReportRequest {
@@ -167,313 +168,296 @@ async function fetchImageAsBase64(url: string): Promise<string | null> {
   }
 }
 
+// ── PDF im Aufbau von Michaels Papierformular ─────────────────────────────
+// „AUFTRAG UND ARBEITSBESTÄTIGUNG für REGIELEISTUNG“: Kopf (Logo, Telefon, Adresse),
+// Monteur/Helfer, Kundendaten, Beschreibung, Stundentabelle mit Unterschrift +
+// ACHTUNG-Hinweis, Material-Linien, unten Datum/Unterschrift. Leere Zeilen bleiben
+// stehen, damit das Blatt auch ausgedruckt und von Hand ergänzt werden kann.
+
+const ACHTUNG_TEXT =
+  "Die werten Kunden werden ersucht, Stundennachweis und Materialaufstellung genau zu kontrollieren, " +
+  "da spätere Reklamationen nicht berücksichtigt werden können. Auf beigestellte Artikel geben wir keine " +
+  "Garantie und keine Gewährleistung. Auf beigestellte Artikel werden 15% vom Listenpreis als " +
+  "Anschlusskosten verrechnet.";
+
+/** „+43 699 14330708“ → „0699/ 143 307 08“ (wie auf dem Formular). */
+function telefonAnzeige(roh: string): string[] {
+  const ziffern = roh.replace(/[^\d+]/g, "").replace(/^\+43/, "0").replace(/^0043/, "0");
+  const m = ziffern.match(/^(0\d{3})(\d+)$/);
+  if (!m) return [roh];
+  const rest = m[2].replace(/(\d{3})(?=\d{2,})/g, "$1 ").trim();
+  return [`${m[1]}/`, rest];
+}
+
+/** Kundenname in Vor-/Nachname teilen — Firmen bleiben ganz im Nachnamen. */
+function nameTeilen(name: string): { vorname: string; nachname: string } {
+  const t = name.trim().replace(/\s+/g, " ");
+  if (/\b(gmbh|og|kg|ag|e\.u\.|gesmbh|gesellschaft|firma|verein|gemeinde)\b/i.test(t) || !t.includes(" ")) return { vorname: "", nachname: t };
+  const teile = t.split(" ");
+  return { vorname: teile.slice(0, -1).join(" "), nachname: teile[teile.length - 1] };
+}
+
+const stundenText = (h: number) => `${h.toFixed(2).replace(".", ",")} h`;
+const datumKurz = (iso: string) => { const [j, m, t] = String(iso).slice(0, 10).split("-"); return `${t}.${m}.${j}`; };
+
 async function generatePDF(data: ReportRequest & { technicians: string[] }, photoImages: (string | null)[]): Promise<string> {
   const { disturbance, materials, technicians, photos } = data;
-  
-  // Create PDF document
-  const doc = new jsPDF({
-    orientation: "portrait",
-    unit: "mm",
-    format: "a4",
-  });
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const L = 12, R = 198, B = R - L;          // Ränder links/rechts, Breite
+  const schwarz = () => doc.setTextColor(0, 0, 0);
 
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 20;
-  const contentWidth = pageWidth - 2 * margin;
-  let yPos = margin;
+  // Firmendaten aus der App (Admin → Angebote & Rechnungen), mit Rückfall auf das Formular
+  const { data: firma } = await supabaseAdmin.from("faktura_firmendaten").select("strasse, plz_ort, telefon, email, web").eq("einzig", true).maybeSingle();
+  const adresse = [firma?.strasse || "Maria Theresienstr. 21-23", firma?.plz_ort || "2601 Eggendorf/SMT", firma?.email || "office@ruffinstallateur.at", firma?.web || "www.ruffinstallateur.at"];
+  const telefon = telefonAnzeige(firma?.telefon || "0699 14330708");
 
-  // Fetch and add company logo (public branding bucket of this project)
+  /** Text, der in eine Breite passen muss — sonst gekürzt. */
+  const passend = (t: string, breite: number) => {
+    let x = t;
+    while (x.length > 1 && doc.getTextWidth(x) > breite) x = x.slice(0, -1);
+    return x.length < t.length ? x.slice(0, -1) + "…" : x;
+  };
+  /** „Label: Wert“ mit Schreiblinie bis `bis` (wie die Linien auf dem Formular). */
+  const feld = (label: string, wert: string, x: number, y: number, bis: number) => {
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); schwarz();
+    doc.text(label, x, y);
+    const start = x + doc.getTextWidth(label) + 2;
+    doc.setLineWidth(0.2); doc.setDrawColor(60, 60, 60);
+    doc.line(start, y + 0.8, bis, y + 0.8);
+    if (wert) { doc.setFont("helvetica", "bold"); doc.text(passend(wert, bis - start - 1), start + 1, y - 0.3); }
+  };
+
+  // ── Kopf ──
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  let logoLoaded = false;
   try {
-    const logoResponse = await fetch(`${supabaseUrl}/storage/v1/object/public/branding/ruff-logo.png`);
-    if (logoResponse.ok) {
-      const logoBuffer = await logoResponse.arrayBuffer();
-      const logoUint8 = new Uint8Array(logoBuffer);
-      let logoBinary = "";
-      for (let i = 0; i < logoUint8.length; i++) {
-        logoBinary += String.fromCharCode(logoUint8[i]);
-      }
-      const logoBase64 = `data:image/png;base64,${btoa(logoBinary)}`;
-      doc.addImage(logoBase64, "PNG", margin, yPos, 30, 19);
-      logoLoaded = true;
+    const logo = await fetch(`${supabaseUrl}/storage/v1/object/public/branding/ruff-logo.png`);
+    if (logo.ok) {
+      const u = new Uint8Array(await logo.arrayBuffer());
+      let bin = ""; for (let i = 0; i < u.length; i++) bin += String.fromCharCode(u[i]);
+      doc.addImage(`data:image/png;base64,${btoa(bin)}`, "PNG", L, 9, 50, 32);
     }
-  } catch (e) {
-    console.error("Could not load logo:", e);
-  }
+  } catch (e) { console.error("Logo:", e); }
+  doc.setFont("helvetica", "bold"); doc.setFontSize(21); schwarz();
+  telefon.forEach((z, i) => doc.text(z, 107, 22 + i * 9, { align: "center" }));
+  doc.setFont("helvetica", "normal"); doc.setFontSize(11);
+  adresse.forEach((z, i) => doc.text(z, R, 16 + i * 6, { align: "right" }));
 
-  // Company name next to logo (or standalone)
-  if (logoLoaded) {
-    doc.setFontSize(20);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(240, 112, 2);
-    doc.text("Ruff Michael GmbH", margin + 35, yPos + 12);
-    yPos += 24;
-  } else {
-    doc.setFontSize(24);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(240, 112, 2);
-    doc.text("Ruff Michael GmbH", margin, yPos);
-    yPos += 8;
-  }
+  // ── Titel ──
+  let y = 50;
+  doc.setFont("helvetica", "bold"); doc.setFontSize(13.5);
+  const t1 = "AUFTRAG UND ARBEITSBESTÄTIGUNG", t2 = "für", t3 = "REGIELEISTUNG";
+  const w1 = doc.getTextWidth(t1), w3 = doc.getTextWidth(t3);
+  doc.setFontSize(12); const w2 = doc.getTextWidth(t2); doc.setFontSize(13.5);
+  const luecke = 2.2; // Abstand zwischen den drei Teilen (Leerzeichen am Ende misst jsPDF nicht verlässlich)
+  let tx = (210 - (w1 + w2 + w3 + 2 * luecke)) / 2;
+  doc.text(t1, tx, y); tx += w1 + luecke;
+  doc.setFontSize(12); doc.text(t2, tx, y); tx += w2 + luecke;
+  doc.setFontSize(13.5); doc.text(t3, tx, y);
 
-  // Divider line
-  doc.setDrawColor(240, 112, 2);
-  doc.setLineWidth(0.5);
-  doc.line(margin, yPos, margin + contentWidth, yPos);
-  yPos += 5;
+  // ── Monteur / Helfer ──
+  const monteur = technicians[0] && technicians[0] !== "Techniker" ? technicians[0] : "";
+  const helfer = technicians.slice(1);
+  doc.setLineWidth(0.6); doc.setDrawColor(0, 0, 0);
+  doc.rect(L, 53, B, 9);
+  feld("Monteur:", monteur, L + 3, 59.5, 104);
+  feld("Helfer:", helfer.join(", "), 108, 59.5, R - 3);
 
-  // Subtitle
-  doc.setFontSize(16);
-  doc.setTextColor(100, 100, 100);
-  // Titel auf Wunsch von Michael (Rechtsanwalt): Auftrag + Bestätigung in einem Dokument
-  doc.text("Auftrag und Arbeitsbestätigung für Regieleistung", margin, yPos);
-  yPos += 12;
+  // ── Kunde ──
+  doc.setLineWidth(0.6); doc.setDrawColor(0, 0, 0);
+  doc.rect(L, 62, B, 26);
+  const n = nameTeilen(disturbance.kunde_name || "");
+  feld("Vorname:", n.vorname, L + 3, 68.5, 104);
+  feld("Nachname:", n.nachname, 108, 68.5, R - 3);
+  feld("Anschrift:", disturbance.kunde_adresse || "", L + 3, 76, R - 3);
+  feld("Telefon:", disturbance.kunde_telefon || "", L + 3, 84, 104);
+  feld("E-Mail:", disturbance.kunde_email || "", 108, 84, R - 3);
 
-  // Reset text color
-  doc.setTextColor(0, 0, 0);
-
-  // Customer Information Section
-  doc.setFontSize(12);
+  // ── Beschreibung der Kundenbestellung ──
+  y = 96;
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); schwarz();
+  const bLabel = "Beschreibung der Kundenbestellung:";
+  doc.text(bLabel, L, y);
+  const bStart = L + doc.getTextWidth(bLabel) + 2;
+  const beschreibung = [disturbance.beschreibung, disturbance.notizen ? `Notiz: ${disturbance.notizen}` : ""].filter(Boolean).join("\n");
   doc.setFont("helvetica", "bold");
-  doc.text("Kundendaten", margin, yPos);
-  yPos += 7;
+  // erste Zeile neben dem Label, weitere über die volle Breite
+  const ersteBreite = R - bStart - 1;
+  const woerter = beschreibung.replace(/\n/g, " \n ").split(" ");
+  let erste = "", i = 0;
+  for (; i < woerter.length; i++) {
+    if (woerter[i] === "\n") { i++; break; }
+    const probe = erste ? `${erste} ${woerter[i]}` : woerter[i];
+    if (doc.getTextWidth(probe) > ersteBreite) break;
+    erste = probe;
+  }
+  const restText = woerter.slice(i).join(" ").replace(/ \n /g, "\n").trim();
+  const weitere = restText ? doc.splitTextToSize(restText, B - 2) as string[] : [];
+  const maxZeilen = 6;
+  const zuLang = weitere.length > maxZeilen;
+  if (zuLang) weitere[maxZeilen - 1] = passend(weitere[maxZeilen - 1] + " …", B - 30) + "  (vollständig auf Seite 2)";
+  const bZeilen = Math.max(1, Math.min(weitere.length, maxZeilen));   // mindestens eine Leerzeile wie am Formular
+  doc.setLineWidth(0.2); doc.setDrawColor(60, 60, 60);
+  doc.line(bStart, y + 0.8, R, y + 0.8);
+  if (erste) doc.text(erste, bStart + 1, y - 0.3);
+  for (let z = 0; z < bZeilen; z++) {
+    const zy = y + 7 * (z + 1);
+    doc.line(L, zy + 0.8, R, zy + 0.8);
+    if (weitere[z]) doc.text(weitere[z], L + 1, zy - 0.3);
+  }
+  y += 7 * bZeilen + 7;
 
+  // ── Stundentabelle ──
+  const cDatum = 22, cMont = 23, cHelf = 23, cUnt = 60;
+  const xD = L, xM = xD + cDatum, xH = xM + cMont, xU = xH + cHelf, xEnde = xU + cUnt;
+  const kopf1 = 6, kopf2 = 5.5, zeileH = 9, zeilen = 8, gesamtH = 8;
+  const top = y;
+  doc.setLineWidth(0.6); doc.setDrawColor(0, 0, 0);
+  const hoehe = kopf1 + kopf2 + zeileH * zeilen + gesamtH;
+  doc.rect(xD, top, xEnde - xD, hoehe);
+  // senkrechte Linien
+  doc.line(xM, top, xM, top + hoehe);
+  doc.line(xU, top, xU, top + hoehe);
+  doc.setLineWidth(0.3); doc.line(xH, top + kopf1, xH, top + hoehe);
+  // waagrechte Linien
+  doc.setLineWidth(0.3); doc.line(xM, top + kopf1, xU, top + kopf1);
+  doc.setLineWidth(0.6); doc.line(xD, top + kopf1 + kopf2, xEnde, top + kopf1 + kopf2);
+  doc.setLineWidth(0.2);
+  for (let z = 1; z < zeilen; z++) doc.line(xD, top + kopf1 + kopf2 + z * zeileH, xEnde, top + kopf1 + kopf2 + z * zeileH);
+  const gesamtY = top + kopf1 + kopf2 + zeilen * zeileH;
+  doc.setLineWidth(0.6); doc.line(xD, gesamtY, xEnde, gesamtY);
+  // Köpfe
+  doc.setFont("helvetica", "bold"); doc.setFontSize(9.5); schwarz();
+  doc.text("Datum", xD + cDatum / 2, top + 7, { align: "center" });
+  doc.text("Arbeitszeit inkl. Wegzeit", xM + (cMont + cHelf) / 2, top + 4.3, { align: "center" });
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  
-  doc.text(`Name: ${disturbance.kunde_name}`, margin, yPos);
-  yPos += 5;
-
-  if (disturbance.kunde_adresse) {
-    doc.text(`Adresse: ${disturbance.kunde_adresse}`, margin, yPos);
-    yPos += 5;
-  }
-
-  if (disturbance.kunde_telefon) {
-    doc.text(`Telefon: ${disturbance.kunde_telefon}`, margin, yPos);
-    yPos += 5;
-  }
-
-  if (disturbance.kunde_email) {
-    doc.text(`E-Mail: ${disturbance.kunde_email}`, margin, yPos);
-    yPos += 5;
-  }
-
-  yPos += 10;
-
-  // Work Information Section
-  doc.setFontSize(12);
+  doc.text("Monteur", xM + cMont / 2, top + kopf1 + 4, { align: "center" });
+  doc.text("Helfer", xH + cHelf / 2, top + kopf1 + 4, { align: "center" });
   doc.setFont("helvetica", "bold");
-  doc.text("Einsatzdaten", margin, yPos);
-  yPos += 7;
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-
-  doc.text(`Datum: ${formatDate(disturbance.datum)}`, margin, yPos);
-  yPos += 5;
-
-  const startTime = disturbance.start_time.slice(0, 5);
-  const endTime = disturbance.end_time.slice(0, 5);
-  doc.text(`Arbeitszeit: ${startTime} - ${endTime} Uhr`, margin, yPos);
-  yPos += 5;
-
-  if (disturbance.pause_minutes > 0) {
-    doc.text(`Pause: ${disturbance.pause_minutes} Minuten`, margin, yPos);
-    yPos += 5;
-  }
-
+  doc.text("Unterschrift des Kunden", xU + cUnt / 2, top + 7, { align: "center" });
+  doc.text("Gesamt", xD + 2, gesamtY + 5.5);
+  // Eintrag des Einsatzes (erste Zeile)
+  const h = Number(disturbance.stunden) || 0;
+  const z1 = top + kopf1 + kopf2;
+  doc.setFont("helvetica", "normal"); doc.setFontSize(9.5);
+  doc.text(datumKurz(disturbance.datum), xD + cDatum / 2, z1 + 5.8, { align: "center" });
   doc.setFont("helvetica", "bold");
-  doc.text(`Gesamtstunden: ${disturbance.stunden.toFixed(2)} Stunden`, margin, yPos);
-  doc.setFont("helvetica", "normal");
-  yPos += 5;
-
-  // Display technicians
-  if (technicians.length === 1) {
-    doc.text(`Techniker: ${technicians[0]}`, margin, yPos);
-    yPos += 5;
-  } else if (technicians.length > 1) {
-    doc.text("Techniker:", margin, yPos);
-    yPos += 5;
-    technicians.forEach((name) => {
-      doc.text(`  - ${name}`, margin, yPos);
-      yPos += 5;
-    });
+  doc.text(stundenText(h), xM + cMont / 2, z1 + 4.6, { align: "center" });
+  doc.setFont("helvetica", "normal"); doc.setFontSize(7);
+  const von = disturbance.start_time.slice(0, 5), bis = disturbance.end_time.slice(0, 5);
+  // nur einfache Zeichen — „−“ oder „′“ kennt die Standardschrift nicht, die Zeile zerfiele
+  doc.text(`${von}-${bis}${disturbance.pause_minutes > 0 ? ` (P ${disturbance.pause_minutes}')` : ""}`, xM + cMont / 2, z1 + 7.8, { align: "center" });
+  if (helfer.length) {
+    doc.setFont("helvetica", "bold"); doc.setFontSize(9.5);
+    doc.text(helfer.length > 1 ? `${helfer.length} × ${stundenText(h)}` : stundenText(h), xH + cHelf / 2, z1 + 4.6, { align: "center" });
+    doc.setFont("helvetica", "normal"); doc.setFontSize(7);
+    doc.text(`${von}-${bis}`, xH + cHelf / 2, z1 + 7.8, { align: "center" });
   }
-  yPos += 7;
-
-  // Work Description Section
-  doc.setFontSize(12);
-  doc.setFont("helvetica", "bold");
-  doc.text("Durchgeführte Arbeiten", margin, yPos);
-  yPos += 7;
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-
-  // Split long text into lines
-  const beschreibungLines = doc.splitTextToSize(disturbance.beschreibung, contentWidth);
-  doc.text(beschreibungLines, margin, yPos);
-  yPos += beschreibungLines.length * 5 + 5;
-
-  // Notes Section (if present)
-  if (disturbance.notizen) {
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.text("Notizen", margin, yPos);
-    yPos += 7;
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    const notizenLines = doc.splitTextToSize(disturbance.notizen, contentWidth);
-    doc.text(notizenLines, margin, yPos);
-    yPos += notizenLines.length * 5 + 5;
-  }
-
-  yPos += 5;
-
-  // Materials Section (if present)
-  if (materials && materials.length > 0) {
-    // Check if we need a new page
-    if (yPos > 220) {
-      doc.addPage();
-      yPos = margin;
-    }
-
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.text("Verwendetes Material", margin, yPos);
-    yPos += 7;
-
-    // Table header
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "bold");
-    doc.setFillColor(240, 240, 240);
-    doc.rect(margin, yPos - 4, contentWidth, 7, "F");
-    doc.text("Material", margin + 2, yPos);
-    doc.text("Menge", margin + 90, yPos);
-    doc.text("Notizen", margin + 120, yPos);
-    yPos += 6;
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-
-    materials.forEach((mat) => {
-      if (yPos > 270) {
-        doc.addPage();
-        yPos = margin;
-      }
-      
-      // Draw row border
-      doc.setDrawColor(200, 200, 200);
-      doc.line(margin, yPos + 2, margin + contentWidth, yPos + 2);
-      
-      doc.text(mat.material || "-", margin + 2, yPos);
-      doc.text(mat.menge || "-", margin + 90, yPos);
-      doc.text(mat.notizen || "-", margin + 120, yPos);
-      yPos += 7;
-    });
-
-    yPos += 8;
-  }
-
-  // Photos Section (if present)
-  if (photos && photos.length > 0 && photoImages.some(img => img !== null)) {
-    // Start new page for photos
-    doc.addPage();
-    yPos = margin;
-
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(0, 0, 0);
-    doc.text("Fotos", margin, yPos);
-    yPos += 10;
-
-    for (let i = 0; i < photos.length; i++) {
-      const imageData = photoImages[i];
-      if (!imageData) continue;
-
-      // Check if we need a new page
-      if (yPos > 200) {
-        doc.addPage();
-        yPos = margin;
-      }
-
-      try {
-        // Add image with max width 80mm, proportional height ~60mm
-        doc.addImage(imageData, "JPEG", margin, yPos, 80, 60);
-        yPos += 65;
-
-        // Add filename below image
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(8);
-        doc.setTextColor(100, 100, 100);
-        doc.text(photos[i].file_name, margin, yPos);
-        yPos += 8;
-        doc.setTextColor(0, 0, 0);
-      } catch (e) {
-        console.error("Error adding image to PDF:", e);
-      }
-    }
-  }
-
-  // Signature Section
-  // Check if we need a new page for signature
-  if (yPos > 200) {
-    doc.addPage();
-    yPos = margin;
-  }
-
-  doc.setFontSize(12);
-  doc.setFont("helvetica", "bold");
-  doc.text("Kundenunterschrift", margin, yPos);
-  yPos += 5;
-
-  // Add signature image if present
   if (disturbance.unterschrift_kunde) {
-    try {
-      // The signature is a base64 data URL
-      const signatureData = disturbance.unterschrift_kunde;
-      
-      // Add the signature image
-      doc.addImage(signatureData, "PNG", margin, yPos, 60, 25);
-      yPos += 30;
-    } catch (e) {
-      console.error("Error adding signature:", e);
-      doc.setFont("helvetica", "italic");
-      doc.setFontSize(10);
-      doc.text("[Unterschrift konnte nicht geladen werden]", margin, yPos + 10);
-      yPos += 20;
+    try { doc.addImage(disturbance.unterschrift_kunde, "PNG", xU + 4, z1 + 0.6, 30, zeileH - 1.2); } catch (e) { console.error("Unterschrift:", e); }
+  }
+  // Gesamt
+  doc.setFont("helvetica", "bold"); doc.setFontSize(9.5);
+  doc.text(stundenText(h), xM + cMont / 2, gesamtY + 5.5, { align: "center" });
+  if (helfer.length) doc.text(stundenText(h * helfer.length), xH + cHelf / 2, gesamtY + 5.5, { align: "center" });
+
+  // ACHTUNG-Hinweis rechts neben der Tabelle
+  const ax = xEnde + 3, aw = R - ax;
+  doc.setFont("helvetica", "bold"); doc.setFontSize(15); schwarz();
+  doc.text("ACHTUNG!", ax, top + 32);
+  doc.setFontSize(7.6);
+  doc.text(doc.splitTextToSize(ACHTUNG_TEXT, aw) as string[], ax, top + 38, { lineHeightFactor: 1.35 });
+
+  // ── Verwendetes Material ──
+  y = top + hoehe + 9;
+  const fussY = 284;
+  const matZeilen = (materials ?? []).map((m) => [m.material, m.menge ? `– ${m.menge}` : "", m.notizen ? `(${m.notizen})` : ""].filter(Boolean).join(" "));
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); schwarz();
+  const mLabel = "Verwendetes Material:";
+  doc.text(mLabel, L, y);
+  const mStart = L + doc.getTextWidth(mLabel) + 2;
+  doc.setLineWidth(0.2); doc.setDrawColor(60, 60, 60);
+  doc.line(mStart, y + 0.8, R, y + 0.8);
+  doc.setFont("helvetica", "bold");
+  let mi = 0;
+  if (matZeilen[0]) { doc.text(passend(matZeilen[0], R - mStart - 1), mStart + 1, y - 0.3); mi = 1; }
+  let my = y + 7;
+  const zeileMaterial = (text?: string) => {
+    doc.setLineWidth(0.2); doc.setDrawColor(60, 60, 60);
+    doc.line(L, my + 0.8, R, my + 0.8);
+    if (text) { doc.setFont("helvetica", "bold"); doc.setFontSize(10.5); schwarz(); doc.text(passend(text, B - 2), L + 1, my - 0.3); }
+    my += 7;
+  };
+  // Linien bis zum Fuß; mehr Material → Folgeseite
+  while (my < fussY - 14) zeileMaterial(matZeilen[mi++]);
+  if (mi < matZeilen.length) {
+    // Rest auf eine Folgeseite, der Fuß kommt danach dort hin
+    doc.setFontSize(8); doc.setFont("helvetica", "italic"); doc.setTextColor(90, 90, 90);
+    doc.text("Fortsetzung Material auf der nächsten Seite", L, my - 2);
+    doc.addPage();
+    my = 20;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); schwarz();
+    doc.text("Verwendetes Material (Fortsetzung):", L, my - 6);
+    while (mi < matZeilen.length) {
+      if (my > fussY - 14) { doc.addPage(); my = 20; }
+      zeileMaterial(matZeilen[mi++]);
     }
-  } else {
-    // Noch nicht unterschrieben: leere Linie zum Unterschreiben auf Papier
-    doc.setDrawColor(120, 120, 120);
-    doc.line(margin, yPos + 20, margin + 80, yPos + 20);
-    doc.setFont("helvetica", "italic");
-    doc.setFontSize(9);
-    doc.setTextColor(120, 120, 120);
-    doc.text("Datum, Unterschrift Kunde", margin, yPos + 25);
-    doc.setTextColor(0, 0, 0);
-    yPos += 32;
+  }
+  doc.setLineWidth(0.6); doc.setDrawColor(0, 0, 0);
+  doc.line(L, fussY - 9, R, fussY - 9);
+
+  // ── Fuß: Datum / Unterschrift ──
+  doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(90, 90, 90);
+  doc.text("Mit der Unterschrift wird der Auftrag für die angeführten Regieleistungen erteilt und deren ordnungsgemäße Durchführung bestätigt.", L, fussY - 5);
+  schwarz(); doc.setFontSize(10);
+  doc.text("Datum", L, fussY + 6);
+  doc.setLineWidth(0.2); doc.setDrawColor(60, 60, 60);
+  doc.line(L + 12, fussY + 6.8, 80, fussY + 6.8);
+  const unterschriftAm = (disturbance as { unterschrift_am?: string | null }).unterschrift_am;
+  if (disturbance.unterschrift_kunde) {
+    doc.setFont("helvetica", "bold");
+    doc.text(datumKurz(unterschriftAm || disturbance.datum), L + 14, fussY + 5.7);
+    doc.setFont("helvetica", "normal");
+  }
+  doc.text("Unterschrift", 112, fussY + 6);
+  doc.line(133, fussY + 6.8, R, fussY + 6.8);
+  if (disturbance.unterschrift_kunde) {
+    try { doc.addImage(disturbance.unterschrift_kunde, "PNG", 140, fussY - 4, 32, 10.5); } catch (e) { console.error("Unterschrift Fuß:", e); }
   }
 
-  // Confirmation text
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(100, 100, 100);
-  const confirmText = "Mit seiner Unterschrift erteilt der Kunde den Auftrag für die oben angeführten Regieleistungen und bestätigt deren ordnungsgemäße Durchführung.";
-  const confirmLines = doc.splitTextToSize(confirmText, contentWidth);
-  doc.text(confirmLines, margin, yPos);
-  yPos += 15;
+  // ── Zu lange Beschreibung: vollständiger Text auf eigener Seite ──
+  if (zuLang) {
+    doc.addPage();
+    doc.setFont("helvetica", "bold"); doc.setFontSize(12); schwarz();
+    doc.text("Beschreibung der Kundenbestellung (vollständig)", L, 18);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10.5);
+    let by = 27;
+    for (const zeile of doc.splitTextToSize(beschreibung, B) as string[]) {
+      if (by > 285) { doc.addPage(); by = 18; }
+      doc.text(zeile, L, by); by += 5.5;
+    }
+  }
 
-  // Footer
-  doc.setFontSize(8);
-  doc.setTextColor(150, 150, 150);
-  const footerY = doc.internal.pageSize.getHeight() - 15;
-  doc.text(`Erstellt am: ${new Date().toLocaleDateString("de-AT")} | Ruff Michael GmbH`, margin, footerY);
+  // ── Fotos (eigene Seiten) ──
+  if (photos && photos.length > 0 && photoImages.some((img) => img !== null)) {
+    doc.addPage();
+    let py = 18;
+    doc.setFont("helvetica", "bold"); doc.setFontSize(12); schwarz();
+    doc.text(`Fotos – ${disturbance.kunde_name} – ${datumKurz(disturbance.datum)}`, L, py);
+    py += 8;
+    for (let k = 0; k < photos.length; k++) {
+      const bild = photoImages[k];
+      if (!bild) continue;
+      if (py > 215) { doc.addPage(); py = 18; }
+      try {
+        doc.addImage(bild, "JPEG", L, py, 90, 67);
+        doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(100, 100, 100);
+        doc.text(photos[k].file_name, L, py + 71);
+        schwarz();
+        py += 77;
+      } catch (e) { console.error("Foto:", e); }
+    }
+  }
 
-  // Return as base64
   return doc.output("datauristring").split(",")[1];
 }
 

@@ -172,11 +172,46 @@ const ProjectDetail = () => {
   };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0 || !projectId || !type) return;
+    const liste = e.target.files ? Array.from(e.target.files) : [];
+    e.target.value = ""; // dieselben Dateien dürfen gleich nochmal gewählt werden
+    await dateienHochladen(liste);
+  };
+
+  // Hineinziehen (am Mac aus Fotos/Finder): gleicher Weg wie „Datei auswählen“
+  const [ziehen, setZiehen] = useState(false);
+  const [fortschritt, setFortschritt] = useState<{ fertig: number; gesamt: number } | null>(null);
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setZiehen(false);
+    if (uploading) return;
+    let liste = Array.from(e.dataTransfer.files ?? []);
+    let uebersprungen = 0;
+    if (type === "photos") {
+      const bilder = liste.filter((f) => f.type.startsWith("image/") || /\.(jpe?g|png|gif|webp|heic|heif)$/i.test(f.name));
+      uebersprungen = liste.length - bilder.length;
+      liste = bilder;
+    }
+    if (!liste.length) {
+      toast({ variant: "destructive", title: "Nichts zum Hochladen", description: "Bitte Fotos aus Fotos oder Finder hierher ziehen — oder auf das Feld klicken." });
+      return;
+    }
+    await dateienHochladen(liste, uebersprungen);
+  };
+
+  // Daneben fallen gelassen: Browser soll das Foto nicht öffnen (man wäre sonst raus aus der App)
+  useEffect(() => {
+    const stopp = (e: DragEvent) => { if (e.dataTransfer?.types?.includes("Files")) e.preventDefault(); };
+    window.addEventListener("dragover", stopp);
+    window.addEventListener("drop", stopp);
+    return () => { window.removeEventListener("dragover", stopp); window.removeEventListener("drop", stopp); };
+  }, []);
+
+  const dateienHochladen = async (selectedFiles: File[], uebersprungen = 0) => {
+    if (selectedFiles.length === 0 || !projectId || !type) return;
 
     setUploading(true);
+    setFortschritt({ fertig: 0, gesamt: selectedFiles.length });
     const bucket = bucketMap[type];
-    const selectedFiles = Array.from(e.target.files);
 
     let successCount = 0;
     let queuedCount = 0;
@@ -194,6 +229,7 @@ const ProjectDetail = () => {
         `${titleMap[type]}: ${file.name}`
       );
 
+      setFortschritt({ fertig: i + 1, gesamt: selectedFiles.length });
       if (res.error) {
         if (!firstError) firstError = res.error;
       } else if (res.queued) {
@@ -215,7 +251,8 @@ const ProjectDetail = () => {
         title: successCount > 0 ? "Erfolg" : "Offline gespeichert",
         description:
           parts.join(" · ") +
-          (queuedCount > 0 ? " – wird automatisch gesendet, sobald wieder Internet da ist." : ""),
+          (queuedCount > 0 ? " – wird automatisch gesendet, sobald wieder Internet da ist." : "") +
+          (uebersprungen > 0 ? ` · ${uebersprungen} Datei(en) sind keine Fotos und wurden übersprungen.` : ""),
       });
       fetchFiles();
     }
@@ -229,7 +266,7 @@ const ProjectDetail = () => {
     }
 
     setUploading(false);
-    e.target.value = "";
+    setFortschritt(null);
   };
 
   const handleDelete = async (file: StorageFile) => {
@@ -343,14 +380,24 @@ const ProjectDetail = () => {
             {/* Upload section - Admin only */}
             {isAdmin && (
               <div className="mb-6">
-                <label htmlFor="file-upload" className="cursor-pointer">
-                  <div className="border-2 border-dashed rounded-lg p-4 sm:p-6 text-center hover:border-primary/50 transition-colors">
+                <label
+                  htmlFor="file-upload"
+                  className="cursor-pointer block"
+                  onDragOver={(e) => { e.preventDefault(); if (!ziehen) setZiehen(true); }}
+                  onDragEnter={(e) => { e.preventDefault(); setZiehen(true); }}
+                  onDragLeave={() => setZiehen(false)}
+                  onDrop={handleDrop}
+                  data-testid="upload-feld"
+                >
+                  <div className={`border-2 border-dashed rounded-lg p-4 sm:p-6 text-center transition-colors ${ziehen ? "border-primary bg-primary/10" : "hover:border-primary/50"}`}>
                     <Upload className="h-8 w-8 mx-auto mb-3 text-muted-foreground" />
                     <p className="text-base font-medium mb-1">
-                      {uploading ? "Lädt hoch..." : "Datei auswählen"}
+                      {uploading
+                        ? `Lädt hoch … ${fortschritt ? `${fortschritt.fertig} von ${fortschritt.gesamt}` : ""}`
+                        : ziehen ? "Loslassen zum Hochladen" : type === "photos" ? "Fotos auswählen oder hierher ziehen" : "Datei auswählen oder hierher ziehen"}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      Klicken zum Auswählen
+                      {type === "photos" ? "Klicken zum Auswählen – mehrere Fotos auf einmal möglich" : "Klicken zum Auswählen"}
                     </p>
                   </div>
                 </label>

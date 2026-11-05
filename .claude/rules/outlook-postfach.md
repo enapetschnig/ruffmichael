@@ -38,6 +38,7 @@ eingetragenen Kunden (`mails.kunde_id`) auch nicht. Gleiche `nummer` + gleicher 
   JWT im Cron-Job nicht zeichengleich mit dem Env-Wert war). Jetzt: Rolle aus dem Token lesen + per RLS-Probe prüfen.
   Prüfen, ob es klemmt: `net._http_response` (nur ~6 h Vorrat) oder `mail_sync_state.letzter_lauf` — der Cron selbst
   meldet immer „succeeded".
+- Vereinzelte `outlook` 500 mit „Graph 502/503“ im Log = Störung bei Microsoft, harmlos: nächster Cron-Lauf holt alles nach, nichts ändern (04.11.2026: 3 von 1.437 Läufen, Cron läuft inzwischen jede Minute).
 
 **Zeitplan:** pg_cron `outlook-mail-sync` alle **5** Minuten (auch beim Öffnen und im Hintergrund, 21.09.2026). Erster Lauf
 holt 60 Tage, danach ab letztem Lauf minus 2 Tage, in 90-Sekunden-Häppchen (`offen: true` = nochmal aufrufen). Was in

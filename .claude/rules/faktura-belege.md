@@ -64,3 +64,5 @@ direkt übernehmen (kamen ASCII-transliteriert zurück: Wärmepumpe → Waermepu
 
 **Offen (Stufe 2, Stand 02.09.):** Material holen mit Artikelstamm (menge ist Text!), Nachträge mit Positionen/Preis,
 Übernahme → Schlussrechnung-Hinweis, Mahnwesen.
+
+- Log „relation "invoices" does not exist“ = Handabfrage einer KI über die Management-API (mgmt-api, read-only, 10.11.2026) auf die alte Lovable-Tabelle, die seit 01.09.2026 gelöscht ist; App/Funktionen lesen `invoices` nicht mehr (Belege = `belege`) – harmlos, nichts ändern.

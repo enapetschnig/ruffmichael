@@ -30,3 +30,13 @@ Login per `auth/v1/admin/generate_link` + `verify`. Management-API blockt Python
   identische Schlüssel je Objekt.
 - Playwright im Session-Scratchpad installieren (`npm i playwright && npx playwright install chromium`), Preview-Server in
   eigenem Bash-Aufruf starten; Port 4173 oft belegt → 4199.
+
+## Grundtests unter tests/roboter/ (11.11.2026)
+- `npx playwright test -c tests/roboter` nach `testumgebung.mjs start` + `daten`: Anmelden, Rechte (UI + RLS + Funktionen),
+  Stunden (Pausenautomatik), Arbeitsbestätigung (PDF), Rechnung (Nummer + PDF-Inhalt). Hilfen in `grundtest-hilfe.ts`.
+- PDFs entstehen am Server: `funktionen.ts` startet `beleg-pdf` und `send-disturbance-report` als edge-runtime-Container
+  im Docker-Netz der Testumgebung (API-Port +30/+31, ohne MS_*-Secrets → nie Mail). Andere Funktionen werden abgefangen.
+- Die Datenkopie bringt `faktura_nummernkreise` nicht im Live-Stand mit (rechnung 2584 statt 2689) → der Belege-Test
+  setzt den Zähler in der Kopie auf höchste Nummer + 1 und danach zurück. Live stimmt der Zähler.
+- Offen (nicht geändert): `generate-uebernahme-pdf`, `voice-to-form`, `sprache-zu-text`, `wunsch-datei` prüfen keinen
+  Benutzer selbst (nur Gateway-JWT, das der Anon-Schlüssel erfüllt) – keine Mail, aber KI-Kosten/Speicher möglich.

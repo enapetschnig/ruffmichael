@@ -31,3 +31,6 @@ paths:
   gesichert (`lib/regieEntwurf.ts`), nur auf DEM Gerät, nur neue Berichte. Gelöscht erst nach erfolgreichem Speichern.
 - Pause in Arbeitsbestätigungen nur, wenn diktiert/eingegeben (Kundenverrechnung) – Ausnahme von der Pausenregel.
 - Abrechnung: `disturbances.abgerechnet_in` („Regieberichte holen“ in der Rechnung).
+- **Anmeldeprüfung (11.11.2026):** `send-disturbance-report` prüft jetzt selbst den Benutzer (`auth.getUser` + Zeile in
+  `user_roles`), sonst 401. Vorher reichte der öffentliche Anon-Schlüssel, um über office@ an eine frei gewählte Adresse
+  zu mailen. Deploy OHNE `--no-verify-jwt` (Gateway-Prüfung ist live an). Test: `tests/roboter/2026-11-11-grund-2-rechte.spec.ts`.

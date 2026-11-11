@@ -507,6 +507,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   try {
+    // Nur angemeldete Benutzer der App (11.11.2026). Vorher reichte der öffentliche Anon-Schlüssel aus dem App-Code,
+    // um über Michaels Outlook-Postfach eine Mail an eine frei gewählte Adresse zu schicken.
+    const { data: { user } } = await createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
+    }).auth.getUser();
+    const { data: rolle } = user
+      ? await supabaseAdmin.from("user_roles").select("role").eq("user_id", user.id).limit(1).maybeSingle()
+      : { data: null };
+    if (!user || !rolle) {
+      return new Response(
+        JSON.stringify({ error: "Nicht angemeldet." }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
     const { disturbance, materials, technicianNames, technicianName, photos, nurPdf }: ReportRequest = await req.json();
 
     // Backward compatibility + fallback

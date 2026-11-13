@@ -40,3 +40,4 @@ Der OneDrive-Zwei-Wege-Sync ist seit 2026-08-22 AKTIV und verifiziert. Erklärun
 **Fotos/Dateien:** Foto-Knopf mit Serienaufnahme und Projektwahl, Skizze auf Foto (07.09.2026). 18.10.2026 (Michael:
 „ich kann nicht foto hochladen“ – am Mac per Ziehen): Drag & Drop mit Hervorhebung, Fortschritt „3 von 5“, gleiche Datei
 nochmal wählbar, Nicht-Bilder im Fotos-Ordner übersprungen.
+- Einzelnes `544 /storage/v1/object/list/project-files` (12.11.2026) = Zeitüberschreitung des Supabase-Speichers beim `list()` in `onedrive-sync`; der Lauf endete trotzdem mit 200, der nächste holt es nach → harmlos, nichts ändern.

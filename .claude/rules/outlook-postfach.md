@@ -47,3 +47,4 @@ Outlook im Papierkorb/Junk landet, wird in der App gelöscht — in Outlook selb
 **Mailversand:** über das Firmenpostfach, Kopie in Michaels „Gesendete Elemente". Belege: Knopf „Per Mail". Resend wird
 nicht mehr gebraucht. Tabellen: `mails`, `mail_anhaenge`, `eingangsrechnungen`, `mail_sync_state`; Bucket
 `mail-anhaenge` (privat, Admin).
+- 12.11.2026 ab 17:38 UTC stundenlang `outlook` 500 (339×, fast jeder Minutenlauf): alles Graph 500/502/503/504 (meist nach ~30 s) bzw. Verbindungsfehler zu login.microsoftonline.com – Microsoft-Störung, keine große Mail, kein Code-Fehler; einzelne Läufe kamen durch, Mails trafen nur verspätet ein → nichts ändern.

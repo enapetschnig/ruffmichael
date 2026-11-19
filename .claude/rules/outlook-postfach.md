@@ -38,6 +38,7 @@ eingetragenen Kunden (`mails.kunde_id`) auch nicht. Gleiche `nummer` + gleicher 
   JWT im Cron-Job nicht zeichengleich mit dem Env-Wert war). Jetzt: Rolle aus dem Token lesen + per RLS-Probe prüfen.
   Prüfen, ob es klemmt: `net._http_response` (nur ~6 h Vorrat) oder `mail_sync_state.letzter_lauf` — der Cron selbst
   meldet immer „succeeded".
+- Einzelner API-555 auf `/rest/v1/mail_sync_state` (18.11.2026 14:59 UTC) = 10-s-Zeitlimit des Supabase-Gateways bei kurzem DB-Hänger (Probe davor 36 s), harmlos: Lauf nahm dann 60 Tage statt 2 (keine Dubletten), nur der ungenutzte Zähler `anzahl_gesamt` fing neu an; nichts ändern.
 - Vereinzelte `outlook` 500 mit „Graph 502/503“ im Log = Störung bei Microsoft, harmlos: nächster Cron-Lauf holt alles nach, nichts ändern (04.11.2026: 3 von 1.437 Läufen, Cron läuft inzwischen jede Minute).
 
 **Zeitplan:** pg_cron `outlook-mail-sync` alle **5** Minuten (auch beim Öffnen und im Hintergrund, 21.09.2026). Erster Lauf
